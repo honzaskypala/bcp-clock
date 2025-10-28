@@ -16,7 +16,7 @@ def time_to_seconds(t):
         raise ValueError(f"Invalid time value: {t}")
 
 class Config:
-    _native_keys = ("event", "yellow", "red", "refreshinterval", "countdowninterval")
+    _native_keys = ("event", "yellow", "red", "refreshinterval", "countdowninterval", "hostname")
 
     def __init__(self, filename="config.json"):
         self.load(filename)
@@ -35,7 +35,8 @@ class Config:
                 "yellow": "10:00",
                 "red": "00:00",
                 "refreshinterval": 60,
-                "countdowninterval": 1
+                "countdowninterval": 1,
+                "hostname": "bcp-timer"
             }
 
     def __getitem__(self, key):

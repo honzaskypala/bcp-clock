@@ -17,7 +17,6 @@ class Event:
         match = re.search(r"^(?:https://www\.bestcoastpairings\.com/(?:organize/)?)?(?:event/)?([^/?]+)", self.init_string)
         if match:
             self.event_id = match.group(1)
-            self.refresh()
         else:
             raise ValueError("Invalid BCP event id.")
 
@@ -39,8 +38,8 @@ class Event:
     @property
     def remaining_seconds(self):
         """ Returns remaining time in seconds for the current round. Negative value means overtime. """
-        return strptime(self.timer[self.overview['status']['currentRound']]['endTime']) - math.floor(time.time())
-    
+        return strptime(self.timer[self.overview['status']['currentRound']]['endTime']) - time.time()
+   
     @property
     def remaining_time_str(self):
         """ Returns remaining time as formatted string MM:SS or HH:MM:SS. Negative value means overtime. """

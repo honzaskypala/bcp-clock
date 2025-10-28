@@ -16,10 +16,22 @@ def main():
     timer_state = [TIMER_INACTIVE] * 4
     timer = [Timer(i) for i in range(4)]
 
+    DISPLAY_BOOTUP = const(0)
+    DISPLAY_EVENTNAME = const(1)
+    DISPLAY_ROUNDNUMBER = const(2)
+    DISPLAY_COUNTDOWN = const(3)
+    display_state = DISPLAY_BOOTUP
+
     config = Config()
     fb = FrameBuffer()
 
+    # splash screen
+    fb.clear()
+    fb.text("BCP-clock", 0, 1)
+    fb.show()
+
     # connect to WiFi here
+    # network.hostname(config["hostname"])
     # sta_if = network.WLAN(network.WLAN.IF_STA)
     # sta_if.active(True)
     # sta_if.connect('ssid', 'password')
@@ -32,6 +44,7 @@ def main():
     event = Event(config["event"])
 
     def display_round(round, total):
+        """ Display current round indicator """
         _active_color = (78, 159, 229)
         _inactive_color = (15, 15, 15)
         _line = const(7)
@@ -55,6 +68,7 @@ def main():
                 fb.pixel(start + r, _line, _active_color if r == round - 1 else _inactive_color)
 
     def countdown_callback(t):
+        """ Countdown timer callback — display remaining time """
         if event.overview["status"]["started"] and not event.overview["status"]["ended"]:
             remaining = event.remaining_seconds
             fb.clear()
@@ -71,16 +85,44 @@ def main():
             timer[1].deinit()
             timer_state[1] = TIMER_INACTIVE
 
-    timer[0].init(period=config["refreshinterval"] * 1000, mode=Timer.PERIODIC, callback=lambda t: event.refresh())
+    def refresh_callback(t):
+        """ Event data refresh callback """
+        nonlocal display_state
+        event.refresh()
+        if event.overview["status"]["ended"] or not event.overview["status"]["started"]:
+            # event either not started or already ended; display event name
+            if display_state != DISPLAY_EVENTNAME:
+                if timer_state[1] == TIMER_COUNTDOWN:
+                    timer[1].deinit()
+                    timer_state[1] = TIMER_INACTIVE
+                fb.clear()
+                fb.text(event.overview["name"], 0, 1)
+                fb.show()
+                display_state = DISPLAY_EVENTNAME
+        elif "timerLength" not in event.timer[event.overview['status']['currentRound']]:
+            # no timer for current round; display round number only
+            if display_state != DISPLAY_ROUNDNUMBER:
+                if timer_state[1] == TIMER_COUNTDOWN:
+                    timer[1].deinit()
+                    timer_state[1] = TIMER_INACTIVE
+                fb.clear()
+                fb.text(f"[{event.overview['status']['currentRound']}]", 8, 1, font="f5x8")
+                fb.show()
+                display_state = DISPLAY_ROUNDNUMBER
+        else:
+            # run countdown timer
+            print("Starting countdown timer")
+            if timer_state[1] != TIMER_COUNTDOWN:
+                if timer_state[1] != TIMER_INACTIVE:
+                    timer[1].deinit()
+                timer[1].init(period=config["countdowninterval"] * 1000, mode=Timer.PERIODIC, callback=countdown_callback)
+                timer_state[1] = TIMER_COUNTDOWN
+                display_state = DISPLAY_COUNTDOWN
+
+    # we will get the event data refreshed periodically
+    timer[0].init(period=config["refreshinterval"] * 1000, mode=Timer.PERIODIC, callback=refresh_callback)
     timer_state[0] = TIMER_REFRESHDATA
-    
-    if event.overview["status"]["started"] and not event.overview["status"]["ended"]:
-        timer[1].init(period=config["countdowninterval"] * 1000, mode=Timer.PERIODIC, callback=countdown_callback)
-        timer_state[1] = TIMER_COUNTDOWN
-    else:
-        fb.clear()
-        fb.text(event.overview["name"], 0, 1, c=(255, 255, 255))
-        fb.show()
+    refresh_callback(None)  # initial data fetch
 
     while True:
         sleep(1)
