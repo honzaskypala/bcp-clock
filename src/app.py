@@ -89,7 +89,7 @@ async def main():
     async def refresh_data():
         """ Async refresh data """
         try:
-            event.refresh()
+            await event.refresh()
         except Exception as e:
             print("Error refreshing data:", e)
             return

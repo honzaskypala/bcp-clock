@@ -8,6 +8,7 @@ import math
 from datetime import strptime
 from random import randint
 import requests
+import asyncio
 
 class Event:
     def __init__(self, event_id):
@@ -20,7 +21,7 @@ class Event:
         else:
             raise ValueError("Invalid BCP event id.")
 
-    def refresh(self):
+    async def refresh(self):
         """ Refresh event data from BCP API """
         baseurl = f"https://newprod-api.bestcoastpairings.com/v1/events/{self.event_id}"
         headers = {"client-id": "web-app"}
