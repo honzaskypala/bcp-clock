@@ -1,7 +1,8 @@
 # BCP Clock
 # (c) 2025 Honza Skýpala
 # WTFPL license applies
- 
+
+import asyncio
 from machine import Timer
 from time import sleep
 from tc001 import FrameBuffer
@@ -9,7 +10,7 @@ from bcp import Event
 from config import Config
 # import network, ntptime
 
-def main():
+async def main():
     TIMER_INACTIVE = const(0)
     TIMER_REFRESHDATA = const(1)
     TIMER_COUNTDOWN = const(2)
@@ -85,10 +86,14 @@ def main():
             timer[1].deinit()
             timer_state[1] = TIMER_INACTIVE
 
-    def refresh_callback(t):
-        """ Event data refresh callback """
+    async def refresh_data():
+        """ Async refresh data """
+        try:
+            event.refresh()
+        except Exception as e:
+            print("Error refreshing data:", e)
+            return
         nonlocal display_state
-        event.refresh()
         if event.overview["status"]["ended"] or not event.overview["status"]["started"]:
             # event either not started or already ended; display event name
             if display_state != DISPLAY_EVENTNAME:
@@ -119,10 +124,18 @@ def main():
                 timer_state[1] = TIMER_COUNTDOWN
                 display_state = DISPLAY_COUNTDOWN
 
+    def refresh_callback(t):
+        """ Event data refresh callback """
+        try:
+            loop = asyncio.get_event_loop()
+            loop.create_task(refresh_data())
+        except Exception as e:
+            print("Cannot create refresh data task:", e)
+
     # we will get the event data refreshed periodically
     timer[0].init(period=config["refreshinterval"] * 1000, mode=Timer.PERIODIC, callback=refresh_callback)
     timer_state[0] = TIMER_REFRESHDATA
     refresh_callback(None)  # initial data fetch
 
     while True:
-        sleep(1)
+        await asyncio.sleep(1)
