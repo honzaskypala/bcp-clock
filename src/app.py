@@ -3,19 +3,22 @@
 # WTFPL license applies
 
 import asyncio
-from machine import Timer
+import machine
 from time import sleep
 from tc001 import FrameBuffer
 from bcp import Event
 from config import Config
-# import network, ntptime
+import network
+import ntptime
+import wifimgr
+import socket
 
 async def main():
     TIMER_INACTIVE = const(0)
     TIMER_REFRESHDATA = const(1)
     TIMER_COUNTDOWN = const(2)
     timer_state = [TIMER_INACTIVE] * 4
-    timer = [Timer(i) for i in range(4)]
+    timer = [machine.Timer(i) for i in range(4)]
 
     DISPLAY_BOOTUP = const(0)
     DISPLAY_EVENTNAME = const(1)
@@ -31,14 +34,22 @@ async def main():
     fb.text("BCP-clock", 0, 1)
     fb.show()
 
-    # connect to WiFi here
-    # network.hostname(config["hostname"])
-    # sta_if = network.WLAN(network.WLAN.IF_STA)
-    # sta_if.active(True)
-    # sta_if.connect('ssid', 'password')
-    # while not sta_if.isconnected():
-    #     pass
-    # ntptime.settime()
+    # connect to WiFi
+    network.hostname(config["hostname"])
+    wlan = wifimgr.get_connection(fb=fb, ssid="BCP-clock", device="BCP Clock")
+    if wlan is None:
+        # TODO: display error message, wait 10 secs and reboot
+        return
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(('', 80))
+        s.listen(5)
+    except OSError as e:
+        # if the code in try block above fails, then a web server from wifimgr.get_connection()
+        # remains open, which is known bug of ESP32. Reboot the hardware to close it.
+        machine.reset()
+    ntptime.settime()
 
     # check if event is non empty, otherwise run config AP
 
@@ -46,10 +57,10 @@ async def main():
 
     def display_round(round, total):
         """ Display current round indicator """
-        _active_color = (78, 159, 229)
-        _inactive_color = (15, 15, 15)
-        _line = const(7)
-        fb.line(0, _line, 31, _line, (0, 0, 0))
+        active_color = (78, 159, 229)
+        inactive_color = (15, 15, 15)
+        line = const(7)
+        fb.line(0, line, 31, line, (0, 0, 0))
         if total < FrameBuffer.WIDTH // 2:
             linewidth = FrameBuffer.WIDTH // total
             offset = {
@@ -59,14 +70,14 @@ async def main():
                 11: 5
             }.get(total, 1)
             for r in range(total):
-                fb.line(r * linewidth + offset, _line, (r + 1) * linewidth + offset - 2, _line, _active_color if r == round - 1 else _inactive_color)
+                fb.line(r * linewidth + offset, line, (r + 1) * linewidth + offset - 2, line, active_color if r == round - 1 else inactive_color)
         else:
             t = total if total <= FrameBuffer.WIDTH else FrameBuffer.WIDTH
             start = (FrameBuffer.WIDTH - (t + (2 if t <= FrameBuffer.WIDTH - 2 else 0))) // 2
             for r in range(t):
                 if total <= FrameBuffer.WIDTH - 2 and r in (round - 1, round):
                     start += 1
-                fb.pixel(start + r, _line, _active_color if r == round - 1 else _inactive_color)
+                fb.pixel(start + r, line, active_color if r == round - 1 else inactive_color)
 
     def countdown_callback(t):
         """ Countdown timer callback — display remaining time """
@@ -91,7 +102,6 @@ async def main():
         try:
             await event.refresh()
         except Exception as e:
-            print("Error refreshing data:", e)
             return
         nonlocal display_state
         if event.overview["status"]["ended"] or not event.overview["status"]["started"]:
@@ -116,11 +126,10 @@ async def main():
                 display_state = DISPLAY_ROUNDNUMBER
         else:
             # run countdown timer
-            print("Starting countdown timer")
             if timer_state[1] != TIMER_COUNTDOWN:
                 if timer_state[1] != TIMER_INACTIVE:
                     timer[1].deinit()
-                timer[1].init(period=config["countdowninterval"] * 1000, mode=Timer.PERIODIC, callback=countdown_callback)
+                timer[1].init(period=config["countdowninterval"] * 1000, mode=machine.Timer.PERIODIC, callback=countdown_callback)
                 timer_state[1] = TIMER_COUNTDOWN
                 display_state = DISPLAY_COUNTDOWN
 
@@ -130,10 +139,10 @@ async def main():
             loop = asyncio.get_event_loop()
             loop.create_task(refresh_data())
         except Exception as e:
-            print("Cannot create refresh data task:", e)
+            pass
 
     # we will get the event data refreshed periodically
-    timer[0].init(period=config["refreshinterval"] * 1000, mode=Timer.PERIODIC, callback=refresh_callback)
+    timer[0].init(period=config["refreshinterval"] * 1000, mode=machine.Timer.PERIODIC, callback=refresh_callback)
     timer_state[0] = TIMER_REFRESHDATA
     refresh_callback(None)  # initial data fetch
 
