@@ -8,6 +8,7 @@ import socket
 import re
 import time
 import json
+from microDNS import MicroDNSSrv
 
 def get_connection(**kwargs):
     """return a working WLAN(STA_IF) instance or None"""
@@ -15,7 +16,7 @@ def get_connection(**kwargs):
     ap_password = kwargs.get('password', "")
     ap_authmode = 3  # WPA2
 
-    NETWORK_PROFILES = 'wifi.json'
+    NETWORK_PROFILES = f'{__name__}.json'
 
     wlan_ap = network.WLAN(network.AP_IF)
     wlan_sta = network.WLAN(network.STA_IF)
@@ -42,28 +43,31 @@ def get_connection(**kwargs):
         with open(NETWORK_PROFILES, "w") as f:
             json.dump(profiles, f)
 
+    def _display_progress():
+        nonlocal fb_x, fb_s
+        print('.', end='')
+        if fb:
+            fb.pixel(fb_x, 7, (0, 0, 0))
+            if fb_x == 31 and fb_s == 1:
+                fb_s = -1
+            elif fb_x == 0 and fb_s == -1: 
+                fb_s = 1
+            fb_x += fb_s
+            fb.pixel(fb_x, 7, (255, 255, 255))
+            fb.show()
+
     def do_connect(ssid, password):
         wlan_sta.active(True)
         if wlan_sta.isconnected():
             return None
         print('Trying to connect to %s...' % ssid)
         wlan_sta.connect(ssid, password)
-        nonlocal fb_x, fb_s
         for retry in range(200):
             connected = wlan_sta.isconnected()
             if connected:
                 break
             time.sleep(0.1)
-            print('.', end='')
-            if fb:
-                fb.pixel(fb_x, 7, (0, 0, 0))
-                if fb_x == 31 and fb_s == 1:
-                    fb_s = -1
-                elif fb_x == 0 and fb_s == -1: 
-                    fb_s = 1
-                fb_x += fb_s
-                fb.pixel(fb_x, 7, (255, 255, 255))
-                fb.show()
+            _display_progress()
         if connected:
             print('\nConnected. Network config: ', wlan_sta.ifconfig())
             
@@ -75,95 +79,100 @@ def get_connection(**kwargs):
 
         return connected
 
-    def send_header(client, status_code=200, content_length=None ):
-        client.sendall("HTTP/1.0 {} OK\r\n".format(status_code))
-        client.sendall("Content-Type: text/html\r\n")
-        if content_length is not None:
-            client.sendall("Content-Length: {}\r\n".format(content_length))
-        client.sendall("\r\n")
-
-    def send_response(client, payload, status_code=200):
-        content_length = len(payload)
-        send_header(client, status_code, content_length)
-        if content_length > 0:
-            client.sendall(payload)
-        client.close()
-
-    def get_css():
-        try:
-            with open('wifi.css', 'r') as file:
-                return file.read()
-        except FileNotFoundError:
-            return ''
-
-    def handle_root(client):
-        css = get_css()
-        wlan_sta.active(True)
-        ssids = sorted(ssid.decode('utf-8') for ssid, *_ in wlan_sta.scan())
-        send_header(client)
-        nonlocal devicename
-        client.sendall(f'<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><h1>{devicename} Wi-Fi Setup</h1><form action="configure" method="post">')
-        if len(ssids):
-            while len(ssids):
-                ssid = ssids.pop(0)
-                if ssid != "":
-                    client.sendall(f'<span class="ssid"><input type="radio" name="ssid" value="{ssid}" id="{ssid}"/><label for="{ssid}">{ssid}</label></span>')
-            client.sendall('<label for="password">Password:</label><input name="password" type="password" id="password" /><input type="submit" value="Submit" /></form></html>')
-        else:
-            client.sendall('No networks found.</html>')
-        client.close()
-
-    def handle_configure(client, request):
-        match = re.search("ssid=([^&]*)&password=(.*)", request)
-
-        if match is None:
-            send_response(client, "Parameters not found", status_code=400)
-            return False
-        # version 1.9 compatibility
-        try:
-            ssid = match.group(1).decode("utf-8").replace("%3F", "?").replace("%21", "!")
-            password = match.group(2).decode("utf-8").replace("%3F", "?").replace("%21", "!")
-        except Exception:
-            ssid = match.group(1).replace("%3F", "?").replace("%21", "!")
-            password = match.group(2).replace("%3F", "?").replace("%21", "!")
-
-        if len(ssid) == 0:
-            send_response(client, "SSID must be provided", status_code=400)
-            return False
-
-        nonlocal devicename
-        css = get_css()
-        if do_connect(ssid, password):
-            response = f'<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><h1 class="success">{devicename} successfully connected to WiFi network {ssid}</h1></html>'
-            send_response(client, response)
-            time.sleep(1)
-            wlan_ap.active(False)
-            try:
-                profiles = read_profiles()
-            except OSError:
-                profiles = {}
-            profiles[ssid] = password
-            write_profiles(profiles)
-
-            time.sleep(5)
-
-            return True
-        else:
-            response = f'<html><head class="error"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><h1 class="error">{devicename} could not connect to WiFi network {ssid}</h1><form><input type="button" value="Go back!" onclick="history.back()"></input></form></html>'
-            send_response(client, response)
-            return False
-
-    def handle_not_found(client, url):
-        send_response(client, "Path not found: {}".format(url), status_code=404)
-
-    def websrv_stop():
-        nonlocal server_socket
-
-        if server_socket:
-            server_socket.close()
-            server_socket = None
-
     def websrv_start(port=80):
+
+        def send_header(client, status_code=200, content_length=None ):
+            client.sendall("HTTP/1.0 {} OK\r\n".format(status_code))
+            client.sendall("Content-Type: text/html\r\n")
+            if content_length is not None:
+                client.sendall("Content-Length: {}\r\n".format(content_length))
+            client.sendall("\r\n")
+
+        def send_response(client, payload, status_code=200):
+            content_length = len(payload)
+            send_header(client, status_code, content_length)
+            if content_length > 0:
+                client.sendall(payload)
+            client.close()
+
+        def get_css():
+            try:
+                with open(f'{__name__}.css', 'r') as file:
+                    return file.read()
+            except FileNotFoundError:
+                return ''
+
+        def handle_redirect(client):
+            html = f"<html><meta name='viewport' content='width=device-width, initial-scale=1.0'><meta http-equiv='refresh' content='0; url=http://{wlan_ap.ifconfig()[0]}'>Redirecting, please wait...</html>"
+            send_response(client, html)
+
+        def handle_root(client):
+            css = get_css()
+            wlan_sta.active(True)
+            ssids = sorted(ssid.decode('utf-8') for ssid, *_ in wlan_sta.scan())
+            send_header(client)
+            nonlocal devicename
+            client.sendall(f'<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><h1>{devicename} Wi-Fi Setup</h1><form action="configure" method="post">')
+            if len(ssids):
+                while len(ssids):
+                    ssid = ssids.pop(0)
+                    if ssid != "":
+                        client.sendall(f'<span class="ssid"><input type="radio" name="ssid" value="{ssid}" id="{ssid}"/><label for="{ssid}">{ssid}</label></span>')
+                client.sendall('<label for="password">Password:</label><input name="password" type="password" id="password" /><input type="submit" value="Submit" /></form></html>')
+            else:
+                client.sendall('No networks found.</html>')
+            client.close()
+
+        def handle_configure(client, request):
+            match = re.search("ssid=([^&]*)&password=(.*)", request)
+
+            if match is None:
+                send_response(client, "Parameters not found", status_code=400)
+                return False
+            # version 1.9 compatibility
+            try:
+                ssid = match.group(1).decode("utf-8").replace("%3F", "?").replace("%21", "!")
+                password = match.group(2).decode("utf-8").replace("%3F", "?").replace("%21", "!")
+            except Exception:
+                ssid = match.group(1).replace("%3F", "?").replace("%21", "!")
+                password = match.group(2).replace("%3F", "?").replace("%21", "!")
+
+            if len(ssid) == 0:
+                send_response(client, "SSID must be provided", status_code=400)
+                return False
+
+            nonlocal devicename
+            css = get_css()
+            if do_connect(ssid, password):
+                response = f'<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><h1 class="success">{devicename} successfully connected to WiFi network {ssid}</h1></html>'
+                send_response(client, response)
+                time.sleep(1)
+                wlan_ap.active(False)
+                try:
+                    profiles = read_profiles()
+                except OSError:
+                    profiles = {}
+                profiles[ssid] = password
+                write_profiles(profiles)
+
+                time.sleep(5)
+
+                return True
+            else:
+                response = f'<html><head class="error"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>{css}</style></head><h1 class="error">{devicename} could not connect to WiFi network {ssid}</h1><form><input type="button" value="Go back!" onclick="history.back()"></input></form></html>'
+                send_response(client, response)
+                return False
+
+        def handle_not_found(client, url):
+            send_response(client, "Path not found: {}".format(url), status_code=404)
+
+        def websrv_stop():
+            nonlocal server_socket
+
+            if server_socket:
+                server_socket.close()
+                server_socket = None
+
         nonlocal server_socket
 
         addr = socket.getaddrinfo('0.0.0.0', port)[0][-1]
@@ -179,9 +188,10 @@ def get_connection(**kwargs):
         server_socket.bind(addr)
         server_socket.listen(1)
 
-        print('Connect to WiFi ssid ' + ap_ssid + ', default password: ' + ap_password)
-        print('and access the ESP via your favorite web browser at 192.168.4.1.')
-        print('Listening on:', addr)
+        mdns = MicroDNSSrv.Create({ '*' : wlan_ap.ifconfig()[0] })
+
+        print(f'Connect to WiFi ssid {ap_ssid}, default password: {ap_password}')
+        print(f'If a config page does not open automatically, access the ESP via your favorite web browser at {wlan_ap.ifconfig()[0]}.')
 
         if fb:
             fb.clear()
@@ -190,6 +200,7 @@ def get_connection(**kwargs):
 
         while True:
             if wlan_sta.isconnected():
+                mdns.Stop()
                 wlan_ap.active(False)
                 return True
 
