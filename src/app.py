@@ -82,7 +82,7 @@ async def main():
     def countdown_callback(t):
         """ Countdown timer callback — display remaining time """
         if event.overview["status"]["started"] and not event.overview["status"]["ended"]:
-            remaining = event.remaining_seconds
+            remaining = event.remaining_seconds()
             fb.clear()
             if remaining <= config["redseconds"]:
                 c = (255, 0, 0)
@@ -95,12 +95,14 @@ async def main():
                 x = 3
                 x_minus = -1
                 y = 1
+                format = "{sign}{hours:01d}:{minutes:02d}:{seconds:02d}"
             else:
                 font = "f4x6"
                 x = 5
                 x_minus = 0
                 y = 0
-            fb.text(event.remaining_time_str, x if remaining >= 0 else x_minus, y, c=c, font=font)
+                format = "{sign}{minutes:02d}:{seconds:02d}" if remaining > -3600 else "{sign}XX:XX"
+            fb.text(event.remaining_time_str(format=format), x if remaining >= 0 else x_minus, y, c=c, font=font)
             display_round(event.overview["status"]["currentRound"], event.overview["status"]["numberOfRounds"])
             fb.show()
         elif timer_state[1] == TIMER_COUNTDOWN:

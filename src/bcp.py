@@ -36,25 +36,15 @@ class Event:
                 if response.status_code == 200:
                     self.timer[current_round] = response.json()
 
-    @property
     def remaining_seconds(self):
         """ Returns remaining time in seconds for the current round. Negative value means overtime. """
         return strptime(self.timer[self.overview['status']['currentRound']]['endTime']) - time.time()
    
-    @property
-    def remaining_time_str(self):
+    def remaining_time_str(self, format="{sign}{hours:02d}:{minutes:02d}:{seconds:02d}"):
         """ Returns remaining time as formatted string MM:SS or HH:MM:SS. Negative value means overtime. """
         sign = ""
-        remaining = self.remaining_seconds
+        remaining = self.remaining_seconds()
         if remaining < 0:
             sign = "-"
             remaining = abs(remaining)
-        hours = remaining // 3600
-        minutes = (remaining % 3600) // 60
-        seconds = remaining % 60
-        if self.timer[self.overview['status']['currentRound']]['timerLength'] > 3600:
-            return f"{sign}{hours:02d}:{minutes:02d}:{seconds:02d}"
-        elif hours:
-            return f"{sign}XX:XX"
-        else:
-            return f"{sign}{minutes:02d}:{seconds:02d}"
+        return format.format(sign=sign, hours=remaining // 3600, minutes=(remaining % 3600) // 60, seconds=remaining % 60)
