@@ -1,8 +1,3 @@
-# Ulanzi TC001 driver
-# (c) 2025 Honza Skýpala
-# WTFPL license applies
-
-# pins mapping:
 #  matrix_pin: GPIO32 
 #  buzzer_pin: GPIO15
 #  battery_pin: GPIO34 
@@ -15,11 +10,14 @@
 
 from neopixel import NeoPixel
 from machine import Pin
+import os
 import struct
+from math import floor
 
 class BitmapFont:
     def __init__(self, fname):
         self._fontname = fname
+        self._filesize = os.stat(fname)[6]
     
     def __exit__(self, exc_type, exc_value, traceback):
         self._font.close()
@@ -27,10 +25,15 @@ class BitmapFont:
     def __enter__(self):
         self._font = open(self._fontname, "rb")
         self.font_width, self.font_height = struct.unpack('BB', self._font.read(2))
+        self.last_ord = floor((self._filesize - 2) / self.font_width) - 1
         return self
     
-    def textwidth(self, text):
-        return len(text) * (self.font_width + 1) - 1
+    def text_width(self, text):
+        l = 0
+        for i in range(len(text)):
+            if ord(text[i]) <= self.last_ord:
+                l += self.font_width + 1
+        return l - 1
 
 class FrameBuffer:
     DEFAULT_FONT = "f4x6"
@@ -123,6 +126,8 @@ class FrameBuffer:
         fpath = self._get_font_path(**kwargs)
         c = kwargs.get('c', (255, 255, 255))
         with FrameBuffer._fonts[fpath] as f:
+            if ord(ch) > f.last_ord:
+                return 0
             xs = 0 if x >= 0 else abs(-x)
             xr = min(FrameBuffer.WIDTH - x, f.font_width)
             ys = 0 if y >= 0 else abs(-y)
@@ -137,7 +142,8 @@ class FrameBuffer:
     
     def text(self, text, x, y, **kwargs):
         for i in range(len(text)):
-            x += self.glyph(text[i], x, y, **kwargs) + 1
-    
+            w = self.glyph(text[i], x, y, **kwargs)
+            x += w + 1 if w > 0 else 0
+
     def show(self):
         FrameBuffer._np.write()
