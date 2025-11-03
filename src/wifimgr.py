@@ -82,10 +82,10 @@ def get_connection(**kwargs):
     def websrv_start(port=80):
 
         def send_header(client, status_code=200, content_length=None ):
-            client.sendall("HTTP/1.0 {} OK\r\n".format(status_code))
+            client.sendall(f"HTTP/1.0 {status_code} OK\r\n")
             client.sendall("Content-Type: text/html\r\n")
             if content_length is not None:
-                client.sendall("Content-Length: {}\r\n".format(content_length))
+                client.sendall(f"Content-Length: {content_length}\r\n")
             client.sendall("\r\n")
 
         def send_response(client, payload, status_code=200):
@@ -117,7 +117,7 @@ def get_connection(**kwargs):
                 while len(ssids):
                     ssid = ssids.pop(0)
                     if ssid != "":
-                        client.sendall(f'<span class="ssid"><input type="radio" name="ssid" value="{ssid}" id="{ssid}"/><label for="{ssid}">{ssid}</label></span>')
+                        client.sendall(f'<div class="ssid"><input type="radio" name="ssid" value="{ssid}" id="{ssid}"/><label for="{ssid}">{ssid}</label></div>')
                 client.sendall('<label for="password">Password:</label><input name="password" type="password" id="password" /><input type="submit" value="Submit" /></form></html>')
             else:
                 client.sendall('No networks found.</html>')
@@ -164,7 +164,7 @@ def get_connection(**kwargs):
                 return False
 
         def handle_not_found(client, url):
-            send_response(client, "Path not found: {}".format(url), status_code=404)
+            send_response(client, f"Path not found: {url}", status_code=404)
 
         def websrv_stop():
             nonlocal server_socket
@@ -195,7 +195,7 @@ def get_connection(**kwargs):
 
         if fb:
             fb.clear()
-            fb.text("AP mode", 0, 1)
+            fb.text("AP mode", 3, 2, font="f3x5")
             fb.show()
 
         while True:
@@ -223,7 +223,7 @@ def get_connection(**kwargs):
                 except OSError:
                     pass
 
-                print("Request is: {}".format(request))
+                print(f"Request is: {request}")
                 if "HTTP" not in request:  # skip invalid requests
                     continue
 
@@ -232,7 +232,7 @@ def get_connection(**kwargs):
                     url = re.search("(?:GET|POST) /(.*?)(?:\\?.*?)? HTTP", request).group(1).decode("utf-8").rstrip("/")
                 except Exception:
                     url = re.search("(?:GET|POST) /(.*?)(?:\\?.*?)? HTTP", request).group(1).rstrip("/")
-                print("URL is {}".format(url))
+                print(f"URL is {url}")
 
                 if "generate_204" in url or "hotspot-detect" in url or "msftconnecttest" in url:
                     handle_redirect(client)

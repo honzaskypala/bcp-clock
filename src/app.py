@@ -31,7 +31,7 @@ async def main():
 
     # splash screen
     fb.clear()
-    fb.text("BCP-clock", 0, 1)
+    fb.text("BCPclock", 0, 2, font="f3x5")
     fb.show()
 
     # connect to WiFi
@@ -51,7 +51,7 @@ async def main():
         machine.reset()
     ntptime.settime()
 
-    # check if event is non empty, otherwise run config AP
+    # TODO: check if event is non empty, otherwise run config AP
 
     event = Event(config["event"])
 
@@ -111,7 +111,7 @@ async def main():
                     timer[1].deinit()
                     timer_state[1] = TIMER_INACTIVE
                 fb.clear()
-                fb.text(event.overview["name"], 0, 1)
+                fb.text(event.overview["name"], 0, 2, font="f3x5")
                 fb.show()
                 display_state = DISPLAY_EVENTNAME
         elif "timerLength" not in event.timer[event.overview['status']['currentRound']]:
