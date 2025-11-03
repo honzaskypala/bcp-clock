@@ -90,7 +90,17 @@ async def main():
                 c = (255, 255, 0)
             else:
                 c = (255, 255, 255)
-            fb.text(event.remaining_time_str, 5 if remaining >= 0 else 0, 0, c=c)
+            if event.timer[event.overview['status']['currentRound']]['timerLength'] > 3600:
+                font = "f3x5"
+                x = 3
+                x_minus = -1
+                y = 1
+            else:
+                font = "f4x6"
+                x = 5
+                x_minus = 0
+                y = 0
+            fb.text(event.remaining_time_str, x if remaining >= 0 else x_minus, y, c=c, font=font)
             display_round(event.overview["status"]["currentRound"], event.overview["status"]["numberOfRounds"])
             fb.show()
         elif timer_state[1] == TIMER_COUNTDOWN:
