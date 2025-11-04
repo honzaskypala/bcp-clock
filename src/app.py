@@ -7,7 +7,7 @@ import machine
 from time import sleep
 from tc001 import FrameBuffer
 from bcp import Event
-from config import Config
+from config import config, load_config
 import network
 import ntptime
 import wifimgr
@@ -26,12 +26,13 @@ async def main():
     DISPLAY_COUNTDOWN = const(3)
     display_state = DISPLAY_BOOTUP
 
-    config = Config()
+    global config
+    config = load_config()
     fb = FrameBuffer()
 
     # splash screen
     fb.clear()
-    fb.text("BCPclock", 0, 2, font="f3x5")
+    fb.text("BCPclock", 0, 1, font="f3x5")
     fb.show()
 
     # connect to WiFi
@@ -84,9 +85,9 @@ async def main():
         if event.overview["status"]["started"] and not event.overview["status"]["ended"]:
             remaining = event.remaining_seconds()
             fb.clear()
-            if remaining <= config["redseconds"]:
+            if remaining <= config["red"]:
                 c = (255, 0, 0)
-            elif remaining <= config["yellowseconds"]:
+            elif remaining <= config["yellow"]:
                 c = (255, 255, 0)
             else:
                 c = (255, 255, 255)
