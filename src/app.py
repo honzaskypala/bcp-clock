@@ -37,7 +37,41 @@ async def main():
 
     display_state = DISPLAY_BOOTUP
 
-    def display_round(round, total):
+    async def setup_network():
+        network.hostname(config.config["hostname"])
+        wlan = wifimgr.get_connection(fb=fb, ssid="BCP-clock", device="BCP Clock")
+        if wlan is None:
+            # if no network, terminate
+            fb.clear()
+            fb.text("nonetwrk", 0, 2, font="f3x5")
+            fb.show()
+            import sys
+            sys.exit()
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(('', 80))
+            s.listen(5)
+            s.close()
+        except OSError as e:
+            # if the code in try block above fails, then a web server from wifimgr.get_connection()
+            # remains open, which is known bug of ESP32. Reboot the hardware to close it.
+            machine.reset()
+        try:
+            ntptime.settime()
+        except OSError as e:
+            # if we cannot sync the time, terminate
+            fb.clear()
+            fb.text("timesync", 0, 2, font="f3x5")
+            fb.show()
+            await asyncio.sleep(5)
+            fb.clear()
+            fb.text("failure", 2, 2, font="f3x5")
+            fb.show()
+            import sys
+            sys.exit()
+
+def display_round(round, total):
         """ Display current round indicator """
         active_color = (78, 159, 229)
         inactive_color = (15, 15, 15)
@@ -202,23 +236,7 @@ async def main():
     fb.text("BCPclock", 0, 1, font="f3x5")
     fb.show()
 
-    # connect to WiFi
-    network.hostname(config.config["hostname"])
-    wlan = wifimgr.get_connection(fb=fb, ssid="BCP-clock", device="BCP Clock")
-    if wlan is None:
-        # TODO: display error message, wait 10 secs and reboot
-        return
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind(('', 80))
-        s.listen(5)
-        s.close()
-    except OSError as e:
-        # if the code in try block above fails, then a web server from wifimgr.get_connection()
-        # remains open, which is known bug of ESP32. Reboot the hardware to close it.
-        machine.reset()
-    ntptime.settime()
+    await setup_network()
 
     if config.config["event"] == "":
         # event not configured yet, launch the config web
