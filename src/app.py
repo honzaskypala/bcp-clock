@@ -71,7 +71,7 @@ async def main():
             import sys
             sys.exit()
 
-def display_round(round, total):
+    def display_round(round, total):
         """ Display current round indicator """
         active_color = (78, 159, 229)
         inactive_color = (15, 15, 15)
