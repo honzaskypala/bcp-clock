@@ -218,20 +218,23 @@ async def main():
             await asyncio.sleep(5)
             display_state = DISPLAY_BOOTUP
 
-        http_start_time = time.time()
-        nonlocal display_state
-        if display_state != DISPLAY_SCROLL_ONCE:
-            display_state = DISPLAY_SCROLL_ONCE
-            import cfgweb
-            try:
-                loop = asyncio.get_event_loop()
-                loop.create_task(cfgweb.http_server())
-                loop.create_task(config_splash())
-            except Exception as e:
-                pass
-        
-        timer[3].init(period=1000, mode=machine.Timer.PERIODIC, callback=check_http_update)
-        timer_state[3] = TIMER_HTTP_CONFIG
+        nonlocal mid_button_press, display_state
+        now = time.ticks_ms()
+        if time.ticks_diff(now, mid_button_press) > 200:
+            mid_button_press = now
+            http_start_time = time.time()
+            if display_state != DISPLAY_SCROLL_ONCE:
+                display_state = DISPLAY_SCROLL_ONCE
+                import cfgweb
+                try:
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(cfgweb.http_server())
+                    loop.create_task(config_splash())
+                except Exception as e:
+                    pass
+            
+            timer[3].init(period=1000, mode=machine.Timer.PERIODIC, callback=check_http_update)
+            timer_state[3] = TIMER_HTTP_CONFIG
 
     gc.enable()
 
@@ -258,6 +261,7 @@ async def main():
     timer_state[0] = TIMER_REFRESH_DATA
     refresh_callback(None)  # initial data fetch
 
+    mid_button_press = 0
     button_pin = machine.Pin(27, machine.Pin.IN, machine.Pin.PULL_UP)
     button_pin.irq(trigger=machine.Pin.IRQ_FALLING, handler=mid_button_pressed)
 
