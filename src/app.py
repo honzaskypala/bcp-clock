@@ -70,6 +70,7 @@ async def main():
             fb.show()
             import sys
             sys.exit()
+        return wlan
 
     def display_round(round, total):
         """ Display current round indicator """
@@ -130,7 +131,6 @@ async def main():
 
     async def refresh_data():
         """ Async refresh data """
-        nonlocal event
         try:
             await event.refresh()
         except Exception as e:
@@ -180,7 +180,8 @@ async def main():
         def check_http_update(t):
 
             async def config_update():
-                config.http_config_updated = False
+                import cfgweb
+                cfgweb.http_config_updated = False
                 # nonlocal event
                 # event = Event(config.config["event"])
                 # refresh_callback(None)   # This does not work, request is sent, but we never get response. Therefore, rather reboot the device.
@@ -188,7 +189,8 @@ async def main():
                 machine.reset()
 
             nonlocal http_start_time
-            if config.http_config_updated:
+            import cfgweb
+            if cfgweb.http_config_updated:
                 try:
                     loop = asyncio.get_event_loop()
                     loop.create_task(config_update())
@@ -218,9 +220,10 @@ async def main():
         nonlocal display_state
         if display_state != DISPLAY_SCROLL_ONCE:
             display_state = DISPLAY_SCROLL_ONCE
+            import cfgweb
             try:
                 loop = asyncio.get_event_loop()
-                loop.create_task(config.http_server())
+                loop.create_task(cfgweb.http_server())
                 loop.create_task(config_splash())
             except Exception as e:
                 pass
@@ -236,7 +239,7 @@ async def main():
     fb.text("BCPclock", 0, 1, font="f3x5")
     fb.show()
 
-    await setup_network()
+    wlan = await setup_network()
 
     if config.config["event"] == "":
         # event not configured yet, launch the config web
