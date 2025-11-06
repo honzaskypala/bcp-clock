@@ -12,6 +12,7 @@ import network
 import ntptime
 import wifimgr
 import socket
+import gc
 
 async def main():
 
@@ -131,6 +132,7 @@ async def main():
 
     async def refresh_data():
         """ Async refresh data """
+        gc.collect()
         try:
             await event.refresh()
         except Exception as e:
@@ -230,6 +232,8 @@ async def main():
         
         timer[3].init(period=1000, mode=machine.Timer.PERIODIC, callback=check_http_update)
         timer_state[3] = TIMER_HTTP_CONFIG
+
+    gc.enable()
 
     config.load_config()
     fb = FrameBuffer()
