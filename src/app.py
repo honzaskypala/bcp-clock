@@ -184,11 +184,10 @@ async def main():
             async def config_update():
                 import cfgweb
                 cfgweb.http_config_updated = False
-                # nonlocal event
-                # event = Event(config.config["event"])
-                # refresh_callback(None)   # This does not work, request is sent, but we never get response. Therefore, rather reboot the device.
-                await asyncio.sleep(1)     # Wait 1 sec, so the user gets http response before machine reboot
-                machine.reset()
+                nonlocal event, display_state
+                event = Event(config.config["event"])
+                display_state = DISPLAY_BOOTUP
+                refresh_callback(None)
 
             nonlocal http_start_time
             import cfgweb
@@ -199,7 +198,8 @@ async def main():
                 except Exception as e:
                     pass
             elif time.time() - http_start_time > 5 * 60:
-                # reset device after 5 minutes of config webserver open and no save
+                # reset device after 5 minutes of config webserver open
+                # TODO: change to only close the webserver instead
                 machine.reset()
 
         async def config_splash():

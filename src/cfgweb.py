@@ -88,9 +88,8 @@ async def http_server():
                 await writer.aclose()
                 return
 
+            status = ""
             request = data.decode()
-            response = html()
-
             if request.startswith("POST"):
                 parts = request.split("\r\n\r\n", 1)
                 if len(parts) > 1:
@@ -104,8 +103,9 @@ async def http_server():
                             config.config[key] = value
                     http_config_updated = True
                     config.save_config()
-                    response = html(status="Configuration saved", filename=f"{__name__}-success.html")
+                    status="Configuration saved"
 
+            response = html(status=status)
             writer.write(response.encode())
             await writer.drain()
 
