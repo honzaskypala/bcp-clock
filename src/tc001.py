@@ -1,3 +1,8 @@
+# Ulanzi TC001 driver
+# (c) 2025 Honza Skýpala
+# WTFPL license applies
+
+# pins mapping:
 #  matrix_pin: GPIO32 
 #  buzzer_pin: GPIO15
 #  battery_pin: GPIO34 
@@ -13,6 +18,7 @@ from machine import Pin
 import os
 import struct
 from math import floor
+import asyncio
 
 class BitmapFont:
     def __init__(self, fname):
@@ -141,9 +147,21 @@ class FrameBuffer:
             return f.font_width   # TODO: change to glyph width for proportional fonts
     
     def text(self, text, x, y, **kwargs):
+        centered = kwargs.get('centered', False)
+        if centered:
+            fpath = self._get_font_path(**kwargs)
+            with FrameBuffer._fonts[fpath] as f:
+                x = floor((WIDTH-f.text_width(text))/2)
         for i in range(len(text)):
             w = self.glyph(text[i], x, y, **kwargs)
             x += w + 1 if w > 0 else 0
+
+    async def texts(self, texts, x, y, **kwargs):
+        for text in texts:
+            self.clear()
+            self.text(text, x, y, **kwargs)
+            self.show()
+            await asyncio.sleep(5)
 
     def show(self):
         FrameBuffer._np.write()

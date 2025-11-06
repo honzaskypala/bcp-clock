@@ -133,7 +133,7 @@ def websrv_start(wlan_sta, kwargs):
 
     if fb:
         fb.clear()
-        fb.text("AP mode", 3, 1, font="f3x5")
+        fb.text("AP mode", 0, 1, font="f3x5", centered=True)
         fb.show()
 
     while True:

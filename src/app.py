@@ -43,9 +43,7 @@ async def main():
         wlan = wifimgr.get_connection(fb=fb, ssid="BCP-clock", device="BCP Clock")
         if wlan is None:
             # if no network, terminate
-            fb.clear()
-            fb.text("nonetwrk", 0, 2, font="f3x5")
-            fb.show()
+            await fb.texts(("no", "network"), 0, 2, font="f3x5", centered=True)
             import sys
             sys.exit()
         try:
@@ -62,13 +60,7 @@ async def main():
             ntptime.settime()
         except OSError as e:
             # if we cannot sync the time, terminate
-            fb.clear()
-            fb.text("timesync", 0, 2, font="f3x5")
-            fb.show()
-            await asyncio.sleep(5)
-            fb.clear()
-            fb.text("failure", 2, 2, font="f3x5")
-            fb.show()
+            await fb.texts(("timesync", "failure"), 0, 2, font="f3x5", centered=True)
             import sys
             sys.exit()
         return wlan
@@ -203,19 +195,8 @@ async def main():
                 machine.reset()
 
         async def config_splash():
+            await fb.texts(("Config", ".".join(wlan.ifconfig()[0].split(".")[:2]), ".".join(wlan.ifconfig()[0].split(".")[-2:])), 0, 2, font="f3x5", centered=True)
             nonlocal display_state
-            fb.clear()
-            fb.text("Config", 0, 2, font="f3x5")
-            fb.show()
-            await asyncio.sleep(5)
-            fb.clear()
-            fb.text(".".join(wlan.ifconfig()[0].split(".")[:2]), 0, 2, font="f3x5")
-            fb.show()
-            await asyncio.sleep(5)
-            fb.clear()
-            fb.text(".".join(wlan.ifconfig()[0].split(".")[-2:]), 0, 2, font="f3x5")
-            fb.show()
-            await asyncio.sleep(5)
             display_state = DISPLAY_BOOTUP
 
         nonlocal mid_button_press, display_state
