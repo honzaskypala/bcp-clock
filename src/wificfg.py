@@ -132,9 +132,7 @@ def websrv_start(wlan_sta, kwargs):
     print(f'If a config page does not open automatically, access the ESP via your favorite web browser at {wlan_ap.ifconfig()[0]}.')
 
     if fb:
-        fb.clear()
-        fb.text("AP mode", 0, 1, font="f3x5", centered=True)
-        fb.show()
+        fb.text("AP mode", 0, 1, font="f3x5", centered=True, clear=True, show=True)
 
     while True:
         if wlan_sta.isconnected():

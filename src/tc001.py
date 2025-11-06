@@ -147,20 +147,23 @@ class FrameBuffer:
             return f.font_width   # TODO: change to glyph width for proportional fonts
     
     def text(self, text, x, y, **kwargs):
-        centered = kwargs.get('centered', False)
-        if centered:
+        if kwargs.get('clear', False):
+            self.clear()
+        if kwargs.get('centered', False):
             fpath = self._get_font_path(**kwargs)
             with FrameBuffer._fonts[fpath] as f:
                 x = floor((WIDTH-f.text_width(text))/2)
         for i in range(len(text)):
             w = self.glyph(text[i], x, y, **kwargs)
             x += w + 1 if w > 0 else 0
+        if kwargs.get('show', False):
+            self.show()
 
     async def texts(self, texts, x, y, **kwargs):
+        kwargs["show"] = True
+        kwargs["clear"] = True
         for text in texts:
-            self.clear()
             self.text(text, x, y, **kwargs)
-            self.show()
             await asyncio.sleep(5)
 
     def show(self):

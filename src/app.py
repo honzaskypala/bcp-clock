@@ -96,7 +96,6 @@ async def main():
             return
         if event.overview["status"]["started"] and not event.overview["status"]["ended"]:
             remaining = event.remaining_seconds()
-            fb.clear()
             if remaining <= config.config["red"]:
                 c = (255, 0, 0)
             elif remaining <= config.config["yellow"]:
@@ -115,7 +114,7 @@ async def main():
                 x_minus = 0
                 y = 0
                 format = "{sign}{minutes:02d}:{seconds:02d}" if remaining > -3600 else "{sign}XX:XX"
-            fb.text(event.remaining_time_str(format=format), x if remaining >= 0 else x_minus, y, c=c, font=font)
+            fb.text(event.remaining_time_str(format=format), x if remaining >= 0 else x_minus, y, c=c, font=font, clear=True)
             display_round(event.overview["status"]["currentRound"], event.overview["status"]["numberOfRounds"])
             fb.show()
         elif timer_state[1] == TIMER_COUNTDOWN:
@@ -138,9 +137,7 @@ async def main():
                 if timer_state[1] == TIMER_COUNTDOWN:
                     timer[1].deinit()
                     timer_state[1] = TIMER_INACTIVE
-                fb.clear()
-                fb.text(event.overview["name"], 0, 2, font="f3x5")
-                fb.show()
+                fb.text(event.overview["name"], 0, 2, font="f3x5", clear=True, show=True)
                 display_state = DISPLAY_EVENTNAME
         elif "timerLength" not in event.timer[event.overview['status']['currentRound']]:
             # no timer for current round; display round number only
@@ -148,9 +145,7 @@ async def main():
                 if timer_state[1] == TIMER_COUNTDOWN:
                     timer[1].deinit()
                     timer_state[1] = TIMER_INACTIVE
-                fb.clear()
-                fb.text(f"[{event.overview['status']['currentRound']}]", 8, 1, font="f5x8")
-                fb.show()
+                fb.text(f"[{event.overview['status']['currentRound']}]", 8, 1, font="f5x8", clear=True, show=True)
                 display_state = DISPLAY_ROUNDNUMBER
         else:
             # run countdown timer
@@ -221,12 +216,7 @@ async def main():
 
     config.load_config()
     fb = FrameBuffer()
-
-    # splash screen
-    fb.clear()
-    fb.text("BCPclock", 0, 1, font="f3x5")
-    fb.show()
-
+    fb.text("BCPclock", 0, 1, font="f3x5", centered=True, show=True)   # splash screen
     wlan = await setup_network()
 
     if config.config["event"] == "":
