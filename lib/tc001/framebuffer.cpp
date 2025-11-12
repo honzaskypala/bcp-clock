@@ -138,3 +138,51 @@ void CFrameBuffer::scroll(int dx, int dy, CRGB fillColor, bool show) {
         FastLED.show();
     }
 }
+
+int CFrameBuffer::glyph(char c, int x, int y, String fontName, CRGB color, bool show) {
+    if (this->font == nullptr || this->currentFontName != fontName) {
+        delete this->font;
+        this->font = new BitmapFont(fontName);
+        this->currentFontName = fontName;
+    }
+
+    uint8_t glyphData[this->font->width()];
+    this->font->getGlyph(c, glyphData);
+
+    for (int i = 0; i < this->font->width(); ++i) {
+        for (int j = 0; j < this->font->height(); ++j) {
+            if (glyphData[i] & (1 << j)) {
+                pixel(x + i, y + j, color);
+            }
+        }
+    }
+
+    if (show) {
+        FastLED.show();
+    }
+
+    return this->font->width();
+}
+
+void CFrameBuffer::text(String str, int x, int y, String fontName, CRGB color, bool clear, bool show) {
+    if (clear) {
+        this->clear();
+    }
+
+    int cursorX = x;
+    for (size_t i = 0; i < str.length(); ++i) {
+        char c = str.charAt(i);
+        cursorX += glyph(c, cursorX, y, fontName, color) + 1;
+    }
+
+    if (show) {
+        FastLED.show();
+    }
+}
+
+void CFrameBuffer::textCentered(String str, int y, String fontName, CRGB color, bool clear, bool show) {
+    int textWidth = this->font->textWidth(str);
+    int startX = (CFrameBuffer::WIDTH - textWidth) / 2;
+
+    text(str, startX, y, fontName, color, clear, show);
+}

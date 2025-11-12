@@ -2,6 +2,7 @@
 #define FRAMEBUFFER_H
 
 #include <FastLED.h>
+#include "bitmapfont.h"
 
 class CFrameBuffer {
 public:
@@ -19,6 +20,9 @@ public:
     void filledRectangle(int x0, int y0, int x1, int y1, CRGB c = CRGB::White, bool show = false);
     void ellipse(int x0, int y0, int rx, int ry, CRGB c = CRGB::White, bool show = false);
     void scroll(int dx, int dy, CRGB fillColor = CRGB::Black, bool show = false);
+    int glyph(char c, int x, int y, String font, CRGB color = CRGB::White, bool show = false);
+    void text(String str, int x, int y, String font, CRGB color = CRGB::White, bool clear = false, bool show = false);
+    void textCentered(String str, int y, String font, CRGB color = CRGB::White, bool clear = false, bool show = false);
 
 private:
     CFrameBuffer();
@@ -30,6 +34,9 @@ private:
     static CRGB leds[NUM_LEDS];
 
     friend CFrameBuffer& getFrameBufferInstance();
+
+    String currentFontName = "";
+    BitmapFont *font = nullptr;
 };
 
 extern CFrameBuffer& FrameBuffer;

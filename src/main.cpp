@@ -1,26 +1,22 @@
 #include <Arduino.h>
 #include <framebuffer.h>
+#include <LittleFS.h>
 
 void setup() {
-  pinMode(15, INPUT_PULLDOWN);
+    pinMode(15, INPUT_PULLDOWN);
+    Serial.begin(9600);
+
+    if (!LittleFS.begin()) {
+        Serial.println("LittleFS mount failed");
+        FrameBuffer.fill(CRGB::Red, true);
+        return;
+    }
+    FrameBuffer.text("BCP", 0, 1, "f3x5", CRGB::White, true, false);
+    FrameBuffer.text("c", 14, 1, "f3x5", CRGB::White, false, false);
+    FrameBuffer.text("lock", 17, 1, "f3x5", CRGB::White, false, true);
 }
 
 void loop() {
-  FrameBuffer.clear();
-  FrameBuffer.hline(0, 0, CFrameBuffer::WIDTH, CRGB::Red, true);
-  delay(1000);
-  FrameBuffer.vline(5, 0, CFrameBuffer::HEIGHT, CRGB::Green, true);
-  delay(1000);
-  FrameBuffer.line(0, 0, CFrameBuffer::WIDTH - 1, CFrameBuffer::HEIGHT - 1, CRGB::Blue, true);
-  delay(1000);
-  FrameBuffer.rectangle(10, 2, 20, 6, CRGB::Yellow, true);
-  delay(1000);
-  FrameBuffer.filledRectangle(22, 1, 30, 5, CRGB::Purple, true);
-  delay(1000);
-  FrameBuffer.ellipse(16, 4, 6, 3, CRGB::Cyan, true);
-  delay(1000);
-  FrameBuffer.scroll(2, 0, CRGB::Black, true); 
-  delay(1000);
-  FrameBuffer.scroll(0, -2, CRGB::Black, true); 
-  delay(1000);
+    delay(5000);
+    FrameBuffer.textCentered("HELLO", 1, "f3x5", CRGB::White, true, true);
 }
