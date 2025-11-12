@@ -1,18 +1,26 @@
 #include <Arduino.h>
-
-// put function declarations here:
-int myFunction(int, int);
+#include <framebuffer.h>
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  pinMode(15, INPUT_PULLDOWN);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+  FrameBuffer.clear();
+  FrameBuffer.hline(0, 0, CFrameBuffer::WIDTH, CRGB::Red, true);
+  delay(1000);
+  FrameBuffer.vline(5, 0, CFrameBuffer::HEIGHT, CRGB::Green, true);
+  delay(1000);
+  FrameBuffer.line(0, 0, CFrameBuffer::WIDTH - 1, CFrameBuffer::HEIGHT - 1, CRGB::Blue, true);
+  delay(1000);
+  FrameBuffer.rectangle(10, 2, 20, 6, CRGB::Yellow, true);
+  delay(1000);
+  FrameBuffer.filledRectangle(22, 1, 30, 5, CRGB::Purple, true);
+  delay(1000);
+  FrameBuffer.ellipse(16, 4, 6, 3, CRGB::Cyan, true);
+  delay(1000);
+  FrameBuffer.scroll(2, 0, CRGB::Black, true); 
+  delay(1000);
+  FrameBuffer.scroll(0, -2, CRGB::Black, true); 
+  delay(1000);
 }
