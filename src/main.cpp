@@ -1,6 +1,7 @@
 #include <Arduino.h>
-#include <framebuffer.h>
 #include <LittleFS.h>
+#include <framebuffer.h>
+#include <config.h>
 
 void setup() {
     pinMode(15, INPUT_PULLDOWN);
@@ -19,6 +20,7 @@ void setup() {
 
     delay(5000);
     FrameBuffer.textScroll("Hello, World!", 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
+    Serial.println(Config.getHostname());
 }
 
 void loop() {
