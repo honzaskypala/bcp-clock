@@ -11,12 +11,20 @@ void setup() {
         FrameBuffer.fill(CRGB::Red, true);
         return;
     }
-    FrameBuffer.text("BCP", 0, 1, "f3x5", CRGB::White, true, false);
-    FrameBuffer.text("c", 14, 1, "f3x5", CRGB::White, false, false);
+
+    // splash screen
+    FrameBuffer.text("BCP", 0, 1, "f3x5", CRGB::White, true);
+    FrameBuffer.text("c", 14, 1, "f3x5", CRGB::White);
     FrameBuffer.text("lock", 17, 1, "f3x5", CRGB::White, false, true);
+
+    delay(5000);
+    FrameBuffer.textScroll("Hello, World!", 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
 }
 
 void loop() {
-    delay(5000);
-    FrameBuffer.textCentered("HELLO", 1, "f3x5", CRGB::White, true, true);
+    delay(10);
+
+    if (FrameBuffer.doTextScrollStep()) {
+        FrameBuffer.textScrollStep();
+    }
 }
