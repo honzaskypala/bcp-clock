@@ -243,14 +243,16 @@ void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CR
     this->scrollStartPos = 0;
 }
 
-void CFrameBuffer::textScrollStep() {
+void CFrameBuffer::textScrollStep(bool show) {
     static int offset = 32;
     this->scroll(1, 0, CRGB::Black, false);
     for (int sy = 0; sy < this->font->height(); sy++) {
         int bufferIndex = offset * this->font->height() + sy;
         pixel(CFrameBuffer::WIDTH - 1, sy + this->scroll_yoffset, this->scrollBuffer[bufferIndex]);
     }
-    this->show();
+    if (show) {
+        this->show();
+    }
     this->_doTextScrollStep = false;
     offset++;
     if (offset >= this->scrollBufferWidth) {
@@ -317,4 +319,40 @@ void CFrameBuffer::textScrollAppend(String str, CRGB color, CRGB bg, int lpad, i
     if (newStart) {
         this->scrollStartPos = oldWidth;
     }
+}
+
+void CFrameBuffer::progressStart(int x, int y, CRGB color, CRGB bg, int speed, int hwtimer, bool show) {
+    if (x >= 0)
+        this->progress_pos = x;
+    this->progress_y = y;
+    this->progress_color = color;
+
+    if (show) {
+        this->progressStep(show);
+    }
+
+    this->progressTimer = timerBegin(hwtimer, 80, true);
+    timerAttachInterrupt(this->progressTimer, []() { FrameBuffer._doProgressStep = true; }, true);
+    timerAlarmWrite(this->progressTimer, speed * 1000, true);
+    timerAlarmEnable(this->progressTimer);
+}
+
+void CFrameBuffer::progressStep(bool show) {
+    this->pixel(this->progress_pos, this->progress_y, progress_bg, false);
+    if ((this->progress_step >= 0 && this->progress_pos + this->progress_step >= CFrameBuffer::WIDTH) || (this->progress_step < 0 && this->progress_pos + this->progress_step < 0)) {
+        this->progress_step = -this->progress_step;
+    }
+    this->progress_pos += this->progress_step;
+    this->pixel(this->progress_pos, this->progress_y, this->progress_color, show);
+    this->_doProgressStep = false;
+}
+
+void CFrameBuffer::progressStop(bool show) {
+    if (this->progressTimer != nullptr) {
+        timerAlarmDisable(this->progressTimer);
+        timerEnd(this->progressTimer);
+        this->progressTimer = nullptr;
+    }
+    this->_doProgressStep = false;
+    this->pixel(this->progress_pos, this->progress_y, progress_bg, show);
 }

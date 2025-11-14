@@ -6,9 +6,12 @@
 #include <bcpevent.h>
 
 void displayRefresh(void* parameter) {
-    while (1) {
+    while (true) {
         if (FrameBuffer.doTextScrollStep()) {
             FrameBuffer.textScrollStep();
+        }
+        if (FrameBuffer.doProgressStep()) {
+            FrameBuffer.progressStep();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -37,9 +40,8 @@ void setup() {
     // splash screen
     FrameBuffer.text("BCP", 0, 1, "f3x5", CRGB::White, true);
     FrameBuffer.text("c", 14, 1, "f3x5", CRGB::White);
-    FrameBuffer.text("lock", 17, 1, "f3x5", CRGB::White, false, true);
-
-    delay(5000);
+    FrameBuffer.text("lock", 17, 1, "f3x5", CRGB::White);
+    FrameBuffer.progressStart();
 
     WifiMgr.connect();
 
@@ -51,6 +53,9 @@ void setup() {
     Serial.println("Event Ended: " + String(BCPEvent.isEnded()));
     Serial.println("Number of Rounds: " + String(BCPEvent.getNumberOfRounds()));
     Serial.println("Current Round: " + String(BCPEvent.getCurrentRound()));
+
+    FrameBuffer.progressStop();
+
     FrameBuffer.textScroll(BCPEvent.getName(), 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
 }
 

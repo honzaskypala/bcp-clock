@@ -27,10 +27,16 @@ public:
 
     hw_timer_t *scrollTimer = nullptr;
     void textScroll(String str, int y, String font, CRGB color = CRGB::White, CRGB bg = CRGB::Black, int lpad = WIDTH, int rpad = 0, int speed = 100, int hwtimer = 0, bool loop = true, bool clear = true);
-    void textScrollStep();
+    void textScrollStep(bool show = true);
     bool doTextScrollStep() { return _doTextScrollStep; };
     void stopTextScroll();
     void textScrollAppend(String str, CRGB color = CRGB::White, CRGB bg = CRGB::Black, int lpad = 0, int rpad = 0, bool newStart = false);
+
+    hw_timer_t *progressTimer = nullptr;
+    void progressStart(int x = 0, int y = 7, CRGB color = CRGB::White, CRGB bg = CRGB::Black, int speed = 100, int hwtimer = 1, bool show = true);
+    void progressStep(bool show = true);
+    bool doProgressStep() { return _doProgressStep; };
+    void progressStop(bool show = true);
 
 private:
     CFrameBuffer();
@@ -45,12 +51,17 @@ private:
 
     String currentFontName = "";
     BitmapFont *font = nullptr;
+
     CRGB *scrollBuffer = nullptr;
     long scrollBufferWidth = 0;
     long scrollStartPos = 0;
     int scroll_yoffset = 0;
     bool loopScrolling = false;
     bool _doTextScrollStep = false;
+
+    int progress_pos = 0, progress_y = 0, progress_step = 1;
+    CRGB progress_color = CRGB::White, progress_bg = CRGB::Black;
+    bool _doProgressStep = false;
 };
 
 extern CFrameBuffer& FrameBuffer;
