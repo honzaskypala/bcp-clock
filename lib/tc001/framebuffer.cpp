@@ -139,13 +139,16 @@ void CFrameBuffer::scroll(int dx, int dy, CRGB fillColor, bool show) {
     }
 }
 
-int CFrameBuffer::glyph(char c, int x, int y, String fontName, CRGB color, bool show) {
+void CFrameBuffer::loadFont(String fontName) {
     if (this->font == nullptr || this->currentFontName != fontName) {
         delete this->font;
         this->font = new BitmapFont(fontName);
         this->currentFontName = fontName;
     }
+}
 
+int CFrameBuffer::glyph(char c, int x, int y, String fontName, CRGB color, bool show) {
+    this->loadFont(fontName);
     uint8_t glyphData[this->font->width()];
     this->font->getGlyph(c, glyphData);
 
@@ -181,6 +184,7 @@ void CFrameBuffer::text(String str, int x, int y, String fontName, CRGB color, b
 }
 
 void CFrameBuffer::textCentered(String str, int y, String fontName, CRGB color, bool clear, bool show) {
+    this->loadFont(fontName);
     int textWidth = this->font->textWidth(str);
     int startX = (CFrameBuffer::WIDTH - textWidth) / 2;
 
@@ -188,12 +192,7 @@ void CFrameBuffer::textCentered(String str, int y, String fontName, CRGB color, 
 }
 
 void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CRGB bg, int lpad, int rpad, int speed, int hwtimer, bool loop, bool clear) {
-    if (this->font == nullptr || this->currentFontName != fontName) {
-        delete this->font;
-        this->font = new BitmapFont(fontName);
-        this->currentFontName = fontName;
-    }
-
+    this->loadFont(fontName);
     int textWidth = this->font->textWidth(str);
     this->scrollBufferWidth = lpad + textWidth + rpad;
     this->scroll_yoffset = y;

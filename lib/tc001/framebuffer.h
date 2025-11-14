@@ -51,6 +51,7 @@ private:
 
     String currentFontName = "";
     BitmapFont *font = nullptr;
+    void loadFont(String fontName);
 
     CRGB *scrollBuffer = nullptr;
     long scrollBufferWidth = 0;
