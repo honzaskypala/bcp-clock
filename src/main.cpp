@@ -40,14 +40,19 @@ void setup() {
     FrameBuffer.text("lock", 17, 1, "f3x5", CRGB::White, false, true);
 
     delay(5000);
-    FrameBuffer.textScroll("Hello, World!", 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
 
     WifiMgr.connect();
 
     BCPEvent.setID("https://www.bestcoastpairings.com/event/IaDn1zzGAq5b");
     Serial.println("Event ID: " + BCPEvent.getID());
+    BCPEvent.refreshData();
+    Serial.println("Event Name: " + BCPEvent.name);
+    Serial.println("Event Started: " + String(BCPEvent.started));
+    Serial.println("Event Ended: " + String(BCPEvent.ended));
+    Serial.println("Number of Rounds: " + String(BCPEvent.numberOfRounds));
+    Serial.println("Current Round: " + String(BCPEvent.currentRound));
 
-    // Serial.println(Config.getHostname());
+    FrameBuffer.textScroll(BCPEvent.name, 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
 }
 
 void loop() {
