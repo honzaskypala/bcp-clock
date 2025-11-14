@@ -2,13 +2,15 @@
 #include <LittleFS.h>
 #include <framebuffer.h>
 #include <config.h>
+#include <wifimgr.h>
+#include <bcpevent.h>
 
 void displayRefresh(void* parameter) {
     while (1) {
         if (FrameBuffer.doTextScrollStep()) {
             FrameBuffer.textScrollStep();
         }
-        vTaskDelay(pdMS_TO_TICKS(10)); // for example, run every 1s
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -23,7 +25,7 @@ void setup() {
             NULL,             // Parameter
             1,                // Priority
             NULL,             // Task handle
-            1                 // Core
+            1                 // Core (0 or 1)
         );
 
     if (!LittleFS.begin()) {
@@ -39,6 +41,13 @@ void setup() {
 
     delay(5000);
     FrameBuffer.textScroll("Hello, World!", 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
+
+    WifiMgr.connect();
+
+    BCPEvent.setID("https://www.bestcoastpairings.com/event/IaDn1zzGAq5b");
+    Serial.println("Event ID: " + BCPEvent.getID());
+
+    // Serial.println(Config.getHostname());
 }
 
 void loop() {
