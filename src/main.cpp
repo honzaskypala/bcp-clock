@@ -46,13 +46,12 @@ void setup() {
     BCPEvent.setID("https://www.bestcoastpairings.com/event/IaDn1zzGAq5b");
     Serial.println("Event ID: " + BCPEvent.getID());
     BCPEvent.refreshData();
-    Serial.println("Event Name: " + BCPEvent.name);
-    Serial.println("Event Started: " + String(BCPEvent.started));
-    Serial.println("Event Ended: " + String(BCPEvent.ended));
-    Serial.println("Number of Rounds: " + String(BCPEvent.numberOfRounds));
-    Serial.println("Current Round: " + String(BCPEvent.currentRound));
-
-    FrameBuffer.textScroll(BCPEvent.name, 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
+    Serial.println("Event Name: " + BCPEvent.getName());
+    Serial.println("Event Started: " + String(BCPEvent.isStarted()));
+    Serial.println("Event Ended: " + String(BCPEvent.isEnded()));
+    Serial.println("Number of Rounds: " + String(BCPEvent.getNumberOfRounds()));
+    Serial.println("Current Round: " + String(BCPEvent.getCurrentRound()));
+    FrameBuffer.textScroll(BCPEvent.getName(), 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
 }
 
 void loop() {

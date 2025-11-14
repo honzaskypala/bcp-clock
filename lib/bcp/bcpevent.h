@@ -9,9 +9,14 @@ public:
     String getID() const { return id; }
     void refreshData();
 
-    String name = "";
-    bool started = false, ended = false;
-    int numberOfRounds = 0, currentRound = 0;
+    String getName() const { return name; }
+    bool isStarted() const { return started; }
+    bool isEnded() const { return ended; }
+    int getNumberOfRounds() const { return numberOfRounds; }
+    int getCurrentRound() const { return currentRound; }
+    int getTimerLength() const { return timerLength; }
+    String getRoundStartTime() const { return roundStartTime; }
+    String getRoundEndTime() const { return roundEndTime; }
 
 private:
     CBCPEvent();
@@ -22,6 +27,13 @@ private:
 
     String id;
     String extractEventID(const String& input);
+
+    String name = "";
+    bool started = false, ended = false;
+    int numberOfRounds = 0, currentRound = 0;
+    int timerLength = 0;
+    String roundStartTime = "", roundEndTime = "";
+
 };
 
 extern CBCPEvent& BCPEvent;
