@@ -17,6 +17,8 @@ public:
     int getTimerLength() const { return timerLength; }
     String getRoundStartTime() const { return roundStartTime; }
     String getRoundEndTime() const { return roundEndTime; }
+    time_t getRoundStartEpoch() const { return roundStartEpoch; }
+    time_t getRoundEndEpoch() const { return roundEndEpoch; }
 
 private:
     CBCPEvent();
@@ -33,14 +35,10 @@ private:
     int numberOfRounds = 0, currentRound = 0;
     int timerLength = 0;
     String roundStartTime = "", roundEndTime = "";
-
+    time_t roundStartEpoch = 0, roundEndEpoch = 0;
+    time_t timegm(struct tm* t);
 };
 
 extern CBCPEvent& BCPEvent;
-
-
-
-
-
 
 #endif

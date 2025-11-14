@@ -2,6 +2,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
 CBCPEvent::CBCPEvent() {
     // Constructor implementation (if needed)
@@ -30,6 +31,26 @@ void CBCPEvent::setID(String newID) {
             this->id += c;
         }
     }
+}
+
+time_t CBCPEvent::timegm(struct tm* t) {
+    // remember current TZ
+    char* old_tz = getenv("TZ");
+    
+    // set TZ = UTC
+    setenv("TZ", "UTC0", 1);
+    tzset();
+    
+    time_t res = mktime(t);   // treat struct tm as UTC
+    
+    // restore original TZ
+    if (old_tz)
+        setenv("TZ", old_tz, 1);
+    else
+        unsetenv("TZ");
+    tzset();
+
+    return res;
 }
 
 void CBCPEvent::refreshData() {
@@ -64,6 +85,8 @@ void CBCPEvent::refreshData() {
                 this->timerLength = 0;
                 this->roundStartTime = "";
                 this->roundEndTime = "";
+                this->roundStartEpoch = 0;
+                this->roundEndEpoch = 0;
             }
 
             if (this->started && !this->ended) {
@@ -73,15 +96,21 @@ void CBCPEvent::refreshData() {
                     return;
                 }
                 timerHttp.addHeader("client-id", "web-app");
-                int timerStatus = http.GET();
+                int timerStatus = timerHttp.GET();
                 if (timerStatus == HTTP_CODE_OK) {
-                    String timerPayload = http.getString();
+                    String timerPayload = timerHttp.getString();
                     JsonDocument timerDoc;
                     DeserializationError timerError = deserializeJson(timerDoc, timerPayload);
                     if (!timerError) {
                         this->timerLength = timerDoc["timerLength"].as<int>();
                         this->roundStartTime = timerDoc["startTime"].as<String>();
+                        struct tm stm = {};
+                        strptime(this->roundStartTime.c_str(), "%Y-%m-%dT%H:%M:%SZ", &stm);
+                        this->roundStartEpoch = this->timegm(&stm);
                         this->roundEndTime = timerDoc["endTime"].as<String>();
+                        struct tm etm = {};
+                        strptime(this->roundEndTime.c_str(), "%Y-%m-%dT%H:%M:%SZ", &etm);
+                        this->roundEndEpoch = this->timegm(&etm);
                     }
                 }
                 timerHttp.end();
