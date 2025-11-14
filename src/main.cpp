@@ -3,9 +3,28 @@
 #include <framebuffer.h>
 #include <config.h>
 
+void displayRefresh(void* parameter) {
+    while (1) {
+        if (FrameBuffer.doTextScrollStep()) {
+            FrameBuffer.textScrollStep();
+        }
+        vTaskDelay(pdMS_TO_TICKS(10)); // for example, run every 1s
+    }
+}
+
 void setup() {
     pinMode(15, INPUT_PULLDOWN);
     Serial.begin(9600);
+
+    xTaskCreatePinnedToCore(
+            displayRefresh,   // Function to run
+            "DisplayRefresh", // Task name
+            4096,             // Stack size
+            NULL,             // Parameter
+            1,                // Priority
+            NULL,             // Task handle
+            1                 // Core
+        );
 
     if (!LittleFS.begin()) {
         Serial.println("LittleFS mount failed");
@@ -20,13 +39,8 @@ void setup() {
 
     delay(5000);
     FrameBuffer.textScroll("Hello, World!", 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
-    Serial.println(Config.getHostname());
 }
 
 void loop() {
-    delay(10);
-
-    if (FrameBuffer.doTextScrollStep()) {
-        FrameBuffer.textScrollStep();
-    }
+    delay(60000);
 }
