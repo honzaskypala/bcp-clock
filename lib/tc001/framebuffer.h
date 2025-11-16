@@ -60,11 +60,11 @@ private:
     long scrollOffset = 32, scrollStartPos = 0;
     int scroll_yoffset = 0;
     bool loopScrolling = false;
-    bool _doTextScrollStep = false;
+    volatile bool _doTextScrollStep = false;
 
     int progress_pos = 0, progress_y = 0, progress_step = 1;
     CRGB progress_color = CRGB::White, progress_bg = CRGB::Black;
-    bool _doProgressStep = false;
+    volatile bool _doProgressStep = false;
 };
 
 extern CFrameBuffer& FrameBuffer;
