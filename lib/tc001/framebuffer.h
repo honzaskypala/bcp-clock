@@ -1,9 +1,13 @@
+// Ulanzi TC001 FrameBuffer
+// (c) 2025 Honza Skýpala
+// WTFPL license applies
+
 #ifndef FRAMEBUFFER_H
 #define FRAMEBUFFER_H
 
 #include <Arduino.h>
 #include <FastLED.h>
-#include "bitmapfont.h"
+#include "fonts.h"
 
 class CFrameBuffer {
 public:
@@ -49,10 +53,8 @@ private:
     static constexpr int DATA_PIN = 32;
     static CRGB leds[NUM_LEDS];
 
-    String currentFontName = "";
-    BitmapFont *font = nullptr;
-    void loadFont(String fontName);
-
+    void populateScrollBuffer(String str, int cursor, CRGB color);
+    const bitmapfont *scrollFont = nullptr;
     CRGB *scrollBuffer = nullptr;
     long scrollBufferWidth = 0;
     long scrollStartPos = 0;

@@ -1,3 +1,7 @@
+// Ulanzi TC001 FrameBuffer
+// (c) 2025 Honza Skýpala
+// WTFPL license applies
+
 #include "framebuffer.h"
 
 CRGB CFrameBuffer::leds[CFrameBuffer::NUM_LEDS];
@@ -139,32 +143,42 @@ void CFrameBuffer::scroll(int dx, int dy, CRGB fillColor, bool show) {
     }
 }
 
-void CFrameBuffer::loadFont(String fontName) {
-    if (this->font == nullptr || this->currentFontName != fontName) {
-        delete this->font;
-        this->font = new BitmapFont(fontName);
-        this->currentFontName = fontName;
-    }
-}
-
 int CFrameBuffer::glyph(char c, int x, int y, String fontName, CRGB color, bool show) {
-    this->loadFont(fontName);
-    uint8_t glyphData[this->font->width()];
-    this->font->getGlyph(c, glyphData);
-
-    for (int i = 0; i < this->font->width(); i++) {
-        for (int j = 0; j < this->font->height(); j++) {
-            if (glyphData[i] & (1 << j)) {
+    int w = 0, h = 0;
+    int sep = fontName.indexOf('x');
+    if (sep > 1) {
+        w = fontName.substring(1, sep).toInt();
+        h = fontName.substring(sep + 1).toInt();
+    } else {
+        return 0; // Invalid font name
+    }
+    const bitmapfont* matched = nullptr;
+    for (size_t i = 0;; ++i) {
+        const auto& f = FONTS[i];
+        if (f.width == 0 || f.height == 0) break; // sentinel
+        if (f.width == w && f.height == h) {
+            matched = &f;
+            break;
+        }
+    }
+    if (!matched) {
+        return 0; // No matching font found
+    }
+    if (c < 0 || c > matched->lastChar) {
+        c = 0; // Character out of bounds
+    }
+    const uint8_t* glyphBitmap = &matched->bitmaps[c * matched->width];
+    for (int i = 0; i < w; i++, glyphBitmap++) {
+        for (int j = 0; j < h; j++) {
+            if (*glyphBitmap & (1 << j)) {
                 pixel(x + i, y + j, color);
             }
         }
     }
-
     if (show) {
         FastLED.show();
     }
-
-    return this->font->width();
+    return w;
 }
 
 void CFrameBuffer::text(String str, int x, int y, String fontName, CRGB color, bool clear, bool show) {
@@ -184,51 +198,82 @@ void CFrameBuffer::text(String str, int x, int y, String fontName, CRGB color, b
 }
 
 void CFrameBuffer::textCentered(String str, int y, String fontName, CRGB color, bool clear, bool show) {
-    this->loadFont(fontName);
-    int textWidth = this->font->textWidth(str);
+    int w = 0, h = 0;
+    int sep = fontName.indexOf('x');
+    if (sep > 1) {
+        w = fontName.substring(1, sep).toInt();
+        h = fontName.substring(sep + 1).toInt();
+    } else {
+        return; // Invalid font name
+    }
+    int textWidth = (w + 1) * str.length() - 1;
     int startX = (CFrameBuffer::WIDTH - textWidth) / 2;
 
     text(str, startX, y, fontName, color, clear, show);
 }
 
+void CFrameBuffer::populateScrollBuffer(String str, int cursor, CRGB color) {
+    for (size_t i = 0; i < str.length(); i++) {
+        char c = str.charAt(i);
+        if (c < 0 || c > this->scrollFont->lastChar) {
+            c = 0; // Character out of bounds
+        }
+        const uint8_t *glyphBitmap;
+        glyphBitmap = &scrollFont->bitmaps[c * this->scrollFont->width];
+
+        for (int gx = 0; gx < this->scrollFont->width; gx++, glyphBitmap++) {
+            for (int gy = 0; gy < this->scrollFont->height; gy++, cursor++) {
+                if (*glyphBitmap & (1 << gy)) {
+                    this->scrollBuffer[cursor] = color;
+                }
+            }
+        }
+        cursor += this->scrollFont->height;
+    }
+}
+
 void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CRGB bg, int lpad, int rpad, int speed, int hwtimer, bool loop, bool clear) {
-    this->loadFont(fontName);
-    int textWidth = this->font->textWidth(str);
+    int w = 0, h = 0;
+    int sep = fontName.indexOf('x');
+    if (sep > 1) {
+        w = fontName.substring(1, sep).toInt();
+        h = fontName.substring(sep + 1).toInt();
+    } else {
+        return; // Invalid font name
+    }
+    scrollFont = nullptr;
+    for (size_t i = 0;; ++i) {
+        const auto& f = FONTS[i];
+        if (f.width == 0 || f.height == 0) break; // sentinel
+        if (f.width == w && f.height == h) {
+            scrollFont = &f;
+            break;
+        }
+    }
+    if (!scrollFont) {
+        return; // No matching font found
+    }
+    int textWidth = (w + 1) * str.length() - 1;
     this->scrollBufferWidth = lpad + textWidth + rpad;
     this->scroll_yoffset = y;
 
     if (this->scrollBuffer != nullptr) {
         delete[] this->scrollBuffer;
     }
-    this->scrollBuffer = new CRGB[this->scrollBufferWidth * this->font->height()];
+    this->scrollBuffer = new CRGB[this->scrollBufferWidth * h];
 
-    for (int i = 0; i < this->scrollBufferWidth * this->font->height(); i++) {
+    for (int i = 0; i < this->scrollBufferWidth * h; i++) {
         this->scrollBuffer[i] = bg;
     }
 
-    int cursor = lpad * this->font->height();
-    for (size_t i = 0; i < str.length(); i++) {
-        char c = str.charAt(i);
-        uint8_t char_width = this->font->width();
-        uint8_t glyphData[char_width];
-        this->font->getGlyph(c, glyphData);
-
-        for (int gx = 0; gx < char_width; gx++) {
-            for (int gy = 0; gy < this->font->height(); gy++, cursor++) {
-                if (glyphData[gx] & (1 << gy)) {
-                    this->scrollBuffer[cursor] = color;
-                }
-            }
-        }
-        cursor += this->font->height();
-    }
+    populateScrollBuffer(str, lpad * this->scrollFont->height, color);
 
     if (clear) {
         this->clear();
     }
 
-    for (int i = 0; i < this->scrollBufferWidth * this->font->height(); i++) {
-        this->pixel(i / this->font->height(), i % this->font->height() + y, this->scrollBuffer[i]);
+    for (int i = 0; i < this->scrollBufferWidth * h; i++) {
+        this->pixel(i / h, i % h + y, this->scrollBuffer[i]);
     }
 
     this->show();
@@ -245,8 +290,8 @@ void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CR
 void CFrameBuffer::textScrollStep(bool show) {
     static int offset = 32;
     this->scroll(1, 0, CRGB::Black, false);
-    for (int sy = 0; sy < this->font->height(); sy++) {
-        int bufferIndex = offset * this->font->height() + sy;
+    for (int sy = 0; sy < this->scrollFont->height; sy++) {
+        int bufferIndex = offset * this->scrollFont->height + sy;
         pixel(CFrameBuffer::WIDTH - 1, sy + this->scroll_yoffset, this->scrollBuffer[bufferIndex]);
     }
     if (show) {
@@ -277,43 +322,27 @@ void CFrameBuffer::stopTextScroll() {
 }
 
 void CFrameBuffer::textScrollAppend(String str, CRGB color, CRGB bg, int lpad, int rpad, bool newStart) {
-    if (this->font == nullptr) {
+    if (this->scrollFont == nullptr) {
         return;
     }
 
     int oldWidth = this->scrollBufferWidth;
-    int textWidth = lpad + this->font->textWidth(str) + rpad;
-    this->scrollBufferWidth += textWidth;
+    int textWidth = (this->scrollFont->width + 1) * str.length() - 1;
+    this->scrollBufferWidth += lpad + textWidth + rpad;
 
-    CRGB *newBuffer = new CRGB[this->scrollBufferWidth * this->font->height()];
+    CRGB *newBuffer = new CRGB[this->scrollBufferWidth * this->scrollFont->height];
 
-    for (int i = 0; i < this->scrollBufferWidth * this->font->height(); i++) {
+    for (int i = 0; i < this->scrollBufferWidth * scrollFont->height; i++) {
         newBuffer[i] = bg;
     }
 
-    for (int i = 0; i < oldWidth * this->font->height(); i++) {
+    for (int i = 0; i < oldWidth * this->scrollFont->height; i++) {
         newBuffer[i] = this->scrollBuffer[i];
     }
-
-    int cursor = (oldWidth + lpad) * this->font->height();
-    for (size_t i = 0; i < str.length(); i++) {
-        char c = str.charAt(i);
-        uint8_t char_width = this->font->width();
-        uint8_t glyphData[char_width];
-        this->font->getGlyph(c, glyphData);
-
-        for (int gx = 0; gx < char_width; gx++) {
-            for (int gy = 0; gy < this->font->height(); gy++, cursor++) {
-                if (glyphData[gx] & (1 << gy)) {
-                    newBuffer[cursor] = color;
-                }
-            }
-        }
-        cursor += this->font->height();
-    }
-
     delete[] this->scrollBuffer;
     this->scrollBuffer = newBuffer;
+
+    populateScrollBuffer(str, (oldWidth + lpad) * this->scrollFont->height, color);
 
     if (newStart) {
         this->scrollStartPos = oldWidth;
