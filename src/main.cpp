@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <LittleFS.h>
 #include <framebuffer.h>
 #include <config.h>
 #include <wifimgr.h>
@@ -186,12 +185,6 @@ void setup() {
             NULL,             // Task handle
             1                 // Core (0 or 1)
         );
-
-    if (!LittleFS.begin()) {
-        Serial.println("LittleFS mount failed");
-        FrameBuffer.fill(CRGB::Red, true);
-        return;
-    }
 
     // splash screen
     FrameBuffer.text("BCP", 0, 1, "f3x5", CRGB::White, true);

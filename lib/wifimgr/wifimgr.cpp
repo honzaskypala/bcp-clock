@@ -5,14 +5,12 @@
 #include "wifimgr.h"
 
 #include <WiFi.h>
-#include <LittleFS.h>
 #include <time.h>
-#include <ArduinoJson.h>
 #include <esp_wifi.h>
 #include <framebuffer.h>
+#include <vector>
 
 // ---------- Config ----------
-static const char* WIFI_JSON_PATH = "/wifi.json";
 static const uint32_t CONNECT_TIMEOUT_MS = 15000;
 static const uint32_t PORTAL_CONNECT_TIMEOUT_MS = 20000;
 static constexpr const char* AP_SSID = "BCP-clock";
@@ -36,11 +34,10 @@ bool CWifiMgr::connect(uint32_t portalTimeoutMs) {
     if (!scanAndSort()) {
         Serial.println("WifiMgr: Scan failed or found no networks.");
     } else {
-        ArduinoJson::JsonDocument credsDoc;
-        bool haveCreds = loadCredentialsDoc(credsDoc);
-        ArduinoJson::JsonObject creds = haveCreds ? credsDoc.as<ArduinoJson::JsonObject>() : ArduinoJson::JsonObject();
-
         // Pass 1: known networks (DO NOT save credential here)
+        std::vector<String> storedSsids;
+        bool haveCreds = listStoredSsids(storedSsids);
+
         if (haveCreds) {
             Serial.println("WifiMgr: Pass 1 - Trying known networks...");
             for (int order = 0; order < scanCount_; ++order) {
@@ -49,14 +46,12 @@ bool CWifiMgr::connect(uint32_t portalTimeoutMs) {
                 Serial.println("WifiMgr: Considering SSID: " + ssid);
                 if (ssid.length() == 0) continue;
 
-                ArduinoJson::JsonVariantConst pwVar = creds[ssid];
-                if (pwVar.is<const char*>()) {
-                    const char* pass = pwVar.as<const char*>();
-                    if (!pass) pass = "";
+                String pass;
+                if (getCredential(ssid.c_str(), pass)) {
                     Serial.printf("WifiMgr: Known SSID candidate: %s (RSSI %d dBm)\n",
                                   ssid.c_str(), scanRssi_[order]);
 
-                    if (attemptConnect(ssid.c_str(), pass, CONNECT_TIMEOUT_MS)) {
+                    if (attemptConnect(ssid.c_str(), pass.c_str(), CONNECT_TIMEOUT_MS)) {
                         connected_ = true;
                         freeScanData();
                         Serial.println("WifiMgr: Connected via known network (no credential save).");
@@ -267,36 +262,85 @@ bool CWifiMgr::attemptConnect(const char* ssid, const char* pass, uint32_t timeo
 }
 
 // ---------- Credentials load/save/remove ----------
-bool CWifiMgr::loadCredentialsDoc(ArduinoJson::JsonDocument& doc) {
-    if (!mountLittleFS()) {
-        Serial.println("WifiMgr: Skipping known networks: cannot mount LittleFS.");
+bool CWifiMgr::beginPrefs(bool readOnly) {
+    // Return true on success, false on failure
+    return prefs_.begin(PREFS_NS, readOnly);
+}
+
+// FNV-1a 32-bit hash for key shortening (SSID can be arbitrary)
+static uint32_t fnv1a32(const String& s) {
+    uint32_t h = 2166136261UL;
+    for (size_t i = 0; i < s.length(); ++i) {
+        h ^= (uint8_t)s[i];
+        h *= 16777619UL;
+    }
+    return h;
+}
+
+String CWifiMgr::makePassKey(const String& ssid) {
+    uint32_t h = fnv1a32(ssid);
+    char buf[13]; // "pwd_" + 8 hex + null
+    snprintf(buf, sizeof(buf), "pwd_%08x", (unsigned)h);
+    return String(buf);
+}
+
+void CWifiMgr::splitList(const String& src, std::vector<String>& out) {
+    out.clear();
+    int start = 0;
+    while (start <= (int)src.length()) {
+        int nl = src.indexOf('\n', start);
+        if (nl < 0) nl = src.length();
+        String item = src.substring(start, nl);
+        if (item.length() > 0) out.push_back(item);
+        start = nl + 1;
+    }
+}
+
+String CWifiMgr::joinList(const std::vector<String>& list) {
+    String s;
+    for (size_t i = 0; i < list.size(); ++i) {
+        s += list[i];
+        if (i + 1 < list.size()) s += '\n';
+    }
+    return s;
+}
+
+bool CWifiMgr::listStoredSsids(std::vector<String>& out) {
+    out.clear();
+    if (!beginPrefs(true)) {
+        Serial.println("WifiMgr: Preferences begin (RO) failed.");
         return false;
     }
-    if (!LittleFS.exists(WIFI_JSON_PATH)) {
-        Serial.println("WifiMgr: No /wifi.json found; skipping known networks.");
-        return false;
+
+    String list;
+    if (prefs_.isKey(PREFS_LIST_KEY)) {
+        list = prefs_.getString(PREFS_LIST_KEY, "");
+    } else {
+        list = "";
     }
-    File f = LittleFS.open(WIFI_JSON_PATH, "r");
-    if (!f) {
-        Serial.println("WifiMgr: Failed to open /wifi.json");
-        return false;
+    prefs_.end();
+
+    splitList(list, out);
+    if (!out.empty()) {
+        Serial.println("WifiMgr: Loaded stored SSIDs from Preferences:");
+        for (auto& s : out) Serial.printf("  SSID: %s\n", s.c_str());
+        return true;
     }
-    auto err = ArduinoJson::deserializeJson(doc, f);
-    f.close();
-    if (err) {
-        Serial.print("WifiMgr: Failed to parse /wifi.json: ");
-        Serial.println(err.c_str());
-        return false;
+    Serial.println("WifiMgr: No stored SSIDs in Preferences.");
+    return false;
+}
+
+bool CWifiMgr::getCredential(const char* ssid, String& outPass) {
+    if (!ssid || !beginPrefs(true)) return false;
+
+    String key = makePassKey(String(ssid));
+    bool ok = false;
+    if (prefs_.isKey(key.c_str())) {
+        outPass = prefs_.getString(key.c_str(), "");
+        ok = true; // can be empty for OPEN
     }
-    if (!doc.is<ArduinoJson::JsonObject>()) {
-        Serial.println("WifiMgr: Invalid /wifi.json: expected {\"ssid\":\"password\",...}");
-        return false;
-    }
-    Serial.println("WifiMgr: Loaded JSON credentials:");
-    for (auto kv : doc.as<ArduinoJson::JsonObject>()) {
-        Serial.printf("  SSID: %s\n", kv.key().c_str());
-    }
-    return true;
+    prefs_.end();
+    return ok;
 }
 
 bool CWifiMgr::saveCredential(const char* ssid, const char* pass) {
@@ -304,40 +348,30 @@ bool CWifiMgr::saveCredential(const char* ssid, const char* pass) {
         Serial.println("WifiMgr: saveCredential: Empty SSID, skipping.");
         return false;
     }
-    if (!mountLittleFS()) {
-        Serial.println("WifiMgr: saveCredential: LittleFS mount failed.");
+    if (!beginPrefs(false)) {
+        Serial.println("WifiMgr: saveCredential: Preferences begin (RW) failed.");
         return false;
     }
-    ArduinoJson::JsonDocument doc;
-    if (LittleFS.exists(WIFI_JSON_PATH)) {
-        File in = LittleFS.open(WIFI_JSON_PATH, "r");
-        if (in) {
-            auto err = ArduinoJson::deserializeJson(doc, in);
-            in.close();
-            if (err) {
-                Serial.print("WifiMgr: saveCredential: Parse error, starting fresh: ");
-                Serial.println(err.c_str());
-                doc.clear();
-            }
-        }
+
+    // Read current list only if it exists to avoid NOT_FOUND log
+    String listStr;
+    if (prefs_.isKey(PREFS_LIST_KEY)) {
+        listStr = prefs_.getString(PREFS_LIST_KEY, "");
+    } else {
+        listStr = "";
     }
-    if (!doc.is<ArduinoJson::JsonObject>()) {
-        doc.clear();
-        doc.to<ArduinoJson::JsonObject>();
-    }
-    auto obj = doc.as<ArduinoJson::JsonObject>();
-    obj[ssid] = (pass && pass[0] != '\0') ? pass : "";
-    File out = LittleFS.open(WIFI_JSON_PATH, "w");
-    if (!out) {
-        Serial.println("WifiMgr: saveCredential: Failed to open for writing.");
-        return false;
-    }
-    if (ArduinoJson::serializeJson(doc, out) == 0) {
-        Serial.println("WifiMgr: saveCredential: Serialization failed.");
-        out.close();
-        return false;
-    }
-    out.close();
+
+    std::vector<String> list;
+    splitList(listStr, list);
+    bool found = false;
+    for (auto& s : list) if (s == ssid) { found = true; break; }
+    if (!found) list.push_back(String(ssid));
+    prefs_.putString(PREFS_LIST_KEY, joinList(list));
+
+    String key = makePassKey(String(ssid));
+    prefs_.putString(key.c_str(), (pass ? pass : ""));
+
+    prefs_.end();
     Serial.printf("WifiMgr: saveCredential: Stored credential for '%s'.\n", ssid);
     return true;
 }
@@ -347,44 +381,41 @@ bool CWifiMgr::removeCredential(const char* ssid) {
         Serial.println("WifiMgr: removeCredential: Empty SSID, skipping.");
         return false;
     }
-    if (!mountLittleFS()) {
-        Serial.println("WifiMgr: removeCredential: LittleFS mount failed.");
-        return false;
-    }
-    if (!LittleFS.exists(WIFI_JSON_PATH)) {
-        Serial.println("WifiMgr: removeCredential: wifi.json does not exist.");
+    if (!beginPrefs(false)) {
+        Serial.println("WifiMgr: removeCredential: Preferences begin (RW) failed.");
         return false;
     }
 
-    ArduinoJson::JsonDocument doc;
-    File in = LittleFS.open(WIFI_JSON_PATH, "r");
-    if (!in) {
-        Serial.println("WifiMgr: removeCredential: Failed to open for reading.");
-        return false;
+    // Read list only if present (avoid NOT_FOUND log)
+    String listStr;
+    if (prefs_.isKey(PREFS_LIST_KEY)) {
+        listStr = prefs_.getString(PREFS_LIST_KEY, "");
+    } else {
+        listStr = "";
     }
-    auto err = ArduinoJson::deserializeJson(doc, in);
-    in.close();
-    if (err || !doc.is<ArduinoJson::JsonObject>()) {
-        Serial.println("WifiMgr: removeCredential: Parse error or not object.");
-        return false;
+
+    std::vector<String> list;
+    splitList(listStr, list);
+    bool removed = false;
+    std::vector<String> out;
+    out.reserve(list.size());
+    for (auto& s : list) {
+        if (s == ssid) { removed = true; continue; }
+        out.push_back(s);
     }
-    auto obj = doc.as<ArduinoJson::JsonObject>();
-    if (obj[ssid].isNull()) {
+    if (!removed) {
+        prefs_.end();
         Serial.printf("WifiMgr: removeCredential: SSID '%s' not found.\n", ssid);
         return false;
     }
-    obj.remove(ssid);
-    File out = LittleFS.open(WIFI_JSON_PATH, "w");
-    if (!out) {
-        Serial.println("WifiMgr: removeCredential: Failed to open for writing.");
-        return false;
+    prefs_.putString(PREFS_LIST_KEY, joinList(out));
+
+    String key = makePassKey(String(ssid));
+    if (prefs_.isKey(key.c_str())) {
+        prefs_.remove(key.c_str());
     }
-    if (ArduinoJson::serializeJson(doc, out) == 0) {
-        Serial.println("WifiMgr: removeCredential: Serialization failed.");
-        out.close();
-        return false;
-    }
-    out.close();
+
+    prefs_.end();
     Serial.printf("WifiMgr: removeCredential: Removed '%s'.\n", ssid);
     return true;
 }
@@ -441,14 +472,6 @@ void CWifiMgr::printLocalTime() {
 }
 
 // ---------- HTML helpers ----------
-bool CWifiMgr::mountLittleFS() {
-    if (!LittleFS.begin(false)) {
-        Serial.println("LittleFS mount failed");
-        return false;
-    }
-    return true;
-}
-
 String CWifiMgr::htmlEscape(const String& in) {
     String out;
     out.reserve(in.length() + 10);
@@ -518,11 +541,10 @@ const char* CWifiMgr::wifiAuthModeToString(uint8_t m) {
 
 // ---------- HTTP Handlers ----------
 void CWifiMgr::handleRoot() {
-    ArduinoJson::JsonDocument credsDoc;
-    bool haveCreds = loadCredentialsDoc(credsDoc);
-    auto creds = haveCreds ? credsDoc.as<ArduinoJson::JsonObject>() : ArduinoJson::JsonObject();
-
     bool showFail = server_.hasArg("fail");
+
+    std::vector<String> storedSsids;
+    bool haveCreds = listStoredSsids(storedSsids);
 
     String page;
     page.reserve(17000);
@@ -618,19 +640,19 @@ void CWifiMgr::handleRoot() {
     }
     page += "</fieldset></form>";
 
+    // Stored networks
     page += "<div class='storedBlock'>";
     page += "<div class='storedLabel'>Stored networks:</div>";
-    if (haveCreds && creds.size() > 0) {
-        for (auto it = creds.begin(); it != creds.end(); ++it) {
-            const char* k = it->key().c_str();
+    if (haveCreds && !storedSsids.empty()) {
+        for (auto& s : storedSsids) {
             page += "<div class='storedRow'>"
-                    "<div class='storedSSID'>" + htmlEscape(String(k)) + "</div>"
-                    "<a class='del' href='/delete?ssid=" + urlEncode(String(k)) +
-                    "' title='Delete' onclick='return confirm(\"Delete SSID " + htmlEscape(String(k)) + "?\");'>👉🗑️</a>"
+                    "<div class='storedSSID'>" + htmlEscape(s) + "</div>"
+                    "<a class='del' href='/delete?ssid=" + urlEncode(s) +
+                    "' title='Delete' onclick='return confirm(\"Delete SSID " + htmlEscape(s) + "?\");'>👉🗑️</a>"
                     "</div>";
         }
     } else {
-        page += "<p>No credentials stored.</p>";
+        page += "<p>No networks stored.</p>";
     }
     page += "</div>";
 
@@ -810,4 +832,6 @@ void CWifiMgr::stopPortal() {
     WiFi.softAPdisconnect(true);
     portalActive_ = false;
     Serial.println("WifiMgr: Portal stopped.");
+    delay(500);
+    ESP.restart();
 }

@@ -1,13 +1,14 @@
-#pragma once
-
 // ESP32 WiFi Manager with captive portal for BCP clock
 // (c) 2025 Honza Skýpala
 // WTFPL license applies
 
+#pragma once
+
 #include <Arduino.h>
 #include <WebServer.h>
 #include <DNSServer.h>
-#include <ArduinoJson.h>
+#include <Preferences.h>
+#include <vector>
 
 class CWifiMgr {
 public:
@@ -19,9 +20,17 @@ private:
     bool scanAndSort();
     void freeScanData();
     bool attemptConnect(const char* ssid, const char* pass, uint32_t timeoutMs);
-    bool loadCredentialsDoc(ArduinoJson::JsonDocument& doc);
+
+    // ---- Credentials storage ----
     bool saveCredential(const char* ssid, const char* pass);
     bool removeCredential(const char* ssid);
+    bool getCredential(const char* ssid, String& outPass);
+    bool listStoredSsids(std::vector<String>& out);
+    bool beginPrefs(bool readOnly);
+    static String makePassKey(const String& ssid);
+    static void splitList(const String& src, std::vector<String>& out);
+    static String joinList(const std::vector<String>& list);
+
     void ensureStaModeForScan();
 
     // ---- Time sync ----
@@ -41,13 +50,17 @@ private:
     void handleNotFound();
 
     // ---- Helpers ----
-    static bool mountLittleFS();
     static String htmlEscape(const String& in);
     static String urlEncode(const String& in);
     static inline bool isOpenEncryption(int enc) { return enc == WIFI_AUTH_OPEN; }
     static const char* wifiAuthModeToString(uint8_t m);
 
 private:
+    // Preferences storage
+    Preferences prefs_;
+    static constexpr const char* PREFS_NS       = "wificreds";
+    static constexpr const char* PREFS_LIST_KEY = "__ssids";
+
     DNSServer dnsServer_;
     WebServer server_{80};
 
