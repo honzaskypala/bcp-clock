@@ -285,23 +285,23 @@ void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CR
 
     this->loopScrolling = loop;
     this->scrollStartPos = 0;
+    this->scrollOffset = 32;
 }
 
 void CFrameBuffer::textScrollStep(bool show) {
-    static int offset = 32;
     this->scroll(1, 0, CRGB::Black, false);
     for (int sy = 0; sy < this->scrollFont->height; sy++) {
-        int bufferIndex = offset * this->scrollFont->height + sy;
+        int bufferIndex = this->scrollOffset * this->scrollFont->height + sy;
         pixel(CFrameBuffer::WIDTH - 1, sy + this->scroll_yoffset, this->scrollBuffer[bufferIndex]);
     }
     if (show) {
         this->show();
     }
     this->_doTextScrollStep = false;
-    offset++;
-    if (offset >= this->scrollBufferWidth) {
+    this->scrollOffset++;
+    if (this->scrollOffset >= this->scrollBufferWidth) {
         if (this->loopScrolling) {
-            offset = this->scrollStartPos;
+            this->scrollOffset = this->scrollStartPos;
         } else {
             this->stopTextScroll();
         }

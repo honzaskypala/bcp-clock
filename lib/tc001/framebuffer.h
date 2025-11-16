@@ -57,7 +57,7 @@ private:
     const bitmapfont *scrollFont = nullptr;
     CRGB *scrollBuffer = nullptr;
     long scrollBufferWidth = 0;
-    long scrollStartPos = 0;
+    long scrollOffset = 32, scrollStartPos = 0;
     int scroll_yoffset = 0;
     bool loopScrolling = false;
     bool _doTextScrollStep = false;
