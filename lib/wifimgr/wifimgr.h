@@ -22,7 +22,6 @@ public:
 private:
     // ---- Core state ----
     volatile bool connected_ = false;
-    bool timeSyncFailed_ = false;
 
     // ---- Core steps ----
     bool scanAndSort();
@@ -39,10 +38,6 @@ private:
 
     void ensureStaModeForScan();
 
-    // ---- Time sync ----
-    bool syncTime(uint32_t timeoutMs = 10000);  // CHANGED: now returns success/failure
-    void printLocalTime();
-
     // ---- Portal ----
     void startConfigPortal();
     void stopPortal();
@@ -55,6 +50,12 @@ private:
     void handleCaptive();
     void handleNotFound();
     void handleDeleteAll();
+
+    // ---- Time sync ----
+    bool syncTime(uint32_t timeoutMs = 10000);  // CHANGED: now returns success/failure
+    void printLocalTime();
+    bool timeSyncFailed_ = false;
+    void failedTimeSyncMsg();
 
     // ---- Helpers ----
     static String htmlEscape(const String& in);
