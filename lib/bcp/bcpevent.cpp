@@ -31,8 +31,8 @@ void CBCPEvent::setID(String newID) {
 
 // ---- Refresh data from BCP API ----
 
-void CBCPEvent::refreshData() {
-    if (id_.length() == 0) return;
+bool CBCPEvent::refreshData() {
+    if (id_.length() == 0) return false;
 
     const String baseUrl = "https://newprod-api.bestcoastpairings.com/v1/events/" + id_;
 
@@ -42,7 +42,7 @@ void CBCPEvent::refreshData() {
     HTTPClient http;
     String url = baseUrl + "/overview";
     if (!http.begin(client, url)) {
-        return;
+        return false;
     }
     http.addHeader("client-id", "web-app");
     int status = http.GET();
@@ -70,7 +70,7 @@ void CBCPEvent::refreshData() {
                 HTTPClient timerHttp;
                 String timerUrl = baseUrl + "/timer?round=" + String(currentRound_);
                 if (!timerHttp.begin(client, timerUrl)) {
-                    return;
+                    return status == HTTP_CODE_OK;
                 }
                 timerHttp.addHeader("client-id", "web-app");
                 int timerStatus = timerHttp.GET();
@@ -95,6 +95,7 @@ void CBCPEvent::refreshData() {
         }
     }
     http.end();
+    return status == HTTP_CODE_OK;
 }
 
 // ---- Helper methods ----

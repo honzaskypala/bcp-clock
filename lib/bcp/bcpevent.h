@@ -15,7 +15,7 @@ public:
     String fullId() { return fullId_; }
 
     // ---- Refresh data from BCP API ----
-    void refreshData();
+    bool refreshData();
 
     // ---- BCP event details ----
     String name() const { return name_; }

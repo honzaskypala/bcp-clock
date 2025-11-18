@@ -275,6 +275,7 @@ void setup() {
 }
 
 void loop() {
+    static int failCount = 0;
     static time_t count = 0;
     if (Config.configUpdated) {
         Config.configUpdated = false;
@@ -288,7 +289,16 @@ void loop() {
             displayUpdate();
         }
     } else if (count % 120 == 0) {
-        BCPEvent.refreshData();
+        if (BCPEvent.refreshData()) {
+            failCount = 0;
+        } else {
+            failCount++;
+            Serial.printf("Main: Failed to refresh BCP event data (failure count %d)\n", failCount);
+            if (failCount >= 5) {
+                Serial.println("Main: Too many consecutive failures, restarting device");
+                ESP.restart();
+            }
+        }
         if (count == 0) {
             FrameBuffer.progressStop();
         }
