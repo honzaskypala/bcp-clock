@@ -94,17 +94,10 @@ bool CBCPEvent::refreshData() {
                 timerHttp.end();
             }
         }
+
     } else if (status == HTTP_CODE_NOT_FOUND) {
-        String payload = http.getString();
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, payload);
-        if (!error) {
-            String errMsg = doc["error"].as<String>();
-            Serial.printf("BCPEvent: Event ID '%s' not found: %s\n", id_.c_str(), errMsg.c_str());
-            if (errMsg == "No event record found") {
-                validId_ = false;
-            }
-        }
+        validId_ = false;
+
     }
     http.end();
     return status == HTTP_CODE_OK || status == HTTP_CODE_NOT_FOUND;
