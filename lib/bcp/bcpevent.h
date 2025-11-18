@@ -1,3 +1,7 @@
+// Best Coast Pairings integration
+// (c) 2025 Honza Skýpala
+// WTFPL license applies
+
 #ifndef BCPEVENT_H
 #define BCPEVENT_H
 
@@ -5,40 +9,55 @@
 
 class CBCPEvent {
 public:
+    // ---- Event ID related ----
     void setID(String newID);
-    String getID() const { return id; }
+    String id() { return id_; }
+    String fullId() { return fullId_; }
+
+    // ---- Refresh data from BCP API ----
     void refreshData();
 
-    String getName() const { return name; }
-    bool isStarted() const { return started; }
-    bool isEnded() const { return ended; }
-    int getNumberOfRounds() const { return numberOfRounds; }
-    int getCurrentRound() const { return currentRound; }
-    int getTimerLength() const { return timerLength; }
-    String getRoundStartTime() const { return roundStartTime; }
-    String getRoundEndTime() const { return roundEndTime; }
-    time_t getRoundStartEpoch() const { return roundStartEpoch; }
-    time_t getRoundEndEpoch() const { return roundEndEpoch; }
+    // ---- BCP event details ----
+    String name() const { return name_; }
+    bool started() const { return started_; }
+    bool ended() const { return ended_; }
+    int numberOfRounds() const { return numberOfRounds_; }
+    int currentRound() const { return currentRound_; }
+
+    // ---- BCP round timer details ----
+    int timerLength() const { return timerLength_; }
+    String roundStartTime() const { return roundStartTime_; }
+    String roundEndTime() const { return roundEndTime_; }
+    time_t roundStartEpoch() const { return roundStartEpoch_; }
+    time_t roundEndEpoch() const { return roundEndEpoch_; }
 
 private:
+    // ---- Singleton related ----
     CBCPEvent();
     CBCPEvent(const CBCPEvent&) = delete;
     CBCPEvent& operator=(const CBCPEvent&) = delete;
-
     friend CBCPEvent& getBCPEventInstance();
 
-    String id;
+    // ---- Event ID related ----
+    String id_;
+    String fullId_;
     String extractEventID(const String& input);
 
-    String name = "";
-    bool started = false, ended = false;
-    int numberOfRounds = 0, currentRound = 0;
-    int timerLength = 0;
-    String roundStartTime = "", roundEndTime = "";
-    time_t roundStartEpoch = 0, roundEndEpoch = 0;
+    // ---- BCP event details ----
+    String name_ = "";
+    bool started_ = false, ended_ = false;
+    int numberOfRounds_ = 0, currentRound_ = 0;
+
+    // ---- BCP round timer details ----
+    int timerLength_ = 0;
+    String roundStartTime_ = "", roundEndTime_ = "";
+    time_t roundStartEpoch_ = 0, roundEndEpoch_ = 0;
+
+    // ---- Helper methods ----
     time_t timegm(struct tm* t);
 };
 
+// ---- Singleton instance ----
 extern CBCPEvent& BCPEvent;
 
 #endif
