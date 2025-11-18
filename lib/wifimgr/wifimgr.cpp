@@ -19,6 +19,8 @@ static const byte DNS_PORT = 53;
 static const char* NTP_SERVER = "pool.ntp.org";
 static const long GMT_OFFSET_SEC = 0;
 static const int DAYLIGHT_OFFSET_SEC = 3600;
+static constexpr const char* PREFS_NS       = "wificreds";
+static constexpr const char* PREFS_LIST_KEY = "__ssids";
 
 // -----------Singleton----------
 CWifiMgr WifiMgr;
@@ -248,7 +250,7 @@ bool CWifiMgr::attemptConnect(const char* ssid, const char* pass, uint32_t timeo
             Serial.println("WifiMgr: NTP sync failed. Disconnecting and failing connect attempt.");
             WiFi.disconnect(true, true);
             FrameBuffer.progressStop();
-            FrameBuffer.stopTextScroll();
+            FrameBuffer.textScrollStop();
             FrameBuffer.textScroll("Error: NTP time sync failed", 2, "f3x5", CRGB::Red, CRGB::Black, 24);
             timeSyncFailed_ = true;
             delay(100);
@@ -832,6 +834,4 @@ void CWifiMgr::stopPortal() {
     WiFi.softAPdisconnect(true);
     portalActive_ = false;
     Serial.println("WifiMgr: Portal stopped.");
-    delay(500);
-    ESP.restart();
 }

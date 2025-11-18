@@ -12,10 +12,15 @@
 
 class CWifiMgr {
 public:
+    // ---- Public API ----
     bool connect(uint32_t portalTimeoutMs = 0);
     bool isConnected() const { return connected_; }
 
 private:
+    // ---- Core state ----
+    volatile bool connected_ = false;
+    bool timeSyncFailed_ = false;
+
     // ---- Core steps ----
     bool scanAndSort();
     void freeScanData();
@@ -55,26 +60,22 @@ private:
     static inline bool isOpenEncryption(int enc) { return enc == WIFI_AUTH_OPEN; }
     static const char* wifiAuthModeToString(uint8_t m);
 
-private:
-    // Preferences storage
+    // ---- Preferences storage ----
     Preferences prefs_;
-    static constexpr const char* PREFS_NS       = "wificreds";
-    static constexpr const char* PREFS_LIST_KEY = "__ssids";
 
+    // ---- DNS and HTTP servers for captive portal ----
     DNSServer dnsServer_;
     WebServer server_{80};
+    bool portalActive_ = false;
 
+    // ---- Wi-Fi scan results ----
     int*     scanIdx_   = nullptr;
     int*     scanRssi_  = nullptr;
     String*  scanSsid_  = nullptr;
     uint8_t* scanEnc_   = nullptr;
     int*     scanChan_  = nullptr;
     int      scanCount_ = 0;
-
-    volatile bool connected_ = false;
-    bool portalActive_ = false;
-
-    bool timeSyncFailed_ = false;
 };
 
+// ---- Singleton instance ----
 extern CWifiMgr WifiMgr;
