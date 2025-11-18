@@ -14,14 +14,15 @@ constexpr int COUNTDOWN_TIMER_ID = 3;
 constexpr int COUNTDOWN_TIMER_PERIOD_US = 1000000; // 1 second
 constexpr int DEBOUNCE_DELAY_MS = 500;
 
-volatile enum {
+enum DisplayState {
     DISPLAY_BOOT,
     DISPLAY_SCROLL_ONCE,
     DISPLAY_EVENT_NAME,
     DISPLAY_EVENT_ROUND,
     DISPLAY_EVENT_COUNTDOWN,
     DISPLAY_EVENT_NO_UPDATE
-} displayState = DISPLAY_BOOT;
+};
+volatile DisplayState displayState = DISPLAY_BOOT;
 
 hw_timer_t *countdownTimer = nullptr;
 volatile bool updateCountdown = false;
