@@ -9,6 +9,7 @@
 #include <esp_wifi.h>
 #include <framebuffer.h>
 #include <vector>
+#include <RTClib.h>
 
 // ---------- Config ----------
 static const uint32_t CONNECT_TIMEOUT_MS = 15000;
@@ -490,9 +491,21 @@ bool CWifiMgr::syncTime(uint32_t timeoutMs) {
     Serial.println("WifiMgr: Syncing time via NTP...");
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
 
+    RTC_DS1307 rtc;
     struct tm timeinfo;
     if (getLocalTime(&timeinfo, timeoutMs)) {
         Serial.println("WifiMgr: Time synchronized:");
+        printLocalTime();
+        if (rtc.begin()) {
+            rtc.adjust(DateTime((uint32_t) time(nullptr)));  // Update RTC time
+        }
+        return true;
+    } else if (rtc.begin() && rtc.now().unixtime() > 1763487357) {
+        Serial.println("WifiMgr: NTP sync failed, but RTC has valid time. Using RTC time.");
+        struct timeval tv;
+        tv.tv_sec = rtc.now().unixtime();
+        tv.tv_usec = 0;
+        settimeofday(&tv, nullptr);
         printLocalTime();
         return true;
     } else {
