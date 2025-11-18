@@ -1,3 +1,8 @@
+// Round countdown clock firmware for Ulanzi TC001 desktop clock hardware,
+// fetching the data from www.bestcoastpairings.com
+// (c) 2025 Honza Skýpala
+// WTFPL license applies
+
 #include <Arduino.h>
 #include <framebuffer.h>
 #include <config.h>
@@ -5,64 +10,65 @@
 #include <bcpevent.h>
 #include <time.h>
 
-enum {
+constexpr int COUNTDOWN_TIMER_ID = 3;
+constexpr int COUNTDOWN_TIMER_PERIOD_US = 1000000; // 1 second
+constexpr int DEBOUNCE_DELAY_MS = 500;
+
+volatile enum {
     DISPLAY_BOOT,
     DISPLAY_SCROLL_ONCE,
     DISPLAY_EVENT_NAME,
     DISPLAY_EVENT_ROUND,
-    DISPLAY_EVENT_COUNTDOWN
+    DISPLAY_EVENT_COUNTDOWN,
+    DISPLAY_EVENT_NO_UPDATE
 } displayState = DISPLAY_BOOT;
 
 hw_timer_t *countdownTimer = nullptr;
-bool updateCountdown = false;
+volatile bool updateCountdown = false;
+volatile bool midButtonPressed = false;
+
+void splashScreen(bool showProgress = true) {
+    displayState = DISPLAY_BOOT;
+    int y = showProgress ? 1 : 2;
+    FrameBuffer.textScrollStop();
+    FrameBuffer.progressStop();
+    FrameBuffer.text("BCP", 0, y, "f3x5", CRGB::White, true);
+    FrameBuffer.text("c", 14, y, "f3x5", CRGB::White);
+    FrameBuffer.text("lock", 17, y, "f3x5", CRGB::White, false, !showProgress);
+    if (showProgress) {
+        FrameBuffer.progressStart(-1);
+    }
+}
+
+void configMessage(bool loop = false) {
+    FrameBuffer.textScrollStop();
+    FrameBuffer.progressStop();
+    FrameBuffer.textScroll("Config page http://" + WiFi.localIP().toString(), 2, "f3x5", CRGB::White, CRGB::Black, 24, loop ? 8 : 32, 100, 3, loop);
+}
+
+// ---- Time countdown using ESP-32 hardware timer ----
+
+void ensureCountdownTimer() {
+    if (countdownTimer == nullptr) {
+        countdownTimer = timerBegin(COUNTDOWN_TIMER_ID, 80, true);
+        timerAttachInterrupt(countdownTimer, []() { 
+            if (displayState == DISPLAY_EVENT_COUNTDOWN) {
+                updateCountdown = true; 
+            }
+        }, true);
+        timerAlarmWrite(countdownTimer, COUNTDOWN_TIMER_PERIOD_US, true);
+        timerAlarmEnable(countdownTimer);
+    }
+}
 
 void stopCountdownTimer() {
-    if (countdownTimer != nullptr) {
-        timerEnd(countdownTimer);
-        countdownTimer = nullptr;
+    if (displayState == DISPLAY_EVENT_COUNTDOWN) {
+        displayState = DISPLAY_BOOT;
     }
     updateCountdown = false;
 }
 
-void displayUpdate() {
-    if (displayState == DISPLAY_SCROLL_ONCE) {
-        return;
-    }
-    if (BCPEvent.getID() != "") {
-
-        if (BCPEvent.isEnded() || !BCPEvent.isStarted()) {
-            // event either not started or already ended
-            if (displayState != DISPLAY_EVENT_NAME) {
-                stopCountdownTimer();
-                FrameBuffer.stopTextScroll();
-                FrameBuffer.textScroll(BCPEvent.getName(), 2, "f3x5", CRGB::Green, CRGB::Black, 16, 16);
-                displayState = DISPLAY_EVENT_NAME;
-            }
-
-        } else if (BCPEvent.getTimerLength() <= 0) {
-            // no timer, show round only
-            if (displayState != DISPLAY_EVENT_ROUND) {
-                stopCountdownTimer();
-                FrameBuffer.stopTextScroll();
-                FrameBuffer.textCentered("Round " + String(BCPEvent.getCurrentRound()), 2, "f3x5", CRGB::White, true, true);
-                displayState = DISPLAY_EVENT_ROUND;
-            }
-
-        } else {
-            // show countdown
-            if (displayState != DISPLAY_EVENT_COUNTDOWN) {
-                FrameBuffer.stopTextScroll();
-                countdownTimer = timerBegin(3, 80, true);
-                timerAttachInterrupt(countdownTimer, []() { updateCountdown = true; }, true);
-                timerAlarmWrite(countdownTimer, 1000000, true);
-                timerAlarmEnable(countdownTimer);
-                displayState = DISPLAY_EVENT_COUNTDOWN;
-            }
-        }
-    }
-}
-
-void displayRound(int currentRound, int totalRounds) {
+inline void displayRound(int currentRound, int totalRounds) {
     CRGB activeColor = CRGB::DeepSkyBlue,
          inactiveColor = 0x0f0f0f;
     const int line = 7;
@@ -110,7 +116,7 @@ void countdownUpdate() {
     }
     updateCountdown = false;
 
-    long remaining = BCPEvent.getRoundEndEpoch() - time(nullptr);
+    long remaining = BCPEvent.roundEndEpoch() - time(nullptr);
 
     CRGB color = CRGB::White;
     if (remaining <= Config.getRedThreshold()) {
@@ -122,7 +128,7 @@ void countdownUpdate() {
     String font = "f4x6";
     int x = remaining < 0 ? 0 : 5,
         y = 0;
-    if (BCPEvent.getTimerLength() > 3600) {
+    if (BCPEvent.timerLength() > 3600) {
         font = "f3x5";
         x = remaining < 0 ? -1 : 3;
         y = 1;
@@ -135,7 +141,7 @@ void countdownUpdate() {
 
     String out  = remaining < 0 ? "-" : "";;
 
-    if (BCPEvent.getTimerLength() <= 3600) {
+    if (BCPEvent.timerLength() <= 3600) {
         // mm:ss
         if (remaining < -3599) {
             out = "-XX:XX";
@@ -152,55 +158,145 @@ void countdownUpdate() {
 
     FrameBuffer.text(out, x, y, font, color, true, false);
 
-    displayRound(BCPEvent.getCurrentRound(), BCPEvent.getNumberOfRounds());
+    displayRound(BCPEvent.currentRound(), BCPEvent.numberOfRounds());
 
     FrameBuffer.show();
-}   
+}  
 
-void displayRefresh(void* parameter) {
+// ---- update display after data refresh ----
+
+void displayUpdate(bool afterScrollOnce = false) {
+    if (displayState == DISPLAY_SCROLL_ONCE || displayState == DISPLAY_EVENT_NO_UPDATE) {
+        return;
+    }
+    if (BCPEvent.id() != "") {
+
+        if (BCPEvent.ended() || !BCPEvent.started()) {
+            // event either not started or already ended
+            if (displayState != DISPLAY_EVENT_NAME) {
+                stopCountdownTimer();
+                FrameBuffer.textScroll(BCPEvent.name(), 2, "f3x5", CRGB::White, CRGB::Black, afterScrollOnce ? 32 : 24, afterScrollOnce ? 0 : 8);
+                displayState = DISPLAY_EVENT_NAME;
+            }
+
+        } else if (BCPEvent.timerLength() <= 0) {
+            // no timer, show round only
+            if (displayState != DISPLAY_EVENT_ROUND) {
+                stopCountdownTimer();
+                FrameBuffer.textScrollStop();
+                FrameBuffer.textCentered("Round " + String(BCPEvent.currentRound()), 2, "f3x5", CRGB::White, true, true);
+                displayState = DISPLAY_EVENT_ROUND;
+            }
+
+        } else {
+            // show countdown
+            if (displayState != DISPLAY_EVENT_COUNTDOWN) {
+                FrameBuffer.textScrollStop();
+                ensureCountdownTimer();
+                displayState = DISPLAY_EVENT_COUNTDOWN;
+            }
+        }
+    }
+}
+
+// ---- event handler running on 2nd core ----
+
+void eventHandler(void* parameter) {
     while (true) {
+        if (midButtonPressed) {
+            static unsigned long lastPress = millis();
+            unsigned long now = millis();
+            if (now - lastPress >= DEBOUNCE_DELAY_MS) {
+                lastPress = now;
+                midButtonPressed = false;
+                stopCountdownTimer();
+                FrameBuffer.textScrollStop();
+                Config.startConfigServer();
+                configMessage();
+                displayState = DISPLAY_SCROLL_ONCE;
+            }
+        }
+        if (Config.isConfigServerRunning()) {
+            Config.handleClient();
+        }
+        if (displayState == DISPLAY_SCROLL_ONCE &&!FrameBuffer.isTextScrollActive()) {
+            displayState = DISPLAY_BOOT;
+            displayUpdate(true);
+        }
         if (FrameBuffer.doTextScrollStep()) {
             FrameBuffer.textScrollStep();
         }
         if (FrameBuffer.doProgressStep()) {
             FrameBuffer.progressStep();
         }
-        if (updateCountdown) {
+        if (updateCountdown && displayState == DISPLAY_EVENT_COUNTDOWN) {
             countdownUpdate();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
+inline void ensureEventID() {
+    // Config.erase(); // for testing only - remove in production
+    if (Config.getEventId() == "") {
+        configMessage(true);
+        Config.startConfigServer(true, 0);
+        while (Config.getEventId() == "") {
+            delay(100); // keep server responsive
+        }
+        splashScreen(false);
+        delay(250); // keep the server responsive for 0.25 second, let the http client receive the response
+    }
+    Config.stopConfigServer(); // no longer needed
+}
+
+// ---- core Arduino functions ----
+
 void setup() {
     pinMode(15, INPUT_PULLDOWN);
     Serial.begin(9600);
 
     xTaskCreatePinnedToCore(
-            displayRefresh,   // Function to run
-            "DisplayRefresh", // Task name
-            4096,             // Stack size
+            eventHandler,     // Function to run
+            "EventHandler",   // Task name
+            4096*2,           // Stack size
             NULL,             // Parameter
             1,                // Priority
             NULL,             // Task handle
             1                 // Core (0 or 1)
         );
 
-    // splash screen
-    FrameBuffer.text("BCP", 0, 1, "f3x5", CRGB::White, true);
-    FrameBuffer.text("c", 14, 1, "f3x5", CRGB::White);
-    FrameBuffer.text("lock", 17, 1, "f3x5", CRGB::White);
-    FrameBuffer.progressStart();
-
+    splashScreen();
     WifiMgr.connect();
-    BCPEvent.setID("https://www.bestcoastpairings.com/organize/event/HW0pjCBn5deR?active_tab=roster");
-    BCPEvent.refreshData();
-
-    FrameBuffer.progressStop();
+    ensureEventID();
+    BCPEvent.setID(Config.getEventId());
 }
 
 void loop() {
-    displayUpdate();
-    delay(60000);
-    BCPEvent.refreshData();
+    static time_t count = 0;
+    if (Config.configUpdated) {
+        Config.configUpdated = false;
+        if (Config.getEventId() != BCPEvent.fullId()) {
+            displayState = DISPLAY_EVENT_NO_UPDATE;
+            splashScreen();
+            BCPEvent.setID(Config.getEventId());
+            BCPEvent.refreshData();
+            FrameBuffer.progressStop();
+            displayState = DISPLAY_BOOT;
+            displayUpdate();
+        }
+    } else if (count % 120 == 0) {
+        BCPEvent.refreshData();
+        if (count == 0) {
+            FrameBuffer.progressStop();
+        }
+        displayState = DISPLAY_BOOT;
+        displayUpdate();
+    }
+    if (count == 0) {
+        pinMode(27, INPUT_PULLUP);
+        attachInterrupt(27, []() { midButtonPressed = true; }, FALLING);
+    }
+    delay(500);
+    count++;    
 }
