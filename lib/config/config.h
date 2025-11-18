@@ -11,10 +11,10 @@
 class CConfig {
 public:
     // ---- Configuration parameter getters ----
-    String getEventId() const { return event_; }
-    long getYellowThreshold() const { return yellow_; }
-    long getRedThreshold() const { return red_; }
-    String getHostname() const { return hostname_; }
+    String eventId() const { return event_; }
+    long yellowThreshold() const { return yellow_; }
+    long redThreshold() const { return red_; }
+    String hostname() const { return hostname_; }
 
     // ---- Erase configuration from persistent storage ----
     void erase();

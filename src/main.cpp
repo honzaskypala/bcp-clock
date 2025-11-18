@@ -119,9 +119,9 @@ void countdownUpdate() {
     long remaining = BCPEvent.roundEndEpoch() - time(nullptr);
 
     CRGB color = CRGB::White;
-    if (remaining <= Config.getRedThreshold()) {
+    if (remaining <= Config.redThreshold()) {
         color = CRGB::Red;
-    } else if (remaining <= Config.getYellowThreshold()) {
+    } else if (remaining <= Config.yellowThreshold()) {
         color = CRGB::Yellow;
     }
 
@@ -238,10 +238,10 @@ void eventHandler(void* parameter) {
 
 inline void ensureEventID() {
     // Config.erase(); // for testing only - remove in production
-    if (Config.getEventId() == "") {
+    if (Config.eventId() == "") {
         configMessage(true);
         Config.startConfigServer(true, 0);
-        while (Config.getEventId() == "") {
+        while (Config.eventId() == "") {
             delay(100); // keep server responsive
         }
         splashScreen(false);
@@ -269,17 +269,17 @@ void setup() {
     splashScreen();
     WifiMgr.connect();
     ensureEventID();
-    BCPEvent.setID(Config.getEventId());
+    BCPEvent.setID(Config.eventId());
 }
 
 void loop() {
     static time_t count = 0;
     if (Config.configUpdated) {
         Config.configUpdated = false;
-        if (Config.getEventId() != BCPEvent.fullId()) {
+        if (Config.eventId() != BCPEvent.fullId()) {
             displayState = DISPLAY_EVENT_NO_UPDATE;
             splashScreen();
-            BCPEvent.setID(Config.getEventId());
+            BCPEvent.setID(Config.eventId());
             BCPEvent.refreshData();
             FrameBuffer.progressStop();
             displayState = DISPLAY_BOOT;
