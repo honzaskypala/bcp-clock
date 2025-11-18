@@ -20,7 +20,8 @@ enum DisplayState {
     DISPLAY_EVENT_NAME,
     DISPLAY_EVENT_ROUND,
     DISPLAY_EVENT_COUNTDOWN,
-    DISPLAY_EVENT_NO_UPDATE
+    DISPLAY_EVENT_NO_UPDATE,
+    DISPLAY_INVALID_EVENT
 };
 volatile DisplayState displayState = DISPLAY_BOOT;
 
@@ -170,7 +171,8 @@ void displayUpdate(bool afterScrollOnce = false) {
     if (displayState == DISPLAY_SCROLL_ONCE || displayState == DISPLAY_EVENT_NO_UPDATE) {
         return;
     }
-    if (BCPEvent.id() != "") {
+    
+    if (BCPEvent.valid()) {
 
         if (BCPEvent.ended() || !BCPEvent.started()) {
             // event either not started or already ended
@@ -197,6 +199,14 @@ void displayUpdate(bool afterScrollOnce = false) {
                 displayState = DISPLAY_EVENT_COUNTDOWN;
             }
         }
+
+    } else if (displayState != DISPLAY_INVALID_EVENT) {
+        // invalid event ID, start config mode
+        stopCountdownTimer();
+        FrameBuffer.textScrollStop();
+        Config.startConfigServer();
+        configMessage(true);
+        displayState = DISPLAY_INVALID_EVENT;
     }
 }
 

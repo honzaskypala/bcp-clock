@@ -13,6 +13,7 @@ public:
     void setID(String newID);
     String id() { return id_; }
     String fullId() { return fullId_; }
+    bool valid() { return validId_; }
 
     // ---- Refresh data from BCP API ----
     bool refreshData();
@@ -39,6 +40,7 @@ private:
     friend CBCPEvent& getBCPEventInstance();
 
     // ---- Event ID related ----
+    bool validId_ = false;
     String id_;
     String fullId_;
     String extractEventID(const String& input);
