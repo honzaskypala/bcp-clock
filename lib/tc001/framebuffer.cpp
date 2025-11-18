@@ -6,16 +6,13 @@
 
 CRGB CFrameBuffer::leds[CFrameBuffer::NUM_LEDS];
 
+// ---- Constructor: init hardware ----
+
 CFrameBuffer::CFrameBuffer() {
     FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
 }
 
-CFrameBuffer& getFrameBufferInstance() {
-    static CFrameBuffer instance;
-    return instance;
-}
-
-CFrameBuffer& FrameBuffer = getFrameBufferInstance();
+// ---- Basic display operations ----
 
 void CFrameBuffer::show() {
     FastLED.show();
@@ -30,30 +27,14 @@ void CFrameBuffer::fill(CRGB c, bool show) {
     }
 }
 
+// ---- Simple geometries ----
+
 void CFrameBuffer::pixel(int x, int y, CRGB color, bool show) {
     if (x < 0 || x >= CFrameBuffer::WIDTH || y < 0 || y >= CFrameBuffer::HEIGHT) {
         return; // Out of bounds
     }
     int index = y % 2 ? (y + 1) * CFrameBuffer::WIDTH - 1 - x : x + y * CFrameBuffer::WIDTH;
     leds[index] = color;
-    if (show) {
-        FastLED.show();
-    }
-}
-
-void CFrameBuffer::hline(int x, int y, int length, CRGB color, bool show) {
-    for (int i = 0; i < length; i++) {
-        pixel(x + i, y, color);
-    }
-    if (show) {
-        FastLED.show();
-    }
-}
-
-void CFrameBuffer::vline(int x, int y, int length, CRGB color, bool show) {
-    for (int i = 0; i < length; i++) {
-        pixel(x, y + i, color);
-    }
     if (show) {
         FastLED.show();
     }
@@ -80,19 +61,14 @@ void CFrameBuffer::rectangle(int x0, int y0, int x1, int y1, CRGB color, bool sh
     hline(x0, y0, x1 - x0 + 1, color);
     hline(x0, y1, x1 - x0 + 1, color);
     vline(x0, y0, y1 - y0 + 1, color);
-    vline(x1, y0, y1 - y0 + 1, color);
-    if (show) {
-        FastLED.show();
-    }
+    vline(x1, y0, y1 - y0 + 1, color, show);
 }
 
 void CFrameBuffer::filledRectangle(int x0, int y0, int x1, int y1, CRGB color, bool show) {
-    for (int y = y0; y <= y1; y++) {
+    for (int y = y0; y < y1; y++) {
         hline(x0, y, x1 - x0 + 1, color);
     }
-    if (show) {
-        FastLED.show();
-    }
+    hline(x0, y1, x1 - x0 + 1, color, show);
 }
 
 void CFrameBuffer::ellipse(int x0, int y0, int rx, int ry, CRGB color, bool show) {
@@ -114,6 +90,8 @@ void CFrameBuffer::ellipse(int x0, int y0, int rx, int ry, CRGB color, bool show
         FastLED.show();
     }
 }
+
+// ---- Scroll display content ----
 
 void CFrameBuffer::scroll(int dx, int dy, CRGB fillColor, bool show) {
     CRGB temp[CFrameBuffer::WIDTH * CFrameBuffer::HEIGHT];
@@ -142,6 +120,8 @@ void CFrameBuffer::scroll(int dx, int dy, CRGB fillColor, bool show) {
         FastLED.show();
     }
 }
+
+// ---- Text output ----
 
 int CFrameBuffer::glyph(char c, int x, int y, String fontName, CRGB color, bool show) {
     int w = 0, h = 0;
@@ -212,27 +192,13 @@ void CFrameBuffer::textCentered(String str, int y, String fontName, CRGB color, 
     text(str, startX, y, fontName, color, clear, show);
 }
 
-void CFrameBuffer::populateScrollBuffer(String str, int cursor, CRGB color) {
-    for (size_t i = 0; i < str.length(); i++) {
-        char c = str.charAt(i);
-        if (c < 0 || c > this->scrollFont->lastChar) {
-            c = 0; // Character out of bounds
-        }
-        const uint8_t *glyphBitmap;
-        glyphBitmap = &scrollFont->bitmaps[c * this->scrollFont->width];
-
-        for (int gx = 0; gx < this->scrollFont->width; gx++, glyphBitmap++) {
-            for (int gy = 0; gy < this->scrollFont->height; gy++, cursor++) {
-                if (*glyphBitmap & (1 << gy)) {
-                    this->scrollBuffer[cursor] = color;
-                }
-            }
-        }
-        cursor += this->scrollFont->height;
-    }
-}
+// ---- Scrolling text output ----
 
 void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CRGB bg, int lpad, int rpad, int speed, int hwtimer, bool loop, bool clear) {
+    if (isTextScrollActive_) {
+        textScrollStop();
+    }
+
     int w = 0, h = 0;
     int sep = fontName.indexOf('x');
     if (sep > 1) {
@@ -254,133 +220,181 @@ void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CR
         return; // No matching font found
     }
     int textWidth = (w + 1) * str.length() - 1;
-    this->scrollBufferWidth = lpad + textWidth + rpad;
-    this->scroll_yoffset = y;
+    scrollBufferWidth = lpad + textWidth + rpad;
+    scroll_yoffset = y;
 
-    if (this->scrollBuffer != nullptr) {
-        delete[] this->scrollBuffer;
+    if (scrollBuffer != nullptr) {
+        delete[] scrollBuffer;
     }
-    this->scrollBuffer = new CRGB[this->scrollBufferWidth * h];
+    scrollBuffer = new CRGB[scrollBufferWidth * h];
 
-    for (int i = 0; i < this->scrollBufferWidth * h; i++) {
-        this->scrollBuffer[i] = bg;
+    for (int i = 0; i < scrollBufferWidth * h; i++) {
+        scrollBuffer[i] = bg;
     }
 
-    populateScrollBuffer(str, lpad * this->scrollFont->height, color);
-
+    populateScrollBuffer(str, lpad * scrollFont->height, color);
     if (clear) {
         this->clear();
     }
 
-    for (int i = 0; i < this->scrollBufferWidth * h; i++) {
-        this->pixel(i / h, i % h + y, this->scrollBuffer[i]);
+    for (int i = 0; i < scrollBufferWidth * h; i++) {
+        pixel(i / h, i % h + y, scrollBuffer[i]);
     }
 
-    this->show();
-
-    this->scrollTimer = timerBegin(hwtimer, 80, true);
-    timerAttachInterrupt(this->scrollTimer, []() { FrameBuffer._doTextScrollStep = true; }, true);
-    timerAlarmWrite(this->scrollTimer, speed * 1000, true);
-    timerAlarmEnable(this->scrollTimer);
-
-    this->loopScrolling = loop;
-    this->scrollStartPos = 0;
-    this->scrollOffset = 32;
+    show();
+    loopScrolling = loop;
+    scrollStartPos = 0;
+    scrollOffset = 32;
+    ensureTimer();
+    isTextScrollActive_ = true;
 }
 
 void CFrameBuffer::textScrollStep(bool show) {
-    this->scroll(1, 0, CRGB::Black, false);
-    for (int sy = 0; sy < this->scrollFont->height; sy++) {
-        int bufferIndex = this->scrollOffset * this->scrollFont->height + sy;
-        pixel(CFrameBuffer::WIDTH - 1, sy + this->scroll_yoffset, this->scrollBuffer[bufferIndex]);
+    scroll(1, 0, CRGB::Black, false);
+    for (int sy = 0; sy < scrollFont->height; sy++) {
+        int bufferIndex = scrollOffset * scrollFont->height + sy;
+        pixel(CFrameBuffer::WIDTH - 1, sy + scroll_yoffset, scrollBuffer[bufferIndex]);
     }
     if (show) {
         this->show();
     }
-    this->_doTextScrollStep = false;
-    this->scrollOffset++;
-    if (this->scrollOffset >= this->scrollBufferWidth) {
-        if (this->loopScrolling) {
-            this->scrollOffset = this->scrollStartPos;
+    doTextScrollStep_ = false;
+    scrollOffset++;
+    if (scrollOffset >= scrollBufferWidth) {
+        if (loopScrolling) {
+            scrollOffset = scrollStartPos;
         } else {
-            this->stopTextScroll();
+            textScrollStop();
         }
     }
 }
 
-void CFrameBuffer::stopTextScroll() {
-    if (this->scrollTimer != nullptr) {
-        timerAlarmDisable(this->scrollTimer);
-        timerEnd(this->scrollTimer);
-        this->scrollTimer = nullptr;
+void CFrameBuffer::textScrollStop() {
+    isTextScrollActive_ = false;
+    doTextScrollStep_ = false;
+    if (scrollBuffer != nullptr) {
+        delete[] scrollBuffer;
+        scrollBuffer = nullptr;
     }
-    if (this->scrollBuffer != nullptr) {
-        delete[] this->scrollBuffer;
-        this->scrollBuffer = nullptr;
-    }
-    this->_doTextScrollStep = false;
 }
 
 void CFrameBuffer::textScrollAppend(String str, CRGB color, CRGB bg, int lpad, int rpad, bool newStart) {
-    if (this->scrollFont == nullptr) {
+    if (scrollFont == nullptr) {
         return;
     }
+    isTextScrollActive_ = false;
 
-    int oldWidth = this->scrollBufferWidth;
-    int textWidth = (this->scrollFont->width + 1) * str.length() - 1;
-    this->scrollBufferWidth += lpad + textWidth + rpad;
+    int oldWidth = scrollBufferWidth;
+    int textWidth = (scrollFont->width + 1) * str.length() - 1;
+    scrollBufferWidth += lpad + textWidth + rpad;
 
-    CRGB *newBuffer = new CRGB[this->scrollBufferWidth * this->scrollFont->height];
+    CRGB *newBuffer = new CRGB[scrollBufferWidth * scrollFont->height];
 
-    for (int i = 0; i < this->scrollBufferWidth * scrollFont->height; i++) {
+    for (int i = 0; i < scrollBufferWidth * scrollFont->height; i++) {
         newBuffer[i] = bg;
     }
 
-    for (int i = 0; i < oldWidth * this->scrollFont->height; i++) {
-        newBuffer[i] = this->scrollBuffer[i];
+    for (int i = 0; i < oldWidth * scrollFont->height; i++) {
+        newBuffer[i] = scrollBuffer[i];
     }
-    delete[] this->scrollBuffer;
-    this->scrollBuffer = newBuffer;
+    delete[] scrollBuffer;
+    scrollBuffer = newBuffer;
 
-    populateScrollBuffer(str, (oldWidth + lpad) * this->scrollFont->height, color);
+    populateScrollBuffer(str, (oldWidth + lpad) * scrollFont->height, color);
 
     if (newStart) {
-        this->scrollStartPos = oldWidth;
+        scrollStartPos = oldWidth;
+    }
+
+    isTextScrollActive_ = true;
+}
+
+void CFrameBuffer::populateScrollBuffer(String str, int cursor, CRGB color) {
+    for (size_t i = 0; i < str.length(); i++) {
+        char c = str.charAt(i);
+        if (c < 0 || c > scrollFont->lastChar) {
+            c = 0; // Character out of bounds
+        }
+        const uint8_t *glyphBitmap;
+        glyphBitmap = &scrollFont->bitmaps[c * scrollFont->width];
+        for (int gx = 0; gx < scrollFont->width; gx++, glyphBitmap++) {
+            for (int gy = 0; gy < scrollFont->height; gy++, cursor++) {
+                if (*glyphBitmap & (1 << gy)) {
+                    scrollBuffer[cursor] = color;
+                }
+            }
+        }
+        cursor += scrollFont->height;
     }
 }
 
+// ---- Progress indicator ----
+
 void CFrameBuffer::progressStart(int x, int y, CRGB color, CRGB bg, int speed, int hwtimer, bool show) {
+    isProgressActive_ = false;
+    doProgressStep_ = false;
+
     if (x >= 0)
-        this->progress_pos = x;
-    this->progress_y = y;
-    this->progress_color = color;
+        progress_pos = x;
+    progress_y = y;
+    progress_color = color;
 
     if (show) {
-        this->progressStep(show);
+        progressStep(show);
     }
 
-    this->progressTimer = timerBegin(hwtimer, 80, true);
-    timerAttachInterrupt(this->progressTimer, []() { FrameBuffer._doProgressStep = true; }, true);
-    timerAlarmWrite(this->progressTimer, speed * 1000, true);
-    timerAlarmEnable(this->progressTimer);
+    ensureTimer();
+    isProgressActive_ = true;
 }
 
 void CFrameBuffer::progressStep(bool show) {
-    this->pixel(this->progress_pos, this->progress_y, progress_bg, false);
-    if ((this->progress_step >= 0 && this->progress_pos + this->progress_step >= CFrameBuffer::WIDTH) || (this->progress_step < 0 && this->progress_pos + this->progress_step < 0)) {
-        this->progress_step = -this->progress_step;
+    pixel(progress_pos, progress_y, progress_bg, false);
+    if ((progress_step >= 0 && progress_pos + progress_step >= CFrameBuffer::WIDTH) || (progress_step < 0 && progress_pos + progress_step < 0)) {
+        progress_step = -progress_step;
     }
-    this->progress_pos += this->progress_step;
-    this->pixel(this->progress_pos, this->progress_y, this->progress_color, show);
-    this->_doProgressStep = false;
+    progress_pos += progress_step;
+    pixel(progress_pos, progress_y, progress_color, show);
+    doProgressStep_ = false;
 }
 
 void CFrameBuffer::progressStop(bool show) {
-    if (this->progressTimer != nullptr) {
-        timerAlarmDisable(this->progressTimer);
-        timerEnd(this->progressTimer);
-        this->progressTimer = nullptr;
+    if (isProgressActive_) {
+        pixel(progress_pos, progress_y, progress_bg, show);
     }
-    this->_doProgressStep = false;
-    this->pixel(this->progress_pos, this->progress_y, progress_bg, show);
+    isProgressActive_ = false;
+    doProgressStep_ = false;
 }
+
+// ---- Hardware timer for animations ----
+
+void CFrameBuffer::ensureTimer(int hwTimer, long period) {
+    if (fbTimer == nullptr) {
+        fbTimer = timerBegin(hwTimer, 80, true);
+        timerAttachInterrupt(fbTimer, &CFrameBuffer::onFbTimerISR, true);
+        timerAlarmWrite(fbTimer, period * 1000, true);
+        timerAlarmEnable(fbTimer);
+    }
+}
+
+void IRAM_ATTR CFrameBuffer::onFbTimerISR() {
+    // NOTE: Keep ISR as short as possible
+    CFrameBuffer* self = &FrameBuffer; // use the global instance, avoid function call in ISR
+    if (!self) {
+        return;
+    }
+    if (self->isTextScrollActive_) {
+        self->doTextScrollStep_ = true;
+    }
+    if (self->isProgressActive_) {
+        self->doProgressStep_ = true;
+    }
+}
+
+// ---- Singleton related ----
+
+CFrameBuffer& getFrameBufferInstance() {
+    static CFrameBuffer instance;
+    return instance;
+}
+
+CFrameBuffer& FrameBuffer = getFrameBufferInstance();

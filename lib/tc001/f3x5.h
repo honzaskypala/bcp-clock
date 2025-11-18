@@ -1,4 +1,4 @@
-// Ulanzi TC001 FrameBuffer
+// Bitmap font 3x5 pixels fixed width
 // (c) 2025 Honza Skýpala
 // Glyphs inspired by 3x5 font by artefucked, https://fontstruct.com/fontstructions/show/794099/3x5px_1
 // WTFPL license applies
@@ -33,7 +33,7 @@ static const uint8_t F3X5_PAGE00_BITMAPS[] PROGMEM = {
     0x0A, 0x04, 0x0A, /* 42 '*' */
     0x04, 0x0E, 0x04, /* 43 '+' */
     0x10, 0x18, 0x00, /* 44 ',' */
-    0x04, 0x04, 0x04, /* 45 '-' (for proportional phont, shortened to 2 pixels) */
+    0x04, 0x04, 0x04, /* 45 '-' (for proportional font, shortened to 2 pixels) */
     0x00, 0x10, 0x00, /* 46 '.' */
     0x10, 0x0C, 0x03, /* 47 '/' */
     0x1E, 0x11, 0x0F, /* 48 '0' */
@@ -49,7 +49,7 @@ static const uint8_t F3X5_PAGE00_BITMAPS[] PROGMEM = {
     0x00, 0x0A, 0x00, /* 58 ':' */
     0x10, 0x1A, 0x00, /* 59 ';' */
     0x04, 0x0A, 0x00, /* 60 '<' */
-    0x0A, 0x0A, 0x0A, /* 61 '=' (for proportional phont, shortened to 2 pixels) */
+    0x0A, 0x0A, 0x0A, /* 61 '=' (for proportional font, shortened to 2 pixels) */
     0x0A, 0x04, 0x00, /* 62 '>' */
     0x01, 0x15, 0x02, /* 63 '?' */
     0x0E, 0x11, 0x17, /* 64 '@' */

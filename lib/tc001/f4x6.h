@@ -1,4 +1,4 @@
-// Ulanzi TC001 FrameBuffer
+// Bitmap font 4x6 pixels fixed width
 // (c) 2025 Honza Skýpala
 // Glyphs inspired by 4x6 font by fiftyclick, https://fontstruct.com/fontstructions/show/1650758/4x6-font
 // WTFPL license applies
