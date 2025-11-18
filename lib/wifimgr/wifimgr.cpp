@@ -26,7 +26,7 @@ static constexpr const char* PREFS_LIST_KEY = "__ssids";
 CWifiMgr WifiMgr;
 
 // ---------- Public API ----------
-bool CWifiMgr::connect(uint32_t portalTimeoutMs) {
+bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs) {
     Serial.begin(9600);
     while (!Serial) {}
 
@@ -36,58 +36,60 @@ bool CWifiMgr::connect(uint32_t portalTimeoutMs) {
     if (!scanAndSort()) {
         Serial.println("WifiMgr: Scan failed or found no networks.");
     } else {
-        // Pass 1: known networks (DO NOT save credential here)
-        std::vector<String> storedSsids;
-        bool haveCreds = listStoredNetworks(storedSsids);
+        if (!enforcePortal) {
+            // Pass 1: known networks (DO NOT save credential here)
+            std::vector<String> storedSsids;
+            bool haveCreds = listStoredNetworks(storedSsids);
 
-        if (haveCreds) {
-            Serial.println("WifiMgr: Pass 1 - Trying known networks...");
+            if (haveCreds) {
+                Serial.println("WifiMgr: Pass 1 - Trying known networks...");
+                for (int order = 0; order < scanCount_; ++order) {
+                    int i = scanIdx_[order];
+                    const String& ssid = scanSsid_[i];
+                    Serial.println("WifiMgr: Considering SSID: " + ssid);
+                    if (ssid.length() == 0) continue;
+
+                    String pass;
+                    if (getCredential(ssid.c_str(), pass)) {
+                        Serial.printf("WifiMgr: Known SSID candidate: %s (RSSI %d dBm)\n",
+                                    ssid.c_str(), scanRssi_[order]);
+
+                        if (attemptConnect(ssid.c_str(), pass.c_str(), CONNECT_TIMEOUT_MS)) {
+                            connected_ = true;
+                            freeScanData();
+                            Serial.println("WifiMgr: Connected via known network (no credential save).");
+                            return true;
+                        }
+                    }
+                    delay(0);
+                }
+                Serial.println("WifiMgr: Pass 1 finished: No known networks connected.");
+            } else {
+                Serial.println("WifiMgr: No known networks (missing or invalid /wifi.json).");
+            }
+
+            // Pass 2: open networks (DO NOT save credential here)
+            Serial.println("WifiMgr: Pass 2 - Trying open networks...");
             for (int order = 0; order < scanCount_; ++order) {
                 int i = scanIdx_[order];
+                uint8_t enc = scanEnc_[i];
+                if (!isOpenEncryption(enc)) continue;
                 const String& ssid = scanSsid_[i];
-                Serial.println("WifiMgr: Considering SSID: " + ssid);
                 if (ssid.length() == 0) continue;
 
-                String pass;
-                if (getCredential(ssid.c_str(), pass)) {
-                    Serial.printf("WifiMgr: Known SSID candidate: %s (RSSI %d dBm)\n",
-                                  ssid.c_str(), scanRssi_[order]);
+                Serial.printf("WifiMgr: Open SSID candidate: %s (RSSI %d dBm)\n",
+                            ssid.c_str(), scanRssi_[order]);
 
-                    if (attemptConnect(ssid.c_str(), pass.c_str(), CONNECT_TIMEOUT_MS)) {
-                        connected_ = true;
-                        freeScanData();
-                        Serial.println("WifiMgr: Connected via known network (no credential save).");
-                        return true;
-                    }
+                if (attemptConnect(ssid.c_str(), nullptr, CONNECT_TIMEOUT_MS)) {
+                    connected_ = true;
+                    freeScanData();
+                    Serial.println("WifiMgr: Connected via open network (no credential save).");
+                    return true;
                 }
                 delay(0);
             }
-            Serial.println("WifiMgr: Pass 1 finished: No known networks connected.");
-        } else {
-            Serial.println("WifiMgr: No known networks (missing or invalid /wifi.json).");
+            Serial.println("WifiMgr: Pass 2 finished: No open networks connected.");
         }
-
-        // Pass 2: open networks (DO NOT save credential here)
-        Serial.println("WifiMgr: Pass 2 - Trying open networks...");
-        for (int order = 0; order < scanCount_; ++order) {
-            int i = scanIdx_[order];
-            uint8_t enc = scanEnc_[i];
-            if (!isOpenEncryption(enc)) continue;
-            const String& ssid = scanSsid_[i];
-            if (ssid.length() == 0) continue;
-
-            Serial.printf("WifiMgr: Open SSID candidate: %s (RSSI %d dBm)\n",
-                          ssid.c_str(), scanRssi_[order]);
-
-            if (attemptConnect(ssid.c_str(), nullptr, CONNECT_TIMEOUT_MS)) {
-                connected_ = true;
-                freeScanData();
-                Serial.println("WifiMgr: Connected via open network (no credential save).");
-                return true;
-            }
-            delay(0);
-        }
-        Serial.println("WifiMgr: Pass 2 finished: No open networks connected.");
     }
 
     Serial.println("WifiMgr: Launching captive configuration portal (blocking until connected or timeout).");

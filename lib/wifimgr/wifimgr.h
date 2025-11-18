@@ -13,7 +13,7 @@
 class CWifiMgr {
 public:
     // ---- Public API ----
-    bool connect(uint32_t portalTimeoutMs = 0);
+    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0);
     bool isConnected() const { return connected_; }
     bool eraseStoredNetworks();
     bool listStoredNetworks(std::vector<String>& out);

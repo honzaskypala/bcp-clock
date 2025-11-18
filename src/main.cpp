@@ -253,8 +253,10 @@ inline void ensureEventID() {
 // ---- core Arduino functions ----
 
 void setup() {
-    pinMode(15, INPUT_PULLDOWN);
+    pinMode(15, INPUT_PULLDOWN);  // stop whistle noise
+    pinMode(27, INPUT_PULLUP);    // mid button
     Serial.begin(9600);
+    while (!Serial);              // wait for serial port to connect. Needed for native USB
 
     xTaskCreatePinnedToCore(
             eventHandler,     // Function to run
@@ -267,7 +269,7 @@ void setup() {
         );
 
     splashScreen();
-    WifiMgr.connect();
+    WifiMgr.connect(digitalRead(27) == LOW);    // if mid button pressed, enforce portal
     ensureEventID();
     BCPEvent.setID(Config.eventId());
 }
@@ -294,7 +296,6 @@ void loop() {
         displayUpdate();
     }
     if (count == 0) {
-        pinMode(27, INPUT_PULLUP);
         attachInterrupt(27, []() { midButtonPressed = true; }, FALLING);
     }
     delay(500);
