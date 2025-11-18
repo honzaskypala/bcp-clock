@@ -38,7 +38,7 @@ bool CWifiMgr::connect(uint32_t portalTimeoutMs) {
     } else {
         // Pass 1: known networks (DO NOT save credential here)
         std::vector<String> storedSsids;
-        bool haveCreds = listStoredSsids(storedSsids);
+        bool haveCreds = listStoredNetworks(storedSsids);
 
         if (haveCreds) {
             Serial.println("WifiMgr: Pass 1 - Trying known networks...");
@@ -106,6 +106,39 @@ bool CWifiMgr::connect(uint32_t portalTimeoutMs) {
 
     freeScanData();
     return connected_;
+}
+
+bool CWifiMgr::eraseStoredNetworks() {
+    Serial.println("WifiMgr: eraseStoredNetworks: Removing all stored SSIDs and credentials.");
+    if (!beginPrefs(false)) {
+        Serial.println("WifiMgr: eraseStoredNetworks: Preferences begin (RW) failed.");
+        return false;
+    }
+
+    String listStr;
+    if (prefs_.isKey(PREFS_LIST_KEY)) {
+        listStr = prefs_.getString(PREFS_LIST_KEY, "");
+    } else {
+        listStr = "";
+    }
+
+    std::vector<String> list;
+    splitList(listStr, list);
+
+    for (auto &s : list) {
+        String key = makePassKey(s);
+        if (prefs_.isKey(key.c_str())) {
+            prefs_.remove(key.c_str());
+        }
+    }
+
+    if (prefs_.isKey(PREFS_LIST_KEY)) {
+        prefs_.remove(PREFS_LIST_KEY);
+    }
+
+    prefs_.end();
+    Serial.println("WifiMgr: eraseStoredNetworks: Completed.");
+    return true;
 }
 
 // ---------- Core steps ----------
@@ -307,7 +340,7 @@ String CWifiMgr::joinList(const std::vector<String>& list) {
     return s;
 }
 
-bool CWifiMgr::listStoredSsids(std::vector<String>& out) {
+bool CWifiMgr::listStoredNetworks(std::vector<String>& out) {
     out.clear();
     if (!beginPrefs(true)) {
         Serial.println("WifiMgr: Preferences begin (RO) failed.");
@@ -378,13 +411,13 @@ bool CWifiMgr::saveCredential(const char* ssid, const char* pass) {
     return true;
 }
 
-bool CWifiMgr::removeCredential(const char* ssid) {
+bool CWifiMgr::removeStoredNetwork(const char* ssid) {
     if (!ssid || ssid[0] == '\0') {
-        Serial.println("WifiMgr: removeCredential: Empty SSID, skipping.");
+        Serial.println("WifiMgr: removeStoredNetwork: Empty SSID, skipping.");
         return false;
     }
     if (!beginPrefs(false)) {
-        Serial.println("WifiMgr: removeCredential: Preferences begin (RW) failed.");
+        Serial.println("WifiMgr: removeStoredNetwork: Preferences begin (RW) failed.");
         return false;
     }
 
@@ -407,7 +440,7 @@ bool CWifiMgr::removeCredential(const char* ssid) {
     }
     if (!removed) {
         prefs_.end();
-        Serial.printf("WifiMgr: removeCredential: SSID '%s' not found.\n", ssid);
+        Serial.printf("WifiMgr: removeStoredNetwork: SSID '%s' not found.\n", ssid);
         return false;
     }
     prefs_.putString(PREFS_LIST_KEY, joinList(out));
@@ -418,7 +451,7 @@ bool CWifiMgr::removeCredential(const char* ssid) {
     }
 
     prefs_.end();
-    Serial.printf("WifiMgr: removeCredential: Removed '%s'.\n", ssid);
+    Serial.printf("WifiMgr: removeStoredNetwork: Removed '%s'.\n", ssid);
     return true;
 }
 
@@ -546,7 +579,7 @@ void CWifiMgr::handleRoot() {
     bool showFail = server_.hasArg("fail");
 
     std::vector<String> storedSsids;
-    bool haveCreds = listStoredSsids(storedSsids);
+    bool haveCreds = listStoredNetworks(storedSsids);
 
     String page;
     page.reserve(17000);
@@ -588,7 +621,7 @@ void CWifiMgr::handleRoot() {
             ".storedLabel{font-size:18px;font-weight:700;margin:4px 0 10px 0;color:#222;}"
             ".storedRow{display:flex;justify-content:space-between;align-items:center;"
                 "border:1px solid #ccc;border-radius:4px;padding:8px 12px;margin-bottom:8px;}"
-            ".storedSSID{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;}"
+            ".storedSSID{font-size:16px;overflow:hidden;text-overflow:ellipsis;}"
             "a.del{display:inline-block;text-decoration:none;font-size:22px;line-height:1;}"
             "a.del:hover{filter:brightness(0.85);}"
             "@media (max-width:580px){"
@@ -599,6 +632,7 @@ void CWifiMgr::handleRoot() {
                 ".btnSubmit{min-width:100%;max-width:none;width:100%;}"
                 ".sectionLabel{font-size:16px;}"
                 ".status{font-size:16px;}"
+                "a#delnetworks{font-size:16px;font-weight:normal;min-width:auto}"
             "}"
             "</style>";
     page += "</head><body><div class='wrap'>";
@@ -653,6 +687,12 @@ void CWifiMgr::handleRoot() {
                     "' title='Delete' onclick='return confirm(\"Delete SSID " + htmlEscape(s) + "?\");'>👉🗑️</a>"
                     "</div>";
         }
+
+        page += "<div class='actions'>"
+                "<a class='btnSubmit' id='delnetworks' href='/deleteAll' "
+                "onclick='return confirm(\"Delete ALL stored SSIDs and passwords?\");'>"
+                "Delete all stored networks</a>"
+                "</div>";
     } else {
         page += "<p>No networks stored.</p>";
     }
@@ -700,7 +740,8 @@ void CWifiMgr::handleConnect() {
         saveCredential(ssid.c_str(), pwd.c_str());
 
         String resp;
-        resp += "<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Connected</title></head><body>";
+        resp += "<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Connected</title></head><style>"
+            "html,body{margin:0;padding:1em;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;}</style><body>";
         resp += "<h1>Connected successfully!</h1>";
         resp += "<p>IP: " + WiFi.localIP().toString() + "</p>";
         resp += "<p>Credential saved. Configuration portal will shut down.</p>";
@@ -723,12 +764,23 @@ void CWifiMgr::handleDelete() {
     String ssid = server_.arg("ssid");
     Serial.printf("WifiMgr: Portal - Request to delete SSID '%s'.\n", ssid.c_str());
 
-    bool ok = removeCredential(ssid.c_str());
+    bool ok = removeStoredNetwork(ssid.c_str());
     if (ok) {
         server_.sendHeader("Location", "/", true);
         server_.send(302, "text/plain", "Deleted. Redirecting...");
     } else {
         server_.send(200, "text/plain", "Delete failed or SSID not found. Return to /.");
+    }
+}
+
+void CWifiMgr::handleDeleteAll() {
+    Serial.println("WifiMgr: Portal - Request to delete ALL stored SSIDs.");
+    bool ok = eraseStoredNetworks();
+    if (ok) {
+        server_.sendHeader("Location", "/", true);
+        server_.send(302, "text/plain", "All deleted. Redirecting...");
+    } else {
+        server_.send(200, "text/plain", "Delete-all failed. Return to /.");
     }
 }
 
@@ -802,6 +854,7 @@ void CWifiMgr::startConfigPortal() {
     server_.on("/connect",   HTTP_POST, [this]() { handleConnect(); });
     server_.on("/rescan",    HTTP_GET,  [this]() { handleRescan(); });
     server_.on("/delete",    HTTP_GET,  [this]() { handleDelete(); });
+    server_.on("/deleteAll", HTTP_GET,  [this]() { handleDeleteAll(); });
 
     server_.on("/generate_204",        [this]() { handleCaptive(); });
     server_.on("/gen_204",             [this]() { handleCaptive(); });

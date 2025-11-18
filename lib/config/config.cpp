@@ -5,6 +5,7 @@
 #include "config.h"
 #include <Preferences.h>
 #include <nvs_flash.h>
+#include <wifimgr.h>
 
 static const String DEF_EVENT = "";
 static const long DEF_YELLOW = 600; // seconds
@@ -110,6 +111,8 @@ void CConfig::startConfigServer(bool atStartup, unsigned long timeoutMs) {
     
     configServer->on("/", HTTP_GET, [this]() { handleConfigRoot(); });
     configServer->on("/config", HTTP_POST, [this]() { handleConfigPost(); });
+    configServer->on("/wifi/delete", HTTP_GET, [this]() { handleWifiDelete(); });
+    configServer->on("/wifi/deleteAll", HTTP_GET, [this]() { handleWifiDeleteAll(); });
 
     // Handle accidental GET on /config by redirecting to root
     configServer->on("/config", HTTP_GET, [this]() {
@@ -166,6 +169,12 @@ void CConfig::handleConfigRoot() {
     if (configServer->hasArg("saved")) {
         status = "Configuration saved";
     }
+    if (configServer->hasArg("wifiDeleted")) {
+        status = "WiFi network deleted";
+    }
+    if (configServer->hasArg("wifiAllDeleted")) {
+        status = "All WiFi networks deleted";
+    }
     
     String page = "<!DOCTYPE html><html><head>"
                   "<title>BCP-clock config</title>"
@@ -202,7 +211,33 @@ void CConfig::handleConfigRoot() {
                 "<input type='submit' />"
                 "</form>";
     }
-    page += "</body></html>";
+
+    // WiFi networks section
+    page += "<div id='wifi-networks'>"
+            "<label class='section'>Stored WiFi networks</label>";
+    std::vector<String> storedNetworks;
+    if (WifiMgr.listStoredNetworks(storedNetworks) && !storedNetworks.empty()) {
+        page += "<div class='wifi-list'>";
+        for (auto& ssid : storedNetworks) {
+            String escapedSsid = ssid;
+            escapedSsid.replace("'", "\\'");
+            page += "<div class='wifi-row'>"
+                    "<span class='wifi-ssid'>" + ssid + "</span>"
+                    "<a class='wifi-del' href='/wifi/delete?ssid=" + urlEncode(ssid) + "' "
+                    "onclick='return confirm(\"Delete WiFi network " + escapedSsid + "?\");'>👉🗑️</a>"
+                    "</div>";
+        }
+        page += "</div>";
+        page += "<div class='wifi-actions'>"
+                "<a class='wifi-btn-del-all' href='/wifi/deleteAll' "
+                "onclick='return confirm(\"Delete ALL stored WiFi networks?\");'>"
+                "Delete all stored networks</a>"
+                "</div>";
+    } else {
+        page += "<p>No stored WiFi networks.</p>";
+    }
+
+    page += "</div></body></html>";
     
     configServer->send(200, "text/html", page);
 }
@@ -216,9 +251,17 @@ inline String CConfig::getCss() const {
            "label {display: inline-block; min-width: 5.5em; font-weight: bold}"
            "input[type=text] {display: inline-block; min-width: 14em; margin-bottom: 0.2em}"
            "label.section {display: block; text-align: center; margin: 1em 0 0.5em; border-top: 1px solid black; width: 100%; padding: 0.7em 0 0.3em; font-size: large}"
-           "input[type=submit], input[type=button] {display: block; width: 100%; font-size: large; margin-top: 1em}"
+           "input[type=submit], input[type=button] {display: block; width: 100%; font-size: large; margin-top: 1em; padding: 0.5em; cursor: pointer}"
            "label[for=yellow] {background: black; color: yellow; padding-left: 0.2em; min-width: 5.3em}"
            "label[for=red] {background: black; color: red; padding-left: 0.2em; min-width: 5.3em}"
+           ".wifi-list {margin: 0.5em 1em}"
+           ".wifi-row {display: flex; justify-content: space-between; align-items: center; padding: 0.5em; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 0.5em}"
+           ".wifi-ssid {overflow: hidden; text-overflow: ellipsis}"
+           ".wifi-del {text-decoration: none; color: red; font-weight: bold; padding: 0.2em 0.5em}"
+           ".wifi-del:hover {background-color: #ffeeee; border-radius: 3px}"
+           ".wifi-actions {margin: 1em; text-align: center}"
+           ".wifi-btn-del-all {display: inline-block; padding: 0.5em 1em; background-color: #eaeaea; color: #111; text-decoration: none; border: 1px solid #777; border-radius: 4px; cursor: pointer}"
+           ".wifi-btn-del-all:hover {filter: brightness(0.95)}"
            "@media (max-width: 700px) {"
                 "body {max-width: 22em}"
                 "h1 {font-size: 1.8em; padding: 0.5em 0em; margin-bottom: 0.5em}"
@@ -227,6 +270,10 @@ inline String CConfig::getCss() const {
                 "label.section {font-size: 1.2em; margin: 0.5em 0 0.2em}"
                 "input[type=text] {display: inline-block; width: 94%; margin-bottom: 0.2em; font-size: 1em; border-color: black}"
                 "input[type=submit], input[type=button] {font-size: 1em; padding: 0.3em}"
+                "#wifi-networks label.section {padding-top: 1em; font-size: 1.8em}"
+                ".wifi-list {margin: 0.5em 0}"
+                ".wifi-row {font-size: 1.2em}"
+                ".wifi-btn-del-all {font-size: 1.2em; padding: 0.5em 1em; width: 90%}"
            "}";
 }
 
@@ -254,6 +301,32 @@ void CConfig::handleConfigPost() {
     } 
 }
 
+void CConfig::handleWifiDelete() {
+    if (!configServer->hasArg("ssid")) {
+        configServer->send(400, "text/plain", "Missing ssid parameter");
+        return;
+    }
+    String ssid = urlDecode(configServer->arg("ssid"));
+    Serial.printf("Config: Request to delete WiFi network '%s'\n", ssid.c_str());
+
+    if (WifiMgr.removeStoredNetwork(ssid.c_str())) {
+        configServer->sendHeader("Location", "/?wifiDeleted=1");
+        configServer->send(302);
+    } else {
+        configServer->send(200, "text/plain", "Delete failed or network not found");
+    }
+}
+
+void CConfig::handleWifiDeleteAll() {
+    Serial.println("Config: Request to delete ALL stored WiFi networks");
+    if (WifiMgr.eraseStoredNetworks()) {
+        configServer->sendHeader("Location", "/?wifiAllDeleted=1");
+        configServer->send(302);
+    } else {
+        configServer->send(200, "text/plain", "Delete all failed");
+    }
+}
+
 String CConfig::urlDecode(const String& str) const {
     String decoded = "";
     char c;
@@ -275,6 +348,26 @@ String CConfig::urlDecode(const String& str) const {
         }
     }
     return decoded;
+}
+
+String CConfig::urlEncode(const String& in) {
+    String out;
+    out.reserve(in.length() * 3);
+    const char* hex = "0123456789ABCDEF";
+    for (size_t i = 0; i < in.length(); ++i) {
+        uint8_t c = (uint8_t)in[i];
+        if ((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') ||
+            c == '-' || c == '_' || c == '.' || c == '~') {
+            out += (char)c;
+        } else {
+            out += '%';
+            out += hex[(c >> 4) & 0xF];
+            out += hex[c & 0xF];
+        }
+    }
+    return out;
 }
 
 // ---- Helpers ----

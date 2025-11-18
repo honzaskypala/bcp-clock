@@ -15,6 +15,9 @@ public:
     // ---- Public API ----
     bool connect(uint32_t portalTimeoutMs = 0);
     bool isConnected() const { return connected_; }
+    bool eraseStoredNetworks();
+    bool listStoredNetworks(std::vector<String>& out);
+    bool removeStoredNetwork(const char* ssid);
 
 private:
     // ---- Core state ----
@@ -28,9 +31,7 @@ private:
 
     // ---- Credentials storage ----
     bool saveCredential(const char* ssid, const char* pass);
-    bool removeCredential(const char* ssid);
     bool getCredential(const char* ssid, String& outPass);
-    bool listStoredSsids(std::vector<String>& out);
     bool beginPrefs(bool readOnly);
     static String makePassKey(const String& ssid);
     static void splitList(const String& src, std::vector<String>& out);
@@ -53,6 +54,7 @@ private:
     void handleDelete();
     void handleCaptive();
     void handleNotFound();
+    void handleDeleteAll();
 
     // ---- Helpers ----
     static String htmlEscape(const String& in);

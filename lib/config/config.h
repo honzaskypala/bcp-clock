@@ -44,8 +44,11 @@ private:
     bool atStartup_ = false;
     void handleConfigRoot();
     void handleConfigPost();
+    void handleWifiDelete();
+    void handleWifiDeleteAll();
     inline String getCss() const;
     String urlDecode(const String& str) const;
+    static String urlEncode(const String& in);
 
     // ---- HTTP server timeout tracking ----
     unsigned long _serverStartMs;   // millis() when server started/reset
