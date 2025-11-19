@@ -63,6 +63,12 @@ private:
     static constexpr int DATA_PIN = 32;
     static CRGB leds[NUM_LEDS];
 
+    // ---- Text output ----
+    bitmapfont const* getFont(String fontName);
+    int width(char c, bitmapfont const* font);
+    int width(String text, bitmapfont const* font);
+    inline const uint8_t* glyphBitmapPtr(char c, bitmapfont const* font) { return &font->bitmaps[font->proportional ? c * (font->width + 1) + 1 : c * font->width]; };
+
     // ---- Scrolling text output ----
     volatile bool isTextScrollActive_ = false;
     volatile bool doTextScrollStep_ = false;

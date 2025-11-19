@@ -528,7 +528,7 @@ void CWifiMgr::printLocalTime() {
 void CWifiMgr::failedTimeSyncMsg() {
     FrameBuffer.progressStop();
     FrameBuffer.textScrollStop();
-    FrameBuffer.textScroll(NTP_TIME_SYNC_FAIL_MSG, 2, "f3x5", CRGB::Red, CRGB::Black, 24);
+    FrameBuffer.textScroll(NTP_TIME_SYNC_FAIL_MSG, 2, "p3x5", CRGB::Red, CRGB::Black, 24);
     delay(100);
 }
 
@@ -902,7 +902,7 @@ void CWifiMgr::startConfigPortal() {
         timeSyncFailed_ = false;
     } else {
         FrameBuffer.progressStop();
-        FrameBuffer.textScroll(APmsg, 2, "f3x5", CRGB::White, CRGB::Black, 24);
+        FrameBuffer.textScroll(APmsg, 2, "p3x5", CRGB::White, CRGB::Black, 24);
     }
 }
 

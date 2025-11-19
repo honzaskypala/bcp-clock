@@ -34,9 +34,8 @@ void splashScreen(bool showProgress = true) {
     int y = showProgress ? 1 : 2;
     FrameBuffer.textScrollStop();
     FrameBuffer.progressStop();
-    FrameBuffer.text("BCP", 0, y, "f3x5", CRGB::White, true);
-    FrameBuffer.text("c", 14, y, "f3x5", CRGB::White);
-    FrameBuffer.text("lock", 17, y, "f3x5", CRGB::White, false, !showProgress);
+    FrameBuffer.text("BCP", 0, y, "p3x5", CRGB::White, true);
+    FrameBuffer.text("clock", 14, y, "p3x5", CRGB::White, false, !showProgress);
     if (showProgress) {
         FrameBuffer.progressStart(-1);
     }
@@ -45,7 +44,7 @@ void splashScreen(bool showProgress = true) {
 void configMessage(bool loop = false) {
     FrameBuffer.textScrollStop();
     FrameBuffer.progressStop();
-    FrameBuffer.textScroll("Config page http://" + WiFi.localIP().toString(), 2, "f3x5", CRGB::White, CRGB::Black, 24, loop ? 8 : 32, 100, 3, loop);
+    FrameBuffer.textScroll("Config page http://" + WiFi.localIP().toString(), 2, "p3x5", CRGB::White, CRGB::Black, 24, loop ? 8 : 32, 100, 3, loop);
 }
 
 // ---- Time countdown using ESP-32 hardware timer ----
@@ -127,7 +126,7 @@ void countdownUpdate() {
         color = CRGB::Yellow;
     }
 
-    String font = "f4x6";
+    String font = "p4x6";
     int x = remaining < 0 ? 0 : 5,
         y = 0;
     if (BCPEvent.timerLength() > 3600) {
@@ -171,14 +170,14 @@ void displayUpdate(bool afterScrollOnce = false) {
     if (displayState == DISPLAY_SCROLL_ONCE || displayState == DISPLAY_EVENT_NO_UPDATE) {
         return;
     }
-    
+
     if (BCPEvent.valid()) {
 
         if (BCPEvent.ended() || !BCPEvent.started()) {
             // event either not started or already ended
             if (displayState != DISPLAY_EVENT_NAME) {
                 stopCountdownTimer();
-                FrameBuffer.textScroll(BCPEvent.name(), 2, "f3x5", CRGB::White, CRGB::Black, afterScrollOnce ? 32 : 24, afterScrollOnce ? 0 : 8);
+                FrameBuffer.textScroll(BCPEvent.name(), 2, "p3x5", CRGB::White, CRGB::Black, afterScrollOnce ? 32 : 24, afterScrollOnce ? 0 : 8);
                 displayState = DISPLAY_EVENT_NAME;
             }
 
@@ -187,7 +186,7 @@ void displayUpdate(bool afterScrollOnce = false) {
             if (displayState != DISPLAY_EVENT_ROUND) {
                 stopCountdownTimer();
                 FrameBuffer.textScrollStop();
-                FrameBuffer.textCentered("Round " + String(BCPEvent.currentRound()), 2, "f3x5", CRGB::White, true, true);
+                FrameBuffer.textCentered("Round " + String(BCPEvent.currentRound()), 2, "p3x5", CRGB::White, true, true);
                 displayState = DISPLAY_EVENT_ROUND;
             }
 

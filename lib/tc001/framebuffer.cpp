@@ -124,32 +124,17 @@ void CFrameBuffer::scroll(int dx, int dy, CRGB fillColor, bool show) {
 // ---- Text output ----
 
 int CFrameBuffer::glyph(char c, int x, int y, String fontName, CRGB color, bool show) {
-    int w = 0, h = 0;
-    int sep = fontName.indexOf('x');
-    if (sep > 1) {
-        w = fontName.substring(1, sep).toInt();
-        h = fontName.substring(sep + 1).toInt();
-    } else {
-        return 0; // Invalid font name
-    }
-    const bitmapfont* matched = nullptr;
-    for (size_t i = 0;; ++i) {
-        const auto& f = FONTS[i];
-        if (f.width == 0 || f.height == 0) break; // sentinel
-        if (f.width == w && f.height == h) {
-            matched = &f;
-            break;
-        }
-    }
-    if (!matched) {
+    const bitmapfont* font = getFont(fontName);
+    if (!font) {
         return 0; // No matching font found
     }
-    if (c < 0 || c > matched->lastChar) {
+    if (c < 0 || c > font->lastChar) {
         c = 0; // Character out of bounds
     }
-    const uint8_t* glyphBitmap = &matched->bitmaps[c * matched->width];
+    int w = width(c, font);
+    const uint8_t* glyphBitmap = glyphBitmapPtr(c, font);
     for (int i = 0; i < w; i++, glyphBitmap++) {
-        for (int j = 0; j < h; j++) {
+        for (int j = 0; j < font->height; j++) {
             if (*glyphBitmap & (1 << j)) {
                 pixel(x + i, y + j, color);
             }
@@ -178,15 +163,11 @@ void CFrameBuffer::text(String str, int x, int y, String fontName, CRGB color, b
 }
 
 void CFrameBuffer::textCentered(String str, int y, String fontName, CRGB color, bool clear, bool show) {
-    int w = 0, h = 0;
-    int sep = fontName.indexOf('x');
-    if (sep > 1) {
-        w = fontName.substring(1, sep).toInt();
-        h = fontName.substring(sep + 1).toInt();
-    } else {
-        return; // Invalid font name
+    bitmapfont const* font = getFont(fontName);
+    if (!font) {
+        return; // No matching font found
     }
-    int textWidth = (w + 1) * str.length() - 1;
+    int textWidth = width(str, font);
     int startX = (CFrameBuffer::WIDTH - textWidth) / 2;
 
     text(str, startX, y, fontName, color, clear, show);
@@ -199,36 +180,20 @@ void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CR
         textScrollStop();
     }
 
-    int w = 0, h = 0;
-    int sep = fontName.indexOf('x');
-    if (sep > 1) {
-        w = fontName.substring(1, sep).toInt();
-        h = fontName.substring(sep + 1).toInt();
-    } else {
-        return; // Invalid font name
-    }
-    scrollFont = nullptr;
-    for (size_t i = 0;; ++i) {
-        const auto& f = FONTS[i];
-        if (f.width == 0 || f.height == 0) break; // sentinel
-        if (f.width == w && f.height == h) {
-            scrollFont = &f;
-            break;
-        }
-    }
+    scrollFont = getFont(fontName);
     if (!scrollFont) {
         return; // No matching font found
     }
-    int textWidth = (w + 1) * str.length() - 1;
+    int textWidth = width(str, scrollFont);
     scrollBufferWidth = lpad + textWidth + rpad;
     scroll_yoffset = y;
 
     if (scrollBuffer != nullptr) {
         delete[] scrollBuffer;
     }
-    scrollBuffer = new CRGB[scrollBufferWidth * h];
+    scrollBuffer = new CRGB[scrollBufferWidth * scrollFont->height];
 
-    for (int i = 0; i < scrollBufferWidth * h; i++) {
+    for (int i = 0; i < scrollBufferWidth * scrollFont->height; i++) {
         scrollBuffer[i] = bg;
     }
 
@@ -237,8 +202,8 @@ void CFrameBuffer::textScroll(String str, int y, String fontName, CRGB color, CR
         this->clear();
     }
 
-    for (int i = 0; i < scrollBufferWidth * h; i++) {
-        pixel(i / h, i % h + y, scrollBuffer[i]);
+    for (int i = 0; i < scrollBufferWidth * scrollFont->height; i++) {
+        pixel(i / scrollFont->height, i % scrollFont->height + y, scrollBuffer[i]);
     }
 
     show();
@@ -285,7 +250,7 @@ void CFrameBuffer::textScrollAppend(String str, CRGB color, CRGB bg, int lpad, i
     isTextScrollActive_ = false;
 
     int oldWidth = scrollBufferWidth;
-    int textWidth = (scrollFont->width + 1) * str.length() - 1;
+    int textWidth = width(str, scrollFont);
     scrollBufferWidth += lpad + textWidth + rpad;
 
     CRGB *newBuffer = new CRGB[scrollBufferWidth * scrollFont->height];
@@ -309,15 +274,58 @@ void CFrameBuffer::textScrollAppend(String str, CRGB color, CRGB bg, int lpad, i
     isTextScrollActive_ = true;
 }
 
+bitmapfont const* CFrameBuffer::getFont(String fontName) {
+    int w = 0, h = 0;
+    int sep = fontName.indexOf('x');
+    if (sep > 1) {
+        w = fontName.substring(1, sep).toInt();
+        h = fontName.substring(sep + 1).toInt();
+    } else {
+        return nullptr; // Invalid font name
+    }
+    for (size_t i = 0;; ++i) {
+        const auto& f = FONTS[i];
+        if (f.width == 0 || f.height == 0) break; // sentinel
+        if (f.width == w && f.height == h && ((f.proportional && fontName.charAt(0) == 'p') || (!f.proportional && fontName.charAt(0) == 'f'))) {
+            return &f;
+        }
+    }
+    return nullptr; // No matching font found
+}
+
+int CFrameBuffer::width(char c, bitmapfont const* font) {
+    if (c < 0 || c > font->lastChar) {
+        c = 0; // Character out of bounds
+    }
+    if (font->proportional) {
+        // For proportional fonts, first byte is width
+        uint8_t charWidth = pgm_read_byte(&font->bitmaps[c * (font->width + 1)]);
+        return charWidth;
+    } else {
+        return font->width;
+    }
+}
+
+int CFrameBuffer::width(String text, bitmapfont const* font) {
+    int textWidth = 0;
+    for (size_t i = 0; i < text.length(); i++) {
+        textWidth += width(text.charAt(i), font) + 1;
+    }
+    if (text.length() > 0) {
+        textWidth--; // Remove last added space
+    }
+    return textWidth;
+}
+
 void CFrameBuffer::populateScrollBuffer(String str, int cursor, CRGB color) {
     for (size_t i = 0; i < str.length(); i++) {
         char c = str.charAt(i);
         if (c < 0 || c > scrollFont->lastChar) {
             c = 0; // Character out of bounds
         }
-        const uint8_t *glyphBitmap;
-        glyphBitmap = &scrollFont->bitmaps[c * scrollFont->width];
-        for (int gx = 0; gx < scrollFont->width; gx++, glyphBitmap++) {
+        uint8_t charWidth = width(c, scrollFont);
+        const uint8_t* glyphBitmap = glyphBitmapPtr(c, scrollFont);
+        for (int gx = 0; gx < charWidth; gx++, glyphBitmap++) {
             for (int gy = 0; gy < scrollFont->height; gy++, cursor++) {
                 if (*glyphBitmap & (1 << gy)) {
                     scrollBuffer[cursor] = color;
