@@ -3,12 +3,12 @@
 // Glyphs inspired by 4x6 font by fiftyclick, https://fontstruct.com/fontstructions/show/1650758/4x6-font
 // WTFPL license applies
 
-#ifndef P4X6P00_H
-#define P4X6P00_H
+#ifndef P4X6_00000_H
+#define P4X6_00000_H
 
 #include <Arduino.h>
 
-static const uint8_t P4X6_PAGE00_BITMAPS[] PROGMEM = {
+static const uint8_t P4X6_00000_BITMAPS[] PROGMEM = {
     /* ASCII 0..31: non-printable, filled with 0x3F */
     4, 0x3F, 0x3F, 0x3F, 0x3F,  4, 0x3F, 0x3F, 0x3F, 0x3F,  4, 0x3F, 0x3F, 0x3F, 0x3F,  4, 0x3F, 0x3F, 0x3F, 0x3F,
     4, 0x3F, 0x3F, 0x3F, 0x3F,  4, 0x3F, 0x3F, 0x3F, 0x3F,  4, 0x3F, 0x3F, 0x3F, 0x3F,  4, 0x3F, 0x3F, 0x3F, 0x3F,

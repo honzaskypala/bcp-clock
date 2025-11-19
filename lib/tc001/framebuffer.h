@@ -33,15 +33,15 @@ public:
     void scroll(int dx, int dy, CRGB fillColor = CRGB::Black, bool show = false);
 
     // ---- Text output ----
-    int glyph(char c, int x, int y, String font, CRGB color = CRGB::White, bool show = false);
-    void text(String str, int x, int y, String font, CRGB color = CRGB::White, bool clear = false, bool show = false);
-    void textCentered(String str, int y, String font, CRGB color = CRGB::White, bool clear = false, bool show = false);
+    int glyph(uint32_t cp, int x, int y, String font, CRGB color = CRGB::White, bool show = false);
+    void text(String text, int x, int y, String font, CRGB color = CRGB::White, bool clear = false, bool show = false);
+    void textCentered(String text, int y, String font, CRGB color = CRGB::White, bool clear = false, bool show = false);
 
     // ---- Scrolling text output ----
-    void textScroll(String str, int y, String font, CRGB color = CRGB::White, CRGB bg = CRGB::Black, int lpad = WIDTH, int rpad = 0, int speed = 100, int hwtimer = 0, bool loop = true, bool clear = true);
+    void textScroll(String text, int y, String font, CRGB color = CRGB::White, CRGB bg = CRGB::Black, int lpad = WIDTH, int rpad = 0, int speed = 100, int hwtimer = 0, bool loop = true, bool clear = true);
     void textScrollStep(bool show = true);
     void textScrollStop();
-    void textScrollAppend(String str, CRGB color = CRGB::White, CRGB bg = CRGB::Black, int lpad = 0, int rpad = 0, bool newStart = false);
+    void textScrollAppend(String text, CRGB color = CRGB::White, CRGB bg = CRGB::Black, int lpad = 0, int rpad = 0, bool newStart = false);
     inline bool isTextScrollActive() { return isTextScrollActive_; };
     inline bool doTextScrollStep() { return doTextScrollStep_; };
 
@@ -65,9 +65,12 @@ private:
 
     // ---- Text output ----
     bitmapfont const* getFont(String fontName);
-    int width(char c, bitmapfont const* font);
+    bitmapfont const* getFont(String fontName, uint32_t cp);
+    bitmapfont const* getFont(const bitmapfont &font, uint32_t cp);
+    bitmapfont const* getFont(int w, int h, bool proportional, uint32_t cp);
+    int width(uint32_t cp, bitmapfont const* font);
     int width(String text, bitmapfont const* font);
-    inline const uint8_t* glyphBitmapPtr(char c, bitmapfont const* font) { return &font->bitmaps[font->proportional ? c * (font->width + 1) + 1 : c * font->width]; };
+    const uint8_t* glyphBitmapPtr(uint32_t cp, bitmapfont const* font);
 
     // ---- Scrolling text output ----
     volatile bool isTextScrollActive_ = false;
@@ -78,7 +81,7 @@ private:
     int scroll_yoffset = 0;
     bool loopScrolling = false;
     const bitmapfont *scrollFont = nullptr;
-    void populateScrollBuffer(String str, int cursor, CRGB color);
+    void populateScrollBuffer(String text, int cursor, CRGB color);
 
     // ---- Progress indicator ----
     volatile bool isProgressActive_ = false;
