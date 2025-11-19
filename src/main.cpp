@@ -312,7 +312,6 @@ void loop() {
         if (count == 0) {
             FrameBuffer.progressStop();
         }
-        displayState = DISPLAY_BOOT;
         displayUpdate();
     }
     if (count == 0) {
