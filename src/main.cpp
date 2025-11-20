@@ -150,7 +150,7 @@ void countdownUpdate() {
     if (dontDisplayHours) {
         // mm:ss
         font = "p4x6";
-        x = remaining < 0 ? 0 : 5;
+        x = remaining < 0 ? 1 : 5;
         y = 0;
         if (remaining < -3599) {
             out = "-XX:XX";
