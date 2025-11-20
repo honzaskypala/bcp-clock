@@ -121,7 +121,11 @@ void countdownUpdate() {
     bool dontDisplayHours = BCPEvent.timerLength() <= 3600;
 
     CRGB color = CRGB::White;
-    if (remaining <= Config.redThreshold()) {
+    if (BCPEvent.timerPaused()) {
+        // timer is paused
+        remaining = BCPEvent.pausedTimeRemaining();
+        color = time(nullptr) % 2 ? CRGB::Magenta : CRGB::Black;
+    } else if (remaining <= Config.redThreshold()) {
         // we are below red threshold of the timer
         color = CRGB::Red;
     } else if (remaining <= Config.yellowThreshold()) {

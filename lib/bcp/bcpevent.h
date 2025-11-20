@@ -11,26 +11,28 @@ class CBCPEvent {
 public:
     // ---- Event ID related ----
     void setID(String newID);
-    String id() { return id_; }
-    String fullId() { return fullId_; }
-    bool valid() { return validId_; }
+    inline String id() { return id_; }
+    inline String fullId() { return fullId_; }
+    inline bool valid() { return validId_; }
 
     // ---- Refresh data from BCP API ----
     bool refreshData();
 
     // ---- BCP event details ----
-    String name() const { return name_; }
-    bool started() const { return started_; }
-    bool ended() const { return ended_; }
-    int numberOfRounds() const { return numberOfRounds_; }
-    int currentRound() const { return currentRound_; }
+    inline String name() const { return name_; }
+    inline bool started() const { return started_; }
+    inline bool ended() const { return ended_; }
+    inline int numberOfRounds() const { return numberOfRounds_; }
+    inline int currentRound() const { return currentRound_; }
 
     // ---- BCP round timer details ----
-    int timerLength() const { return timerLength_; }
-    String roundStartTime() const { return roundStartTime_; }
-    String roundEndTime() const { return roundEndTime_; }
-    time_t roundStartEpoch() const { return roundStartEpoch_; }
-    time_t roundEndEpoch() const { return roundEndEpoch_; }
+    inline uint32_t timerLength() const { return timerLength_; }
+    inline String roundStartTime() const { return roundStartTime_; }
+    inline String roundEndTime() const { return roundEndTime_; }
+    inline time_t roundStartEpoch() const { return roundStartEpoch_; }
+    inline time_t roundEndEpoch() const { return roundEndEpoch_; }
+    inline bool timerPaused() const { return timerPaused_; }
+    inline uint32_t pausedTimeRemaining() const { return pausedTimeRemaining_; }
 
 private:
     // ---- Singleton related ----
@@ -51,9 +53,11 @@ private:
     int numberOfRounds_ = 0, currentRound_ = 0;
 
     // ---- BCP round timer details ----
-    int timerLength_ = 0;
+    uint32_t timerLength_ = 0;
     String roundStartTime_ = "", roundEndTime_ = "";
     time_t roundStartEpoch_ = 0, roundEndEpoch_ = 0;
+    bool timerPaused_ = false;
+    uint32_t pausedTimeRemaining_ = 0;
 
     // ---- Helper methods ----
     time_t timegm(struct tm* t);

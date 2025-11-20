@@ -89,6 +89,14 @@ bool CBCPEvent::refreshData() {
                         struct tm etm = {};
                         strptime(roundEndTime_.c_str(), "%Y-%m-%dT%H:%M:%SZ", &etm);
                         roundEndEpoch_ = timegm(&etm);
+                        if (timerDoc.containsKey("timerPaused")) {
+                            timerPaused_ = timerDoc["timerPaused"].as<bool>();
+                            if (timerPaused_) {
+                                pausedTimeRemaining_ = timerDoc["pausedTimeRemaining"].as<int>();
+                            }
+                        } else {
+                            timerPaused_ = false;
+                        }
                     }
                 }
                 timerHttp.end();
