@@ -47,10 +47,14 @@ private:
     String fullId_;
     String extractEventID(const String& input);
 
+    // ---- REST API ----
+    int BCPRest(const String& endpoint, String& outPayload);
+
     // ---- BCP event details ----
     String name_ = "";
     bool started_ = false, ended_ = false;
     int numberOfRounds_ = 0, currentRound_ = 0;
+    void handleEventOverviewPayload(const String& payload);
 
     // ---- BCP round timer details ----
     uint32_t timerLength_ = 0;
@@ -58,6 +62,8 @@ private:
     time_t roundStartEpoch_ = 0, roundEndEpoch_ = 0;
     bool timerPaused_ = false;
     uint32_t pausedTimeRemaining_ = 0;
+    void fetchTimerData();
+    void handleEventTimerPayload(const String& payload);
 
     // ---- Helper methods ----
     time_t timegm(struct tm* t);
