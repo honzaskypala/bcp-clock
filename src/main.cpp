@@ -118,32 +118,36 @@ void countdownUpdate() {
     updateCountdown = false;
 
     long remaining = BCPEvent.roundEndEpoch() - time(nullptr);
+    bool dontDisplayHours = BCPEvent.timerLength() <= 3600;
 
     CRGB color = CRGB::White;
     if (remaining <= Config.redThreshold()) {
+        // we are below red threshold of the timer
         color = CRGB::Red;
     } else if (remaining <= Config.yellowThreshold()) {
+        // we are below yellow threshold of the timer
         color = CRGB::Yellow;
+    } else if (remaining > BCPEvent.timerLength() || (remaining == BCPEvent.timerLength() && BCPEvent.timerLength() <= 3600)) {
+        // event round not yet started, show time to start
+        color = CRGB::Green;
+        remaining -= BCPEvent.timerLength();
+        dontDisplayHours = remaining < 3600 && BCPEvent.timerLength() <= 3600;
     }
-
-    String font = "p4x6";
-    int x = remaining < 0 ? 0 : 5,
-        y = 0;
-    if (BCPEvent.timerLength() > 3600) {
-        font = "f3x5";
-        x = remaining < 0 ? -1 : 3;
-        y = 1;
-    }
-
-    int t = remaining < 0 ? -remaining : remaining;
-    int hours = t / 3600;
-    int minutes = (t % 3600) / 60;
-    int seconds = t % 60;
 
     String out  = remaining < 0 ? "-" : "";;
+    int absoluteTime = remaining < 0 ? -remaining : remaining;
+    int hours = absoluteTime / 3600;
+    int minutes = (absoluteTime % 3600) / 60;
+    int seconds = absoluteTime % 60;
 
-    if (BCPEvent.timerLength() <= 3600) {
+    int x, y;
+    String font;
+
+    if (dontDisplayHours) {
         // mm:ss
+        font = "p4x6";
+        x = remaining < 0 ? 0 : 5;
+        y = 0;
         if (remaining < -3599) {
             out = "-XX:XX";
         } else {
@@ -152,15 +156,20 @@ void countdownUpdate() {
         }
     } else {
         // h:mm:ss
-        out += String(hours) + ":" +
-               String(minutes / 10) + String(minutes % 10) + ":" +
-               String(seconds / 10) + String(seconds % 10);
+        font = "f3x5";
+        x = remaining < 0 ? -1 : 3;
+        y = 1;
+        if (remaining < -35999) {
+            out = "-X:XX:XX";
+        } else {
+            out += String(hours) + ":" +
+                String(minutes / 10) + String(minutes % 10) + ":" +
+                String(seconds / 10) + String(seconds % 10);
+        }
     }
 
     FrameBuffer.text(out, x, y, font, color, true, false);
-
     displayRound(BCPEvent.currentRound(), BCPEvent.numberOfRounds());
-
     FrameBuffer.show();
 }  
 
