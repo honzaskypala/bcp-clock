@@ -13,13 +13,15 @@
 class CWifiMgr {
 public:
     // ---- Public API ----
-    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0);
+    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0, Print *debugOut = nullptr);
     bool isConnected() const { return connected_; }
     bool eraseStoredNetworks();
     bool listStoredNetworks(std::vector<String>& out);
     bool removeStoredNetwork(const char* ssid);
 
 private:
+    Print *debugOut_ = nullptr;  // Optional debug output
+
     // ---- Core state ----
     volatile bool connected_ = false;
 

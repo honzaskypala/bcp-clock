@@ -25,20 +25,21 @@ static constexpr const char* PREFS_LIST_KEY = "__ssids";
 constexpr const char* CONNECTION_FAIL_MSG = "Error: Connection failed";
 constexpr const char* NTP_TIME_SYNC_FAIL_MSG = "Error: NTP time sync failed";
 
+#define WIFIMGR_DEBUG(msg) if (debugOut_) { debugOut_->print("[WiFiMgr] "); debugOut_->println(msg); }
+
 // -----------Singleton----------
 CWifiMgr WifiMgr;
 
 // ---------- Public API ----------
-bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs) {
-    Serial.begin(9600);
-    while (!Serial) {}
+bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *debugOut) {
+    debugOut_ = debugOut;
 
-    Serial.println("WifiMgr: Attempting automatic WiFi connection.");
+    WIFIMGR_DEBUG("Attempting automatic WiFi connection.");
     connected_ = false;
     timeSyncFailed_ = false;
 
     if (!scanAndSort()) {
-        Serial.println("WifiMgr: Scan failed or found no networks.");
+        WIFIMGR_DEBUG("Scan failed or found no networks.");
 
     } else if (!enforcePortal) {
         // Pass 1: known networks (DO NOT save credential here)
@@ -46,34 +47,33 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs) {
         bool haveCreds = listStoredNetworks(storedSsids);
 
         if (haveCreds) {
-            Serial.println("WifiMgr: Pass 1 - Trying known networks...");
+            WIFIMGR_DEBUG("Pass 1 - Trying known networks...");
             for (int order = 0; order < scanCount_; ++order) {
                 int i = scanIdx_[order];
                 const String& ssid = scanSsid_[i];
-                Serial.println("WifiMgr: Considering SSID: " + ssid);
+                WIFIMGR_DEBUG("Considering SSID: " + ssid);
                 if (ssid.length() == 0) continue;
 
                 String pass;
                 if (getCredential(ssid.c_str(), pass)) {
-                    Serial.printf("WifiMgr: Known SSID candidate: %s (RSSI %d dBm)\n",
-                                ssid.c_str(), scanRssi_[order]);
+                    WIFIMGR_DEBUG("Known SSID candidate: " + ssid + " (RSSI " + String(scanRssi_[order]) + " dBm)");
 
                     if (attemptConnect(ssid.c_str(), pass.c_str(), CONNECT_TIMEOUT_MS)) {
                         connected_ = true;
                         freeScanData();
-                        Serial.println("WifiMgr: Connected via known network (no credential save).");
+                        WIFIMGR_DEBUG("Connected via known network (no credential save).");
                         return true;
                     }
                 }
                 delay(0);
             }
-            Serial.println("WifiMgr: Pass 1 finished: No known networks connected.");
+            WIFIMGR_DEBUG("Pass 1 finished: No known networks connected.");
         } else {
-            Serial.println("WifiMgr: No known networks (missing or invalid /wifi.json).");
+            WIFIMGR_DEBUG("No known networks (missing or invalid /wifi.json).");
         }
 
         // Pass 2: open networks (DO NOT save credential here)
-        Serial.println("WifiMgr: Pass 2 - Trying open networks...");
+        WIFIMGR_DEBUG("Pass 2 - Trying open networks...");
         for (int order = 0; order < scanCount_; ++order) {
             int i = scanIdx_[order];
             uint8_t enc = scanEnc_[i];
@@ -81,25 +81,23 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs) {
             const String& ssid = scanSsid_[i];
             if (ssid.length() == 0) continue;
 
-            Serial.printf("WifiMgr: Open SSID candidate: %s (RSSI %d dBm)\n",
-                        ssid.c_str(), scanRssi_[order]);
-
+            WIFIMGR_DEBUG("Open SSID candidate: " + ssid + " (RSSI " + String(scanRssi_[order]) + " dBm)");
             if (attemptConnect(ssid.c_str(), nullptr, CONNECT_TIMEOUT_MS)) {
                 connected_ = true;
                 freeScanData();
-                Serial.println("WifiMgr: Connected via open network (no credential save).");
+                WIFIMGR_DEBUG("Connected via open network (no credential save).");
                 return true;
             }
             delay(0);
         }
-        Serial.println("WifiMgr: Pass 2 finished: No open networks connected.");
+        WIFIMGR_DEBUG("Pass 2 finished: No open networks connected.");
 
         if (timeSyncFailed_) {
             failedTimeSyncMsg();
         }
     }
 
-    Serial.println("WifiMgr: Launching captive configuration portal (blocking until connected or timeout).");
+    WIFIMGR_DEBUG("Launching captive configuration portal (blocking until connected or timeout).");
     startConfigPortal();
     uint32_t portalStart = millis();
 
@@ -108,7 +106,7 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs) {
         server_.handleClient();
         delay(10);
         if (portalTimeoutMs > 0 && (millis() - portalStart) > portalTimeoutMs) {
-            Serial.println("WifiMgr: Portal timeout reached, exiting without WiFi.");
+            WIFIMGR_DEBUG("Portal timeout reached, exiting without WiFi.");
             break;
         }
     }
@@ -118,9 +116,9 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs) {
 }
 
 bool CWifiMgr::eraseStoredNetworks() {
-    Serial.println("WifiMgr: eraseStoredNetworks: Removing all stored SSIDs and credentials.");
+    WIFIMGR_DEBUG("Removing all stored SSIDs and credentials.");
     if (!beginPrefs(false)) {
-        Serial.println("WifiMgr: eraseStoredNetworks: Preferences begin (RW) failed.");
+        WIFIMGR_DEBUG("Preferences begin (RW) failed.");
         return false;
     }
 
@@ -146,7 +144,7 @@ bool CWifiMgr::eraseStoredNetworks() {
     }
 
     prefs_.end();
-    Serial.println("WifiMgr: eraseStoredNetworks: Completed.");
+    WIFIMGR_DEBUG("Completed.");
     return true;
 }
 
@@ -154,22 +152,21 @@ bool CWifiMgr::eraseStoredNetworks() {
 bool CWifiMgr::scanAndSort() {
     ensureStaModeForScan();
 
-    Serial.println();
-    Serial.println("WifiMgr: Preparing for WiFi scan...");
+    WIFIMGR_DEBUG("Preparing for WiFi scan...");
     if (!portalActive_) {
-        Serial.println("WifiMgr: Waiting 3 seconds before scan to avoid early boot scan issues...");
+        WIFIMGR_DEBUG("Waiting 3 seconds before scan to avoid early boot scan issues...");
         delay(3000);
     } else {
-        Serial.println("WifiMgr: Portal active - skipping initial scan delay to keep AP responsive.");
+        WIFIMGR_DEBUG("Portal active - skipping initial scan delay to keep AP responsive.");
         delay(50);
     }
 
-    Serial.println("WifiMgr: Starting WiFi scan...");
+    WIFIMGR_DEBUG("Starting WiFi scan...");
     int n = WiFi.scanNetworks();
-    Serial.println("WifiMgr: Scan done");
+    WIFIMGR_DEBUG("Scan done");
 
     if (n <= 0) {
-        Serial.println("WifiMgr: No networks found");
+        WIFIMGR_DEBUG("No networks found");
         return false;
     }
 
@@ -186,7 +183,7 @@ bool CWifiMgr::scanAndSort() {
             scanEnc_   = new uint8_t[scanCount_];
             scanChan_  = new int[scanCount_];
 
-            Serial.println("WifiMgr: Scan results (driver):");
+            WIFIMGR_DEBUG("Scan results (driver):");
             for (int i = 0; i < scanCount_; ++i) {
                 scanIdx_[i]  = i;
                 scanSsid_[i] = String(reinterpret_cast<const char*>(recs[i].ssid));
@@ -195,13 +192,7 @@ bool CWifiMgr::scanAndSort() {
                 scanChan_[i] = static_cast<int>(recs[i].primary);
 
                 const uint8_t* b = recs[i].bssid;
-                Serial.printf("  [%d] SSID='%s' RSSI=%d dBm ENC=%u CH=%d BSSID=%02X:%02X:%02X:%02X:%02X:%02X\n",
-                              i,
-                              scanSsid_[i].c_str(),
-                              scanRssi_[i],
-                              (unsigned)scanEnc_[i],
-                              scanChan_[i],
-                              b[0], b[1], b[2], b[3], b[4], b[5]);
+                WIFIMGR_DEBUG("  [" + String(i) + "] SSID='" + scanSsid_[i] + "' RSSI=" + String(scanRssi_[i]) + " dBm ENC=" + String((unsigned)scanEnc_[i]) + " CH=" + String(scanChan_[i]) + " BSSID=" + String(b[0], HEX) + ":" + String(b[1], HEX) + ":" + String(b[2], HEX) + ":" + String(b[3], HEX) + ":" + String(b[4], HEX) + ":" + String(b[5], HEX));
             }
             usedDriverRecords = true;
         }
@@ -216,19 +207,14 @@ bool CWifiMgr::scanAndSort() {
         scanEnc_   = new uint8_t[scanCount_];
         scanChan_  = new int[scanCount_];
 
-        Serial.println("WifiMgr: Scan results (fallback API):");
+        WIFIMGR_DEBUG("Scan results (fallback API):");
         for (int i = 0; i < scanCount_; ++i) {
             scanIdx_[i]  = i;
             scanSsid_[i] = WiFi.SSID(i);
             scanRssi_[i] = WiFi.RSSI(i);
             scanEnc_[i]  = (uint8_t)WiFi.encryptionType(i);
             scanChan_[i] = WiFi.channel(i);
-            Serial.printf("  [%d] SSID='%s' RSSI=%d dBm ENC=%u CH=%d\n",
-                          i,
-                          scanSsid_[i].c_str(),
-                          scanRssi_[i],
-                          (unsigned)scanEnc_[i],
-                          scanChan_[i]);
+            WIFIMGR_DEBUG("  [" + String(i) + "] SSID='" + scanSsid_[i] + "' RSSI=" + String(scanRssi_[i]) + " dBm ENC=" + String((unsigned)scanEnc_[i]) + " CH=" + String(scanChan_[i]));
         }
     }
 
@@ -248,7 +234,7 @@ bool CWifiMgr::scanAndSort() {
         scanRssi_[j + 1] = keyRssi;
     }
 
-    Serial.printf("WifiMgr: %d networks found (sorted strongest to weakest)\n", scanCount_);
+    WIFIMGR_DEBUG("" + String(scanCount_) + " networks found (sorted strongest to weakest)");
     return true;
 }
 
@@ -266,9 +252,7 @@ void CWifiMgr::freeScanData() {
 bool CWifiMgr::attemptConnect(const char* ssid, const char* pass, uint32_t timeoutMs) {
     if (!ssid || ssid[0] == '\0') return false;
 
-    Serial.print("WifiMgr: Trying to connect to SSID: ");
-    Serial.println(ssid);
-
+    WIFIMGR_DEBUG("Trying to connect to SSID: " + String(ssid));
     WiFi.disconnect(true, true);
     delay(50);
 
@@ -285,11 +269,9 @@ bool CWifiMgr::attemptConnect(const char* ssid, const char* pass, uint32_t timeo
     }
 
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.print("WifiMgr: Connected. IP address: ");
-        Serial.println(WiFi.localIP());
-
+        WIFIMGR_DEBUG("Connected. IP address: " + WiFi.localIP().toString());
         if (!syncTime(10000)) {
-            Serial.println("WifiMgr: NTP sync failed. Disconnecting and failing connect attempt.");
+            WIFIMGR_DEBUG("NTP sync failed. Disconnecting and failing connect attempt.");
             WiFi.disconnect(true, true);
             timeSyncFailed_ = true;
             return false;
@@ -297,7 +279,7 @@ bool CWifiMgr::attemptConnect(const char* ssid, const char* pass, uint32_t timeo
 
         return true;
     }
-    Serial.println("WifiMgr: Connection attempt failed.");
+    WIFIMGR_DEBUG("Connection attempt failed.");
     return false;
 }
 
@@ -348,7 +330,7 @@ String CWifiMgr::joinList(const std::vector<String>& list) {
 bool CWifiMgr::listStoredNetworks(std::vector<String>& out) {
     out.clear();
     if (!beginPrefs(true)) {
-        Serial.println("WifiMgr: Preferences begin (RO) failed.");
+        WIFIMGR_DEBUG("Preferences begin (RO) failed.");
         return false;
     }
 
@@ -362,11 +344,11 @@ bool CWifiMgr::listStoredNetworks(std::vector<String>& out) {
 
     splitList(list, out);
     if (!out.empty()) {
-        Serial.println("WifiMgr: Loaded stored SSIDs from Preferences:");
-        for (auto& s : out) Serial.printf("  SSID: %s\n", s.c_str());
+        WIFIMGR_DEBUG("Loaded stored SSIDs from Preferences:");
+        for (auto& s : out) WIFIMGR_DEBUG("  SSID: " + s);
         return true;
     }
-    Serial.println("WifiMgr: No stored SSIDs in Preferences.");
+    WIFIMGR_DEBUG("No stored SSIDs in Preferences.");
     return false;
 }
 
@@ -385,11 +367,11 @@ bool CWifiMgr::getCredential(const char* ssid, String& outPass) {
 
 bool CWifiMgr::saveCredential(const char* ssid, const char* pass) {
     if (!ssid || ssid[0] == '\0') {
-        Serial.println("WifiMgr: saveCredential: Empty SSID, skipping.");
+        WIFIMGR_DEBUG("Empty SSID, skipping.");
         return false;
     }
     if (!beginPrefs(false)) {
-        Serial.println("WifiMgr: saveCredential: Preferences begin (RW) failed.");
+        WIFIMGR_DEBUG("Preferences begin (RW) failed.");
         return false;
     }
 
@@ -412,17 +394,17 @@ bool CWifiMgr::saveCredential(const char* ssid, const char* pass) {
     prefs_.putString(key.c_str(), (pass ? pass : ""));
 
     prefs_.end();
-    Serial.printf("WifiMgr: saveCredential: Stored credential for '%s'.\n", ssid);
+    WIFIMGR_DEBUG("Stored credential for '" + String(ssid));
     return true;
 }
 
 bool CWifiMgr::removeStoredNetwork(const char* ssid) {
     if (!ssid || ssid[0] == '\0') {
-        Serial.println("WifiMgr: removeStoredNetwork: Empty SSID, skipping.");
+        WIFIMGR_DEBUG("Empty SSID, skipping.");
         return false;
     }
     if (!beginPrefs(false)) {
-        Serial.println("WifiMgr: removeStoredNetwork: Preferences begin (RW) failed.");
+        WIFIMGR_DEBUG("Preferences begin (RW) failed.");
         return false;
     }
 
@@ -445,7 +427,7 @@ bool CWifiMgr::removeStoredNetwork(const char* ssid) {
     }
     if (!removed) {
         prefs_.end();
-        Serial.printf("WifiMgr: removeStoredNetwork: SSID '%s' not found.\n", ssid);
+        WIFIMGR_DEBUG("SSID '" + String(ssid) + "' not found.");
         return false;
     }
     prefs_.putString(PREFS_LIST_KEY, joinList(out));
@@ -456,7 +438,7 @@ bool CWifiMgr::removeStoredNetwork(const char* ssid) {
     }
 
     prefs_.end();
-    Serial.printf("WifiMgr: removeStoredNetwork: Removed '%s'.\n", ssid);
+    WIFIMGR_DEBUG("Removed '" + String(ssid) + "'.");
     return true;
 }
 
@@ -488,20 +470,20 @@ void CWifiMgr::ensureStaModeForScan() {
 // ---- Time sync ----
 
 bool CWifiMgr::syncTime(uint32_t timeoutMs) {
-    Serial.println("WifiMgr: Syncing time via NTP...");
+    WIFIMGR_DEBUG("Syncing time via NTP...");
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
 
     RTC_DS1307 rtc;
     struct tm timeinfo;
     if (getLocalTime(&timeinfo, timeoutMs)) {
-        Serial.println("WifiMgr: Time synchronized:");
+        WIFIMGR_DEBUG("Time synchronized:");
         printLocalTime();
         if (rtc.begin()) {
             rtc.adjust(DateTime((uint32_t) time(nullptr)));  // Update RTC time
         }
         return true;
     } else if (rtc.begin() && rtc.now().unixtime() > 1763487357) {
-        Serial.println("WifiMgr: NTP sync failed, but RTC has valid time. Using RTC time.");
+        WIFIMGR_DEBUG("NTP sync failed, but RTC has valid time. Using RTC time.");
         struct timeval tv;
         tv.tv_sec = rtc.now().unixtime();
         tv.tv_usec = 0;
@@ -509,7 +491,7 @@ bool CWifiMgr::syncTime(uint32_t timeoutMs) {
         printLocalTime();
         return true;
     } else {
-        Serial.println("WifiMgr: Failed to obtain time.");
+        WIFIMGR_DEBUG("Failed to obtain time.");
         return false;
     }
 }
@@ -517,12 +499,12 @@ bool CWifiMgr::syncTime(uint32_t timeoutMs) {
 void CWifiMgr::printLocalTime() {
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo)) {
-        Serial.println("WifiMgr: Failed to obtain time.");
+        WIFIMGR_DEBUG("Failed to obtain time.");
         return;
     }
     char buf[64];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", &timeinfo);
-    Serial.printf("WifiMgr: Local time: %s\n", buf);
+    WIFIMGR_DEBUG("Local time: " + String(buf));
 }
 
 void CWifiMgr::failedTimeSyncMsg() {
@@ -739,7 +721,7 @@ void CWifiMgr::handleRoot() {
 }
 
 void CWifiMgr::handleRescan() {
-    Serial.println("WifiMgr: Portal - Rescanning networks...");
+    WIFIMGR_DEBUG("Portal - Rescanning networks...");
     if (scanAndSort()) {
         server_.sendHeader("Location", "/", true);
         server_.send(302, "text/plain", "Rescanned. Redirecting...");
@@ -757,9 +739,8 @@ void CWifiMgr::handleConnect() {
     String ssid = server_.arg("ssid");
     String pwd  = server_.hasArg("pwd") ? server_.arg("pwd") : "";
 
-    Serial.print("WifiMgr: Portal - User selected SSID: ");
-    Serial.println(ssid);
-    Serial.println("WifiMgr: Portal - Attempting connection...");
+    WIFIMGR_DEBUG("Portal - User selected SSID: " + ssid);
+    WIFIMGR_DEBUG("Portal - Attempting connection...");
 
     timeSyncFailed_ = false;
     if (attemptConnect(ssid.c_str(), pwd.c_str(), PORTAL_CONNECT_TIMEOUT_MS)) {
@@ -789,7 +770,7 @@ void CWifiMgr::handleDelete() {
         return;
     }
     String ssid = server_.arg("ssid");
-    Serial.printf("WifiMgr: Portal - Request to delete SSID '%s'.\n", ssid.c_str());
+    WIFIMGR_DEBUG("Portal - Request to delete SSID '" + ssid + "'.");
 
     bool ok = removeStoredNetwork(ssid.c_str());
     if (ok) {
@@ -801,7 +782,7 @@ void CWifiMgr::handleDelete() {
 }
 
 void CWifiMgr::handleDeleteAll() {
-    Serial.println("WifiMgr: Portal - Request to delete ALL stored SSIDs.");
+    WIFIMGR_DEBUG("Portal - Request to delete ALL stored SSIDs.");
     bool ok = eraseStoredNetworks();
     if (ok) {
         server_.sendHeader("Location", "/", true);
@@ -827,11 +808,11 @@ void CWifiMgr::handleNotFound() {
 // ---------- AP / Portal ----------
 void CWifiMgr::startConfigPortal() {
     if (portalActive_) {
-        Serial.println("WifiMgr: Portal already active.");
+        WIFIMGR_DEBUG("Portal already active.");
         return;
     }
 
-    Serial.println("WifiMgr: Starting configuration & captive portal AP...");
+    WIFIMGR_DEBUG("Starting configuration & captive portal AP...");
 
     // Ensure previous AP is shut down
     WiFi.softAPdisconnect(true);
@@ -856,25 +837,24 @@ void CWifiMgr::startConfigPortal() {
 
     esp_err_t err = esp_wifi_set_config(WIFI_IF_AP, &apConfig);
     if (err != ESP_OK) {
-        Serial.printf("WifiMgr: esp_wifi_set_config failed: %d\n", (int)err);
+        WIFIMGR_DEBUG("esp_wifi_set_config failed: " + String((int)err));
     }
 
     if (!WiFi.softAP(AP_SSID)) {
-        Serial.println("WifiMgr: Failed to start AP (softAP).");
+        WIFIMGR_DEBUG("Failed to start AP (softAP).");
     } else {
-        Serial.printf("WifiMgr: AP started. SSID: %s (OPEN)\n", AP_SSID);
+        WIFIMGR_DEBUG("AP started. SSID: " + String(AP_SSID) + " (OPEN)");
     }
 
     IPAddress apIP = WiFi.softAPIP();
-    Serial.print("WifiMgr: AP IP address: ");
-    Serial.println(apIP);
+    WIFIMGR_DEBUG("AP IP address: " + apIP.toString());
 
     WiFi.enableSTA(true);
 
     if (!dnsServer_.start(DNS_PORT, "*", apIP)) {
-        Serial.println("WifiMgr: DNS Server failed to start.");
+        WIFIMGR_DEBUG("DNS Server failed to start.");
     } else {
-        Serial.println("WifiMgr: DNS Server started for captive portal.");
+        WIFIMGR_DEBUG("DNS Server started for captive portal.");
     }
 
     server_.on("/",          [this]() { handleRoot(); });
@@ -895,7 +875,7 @@ void CWifiMgr::startConfigPortal() {
 
     server_.begin();
     portalActive_ = true;
-    Serial.println("WifiMgr: HTTP portal server started on port 80.");
+    WIFIMGR_DEBUG("HTTP portal server started on port 80.");
     String APmsg = "AP mode - Connect to Wi-Fi " + String(AP_SSID) + ", then open http://" + WiFi.softAPIP().toString() + " to configure.";
     if (timeSyncFailed_) {
         FrameBuffer.textScrollAppend(APmsg, CRGB::White, CRGB::Black, 24, 8, true);
@@ -908,10 +888,10 @@ void CWifiMgr::startConfigPortal() {
 
 void CWifiMgr::stopPortal() {
     if (!portalActive_) return;
-    Serial.println("WifiMgr: Stopping configuration portal...");
+    WIFIMGR_DEBUG("Stopping configuration portal...");
     server_.stop();
     dnsServer_.stop();
     WiFi.softAPdisconnect(true);
     portalActive_ = false;
-    Serial.println("WifiMgr: Portal stopped.");
+    WIFIMGR_DEBUG("Portal stopped.");
 }
