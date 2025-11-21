@@ -7,7 +7,6 @@
 #include <WiFi.h>
 #include <time.h>
 #include <esp_wifi.h>
-#include <framebuffer.h>
 #include <vector>
 #include <RTClib.h>
 
@@ -26,12 +25,14 @@ constexpr const char* CONNECTION_FAIL_MSG = "Error: Connection failed";
 constexpr const char* NTP_TIME_SYNC_FAIL_MSG = "Error: NTP time sync failed";
 
 #define WIFIMGR_DEBUG(msg) if (debugOut_) { debugOut_->print("[WiFiMgr] "); debugOut_->println(msg); }
+#define WIFIMGR_MSG(msg) if (usrMsg_) { usrMsg_->println(msg); }
 
 // -----------Singleton----------
 CWifiMgr WifiMgr;
 
 // ---------- Public API ----------
-bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *debugOut) {
+bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrMsg, Print *debugOut) {
+    usrMsg_ = usrMsg;
     debugOut_ = debugOut;
 
     WIFIMGR_DEBUG("Attempting automatic WiFi connection.");
@@ -93,7 +94,7 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *debu
         WIFIMGR_DEBUG("Pass 2 finished: No open networks connected.");
 
         if (timeSyncFailed_) {
-            failedTimeSyncMsg();
+            WIFIMGR_MSG(NTP_TIME_SYNC_FAIL_MSG);
         }
     }
 
@@ -507,13 +508,6 @@ void CWifiMgr::printLocalTime() {
     WIFIMGR_DEBUG("Local time: " + String(buf));
 }
 
-void CWifiMgr::failedTimeSyncMsg() {
-    FrameBuffer.progressStop();
-    FrameBuffer.textScrollStop();
-    FrameBuffer.textScroll(NTP_TIME_SYNC_FAIL_MSG, 2, "p3x5", CRGB::Red, CRGB::Black, 24);
-    delay(100);
-}
-
 // ---------- HTML helpers ----------
 String CWifiMgr::htmlEscape(const String& in) {
     String out;
@@ -876,14 +870,7 @@ void CWifiMgr::startConfigPortal() {
     server_.begin();
     portalActive_ = true;
     WIFIMGR_DEBUG("HTTP portal server started on port 80.");
-    String APmsg = "AP mode - Connect to Wi-Fi " + String(AP_SSID) + ", then open http://" + WiFi.softAPIP().toString() + " to configure.";
-    if (timeSyncFailed_) {
-        FrameBuffer.textScrollAppend(APmsg, CRGB::White, CRGB::Black, 24, 8, true);
-        timeSyncFailed_ = false;
-    } else {
-        FrameBuffer.progressStop();
-        FrameBuffer.textScroll(APmsg, 2, "p3x5", CRGB::White, CRGB::Black, 24);
-    }
+    WIFIMGR_MSG("AP mode - Connect to Wi-Fi " + String(AP_SSID) + ", then open http://" + WiFi.softAPIP().toString() + " to configure.");
 }
 
 void CWifiMgr::stopPortal() {

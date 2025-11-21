@@ -13,14 +13,16 @@
 class CWifiMgr {
 public:
     // ---- Public API ----
-    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0, Print *debugOut = nullptr);
+    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0, Print *usrMsg = &Serial, Print *debugOut = nullptr);
     bool isConnected() const { return connected_; }
     bool eraseStoredNetworks();
     bool listStoredNetworks(std::vector<String>& out);
     bool removeStoredNetwork(const char* ssid);
+    inline bool timeSyncFailed() const { return timeSyncFailed_; }
 
 private:
     Print *debugOut_ = nullptr;  // Optional debug output
+    Print *usrMsg_   = &Serial;  // Optional user messages output
 
     // ---- Core state ----
     volatile bool connected_ = false;
@@ -57,7 +59,6 @@ private:
     bool syncTime(uint32_t timeoutMs = 10000);  // CHANGED: now returns success/failure
     void printLocalTime();
     bool timeSyncFailed_ = false;
-    void failedTimeSyncMsg();
 
     // ---- Helpers ----
     static String htmlEscape(const String& in);

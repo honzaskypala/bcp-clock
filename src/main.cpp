@@ -29,6 +29,34 @@ hw_timer_t *countdownTimer = nullptr;
 volatile bool updateCountdown = false;
 volatile bool midButtonPressed = false;
 
+class CWifiMgrMsg : public Print {
+private:
+    char buffer[256];
+    size_t bufferIndex = 0;
+
+public:
+    size_t write(uint8_t c) override {
+        if (c == '\n' || bufferIndex >= sizeof(buffer) - 1) {
+            buffer[bufferIndex] = '\0';
+            if (strncmp(buffer, "Error:", 6) == 0) {
+                FrameBuffer.progressStop();
+                FrameBuffer.textScrollStop();
+                FrameBuffer.textScroll(buffer, 2, "p3x5", CRGB::Red, CRGB::Black, 24);
+            } else if (WifiMgr.timeSyncFailed()) {
+                FrameBuffer.textScrollAppend(buffer, CRGB::White, CRGB::Black, 24, 8, true);
+            } else {
+                FrameBuffer.progressStop();
+                FrameBuffer.textScrollStop();
+                FrameBuffer.textScroll(buffer, 2, "p3x5", CRGB::White, CRGB::Black, 24);
+            }
+            bufferIndex = 0;
+        } else if (c != '\r' && bufferIndex < sizeof(buffer) - 2) {
+            buffer[bufferIndex++] = c;
+        }
+        return 1;
+    }
+} WifiMgrMsg;
+
 void splashScreen(bool showProgress = true) {
     displayState = DISPLAY_BOOT;
     int y = showProgress ? 1 : 2;
@@ -292,7 +320,7 @@ void setup() {
         );
 
     splashScreen();
-    WifiMgr.connect(digitalRead(27) == LOW);    // if mid button pressed, enforce portal
+    WifiMgr.connect(digitalRead(27) == LOW, 0, &WifiMgrMsg /*, &Serial */);    // if mid button pressed, enforce portal
     ensureEventID();
     BCPEvent.setID(Config.eventId());
 }
