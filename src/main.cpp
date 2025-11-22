@@ -14,6 +14,9 @@ constexpr int COUNTDOWN_TIMER_ID = 3;
 constexpr int COUNTDOWN_TIMER_PERIOD_US = 1000000; // 1 second
 constexpr int DEBOUNCE_DELAY_MS = 500;
 
+Print *debugOut_ = nullptr;  // Optional debug output
+#define MAIN_DEBUG(msg) if (debugOut_) { debugOut_->print("[Main] "); debugOut_->println(msg); }
+
 enum DisplayState {
     DISPLAY_BOOT,
     DISPLAY_SCROLL_ONCE,
@@ -308,6 +311,7 @@ void setup() {
     pinMode(27, INPUT_PULLUP);    // mid button
     Serial.begin(9600);
     while (!Serial);              // wait for serial port to connect. Needed for native USB
+    debugOut_ = &Serial;
 
     xTaskCreatePinnedToCore(
             eventHandler,     // Function to run
@@ -320,7 +324,8 @@ void setup() {
         );
 
     splashScreen();
-    WifiMgr.connect(digitalRead(27) == LOW, 0, &WifiMgrMsg /*, &Serial */);    // if mid button pressed, enforce portal
+    WifiMgr.connect(digitalRead(27) == LOW, 0, &WifiMgrMsg, debugOut_);    // if mid button pressed, enforce portal
+    Config.debugOut = debugOut_;
     ensureEventID();
     BCPEvent.setID(Config.eventId());
 }
@@ -340,13 +345,15 @@ void loop() {
             displayUpdate();
         }
     } else if (count % 120 == 0) {
+        MAIN_DEBUG("Refreshing BCP event data...");
         if (BCPEvent.refreshData()) {
+            MAIN_DEBUG("BCP event data refreshed successfully");
             failCount = 0;
         } else {
             failCount++;
-            Serial.printf("Main: Failed to refresh BCP event data (failure count %d)\n", failCount);
+            MAIN_DEBUG("Failed to refresh BCP event data (failure count " + String(failCount) + ")");
             if (failCount >= 5) {
-                Serial.println("Main: Too many consecutive failures, restarting device");
+                MAIN_DEBUG("Too many consecutive failures, restarting device");
                 ESP.restart();
             }
         }

@@ -26,6 +26,8 @@ public:
     bool isConfigServerRunning() const { return configServer != nullptr; }
     volatile bool configUpdated = false;
 
+    Print *debugOut = nullptr;  // Optional debug output
+
 private:
     // ---- Singleton related ----
     CConfig();
@@ -59,7 +61,7 @@ private:
     String secondsToTime(long seconds) const;
     long timeToSeconds(const String& time) const;
     static uint8_t h2int(char c);
-    static bool ensureNvsReady();
+    bool ensureNvsReady();
 };
 
 extern CConfig& Config;

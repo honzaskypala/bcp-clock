@@ -7,6 +7,8 @@
 #include <nvs_flash.h>
 #include <wifimgr.h>
 
+#define CONFIG_DEBUG(msg) if (debugOut) { debugOut->print("[Config] "); debugOut->println(msg); }
+
 static const String DEF_EVENT = "";
 static const long DEF_YELLOW = 600; // seconds
 static const long DEF_RED    = 0;   // seconds
@@ -46,9 +48,9 @@ CConfig::CConfig() {
         red_      = r;
         hostname_ = prefs.getString("hostname", hostname_);
         prefs.end();
-        if (Serial) Serial.println("Config: preferences loaded");
+        CONFIG_DEBUG("Preferences loaded");
     } else {
-        if (Serial) Serial.println("Config: failed to open preferences for reading");
+        CONFIG_DEBUG("Failed to open preferences for reading");
     }
 }
 
@@ -56,20 +58,20 @@ CConfig::CConfig() {
 
 void CConfig::savePreferences() {
     if (!ensureNvsReady()) {
-        if (Serial) Serial.println("Config: NVS not ready for writing");
+        CONFIG_DEBUG("NVS not ready for writing");
         return;
     }
     Preferences prefs;
     if (prefs.begin(CONFIG_NS, false)) { // write mode
-        Serial.println("Config: saving preferences");
+        CONFIG_DEBUG("Saving preferences");
         prefs.putString("event", event_);
         prefs.putLong("yellow", yellow_);
         prefs.putLong("red", red_);
         prefs.putString("hostname", hostname_);
         prefs.end();
-        Serial.println("Config: preferences saved");
+        CONFIG_DEBUG("Preferences saved");
     } else {
-        Serial.println("Config: failed to open preferences for writing");
+        CONFIG_DEBUG("Failed to open preferences for writing");
     }
 }
 
@@ -77,22 +79,22 @@ void CConfig::savePreferences() {
 
 void CConfig::erase() {
     if (!ensureNvsReady()) {
-        if (Serial) Serial.println("Config: NVS not ready for clearing");
+        CONFIG_DEBUG("NVS not ready for clearing");
         return;
     }
     Preferences prefs;
     if (prefs.begin(CONFIG_NS, false)) { // write mode
-        Serial.println("Config: clearing preferences");
+        CONFIG_DEBUG("Clearing preferences");
         prefs.clear();
         prefs.end();
-        Serial.println("Config: preferences cleared");
+        CONFIG_DEBUG("Preferences cleared");
         // Reset to defaults
         event_ = DEF_EVENT;
         yellow_ = DEF_YELLOW;
         red_ = DEF_RED;
         hostname_ = DEF_HOSTNAME;
     } else {
-        if (Serial) Serial.println("Config: failed to open preferences for clearing");
+        CONFIG_DEBUG("Failed to open preferences for clearing");
     }
 }
 
@@ -134,13 +136,7 @@ void CConfig::startConfigServer(bool atStartup, unsigned long timeoutMs) {
     configServer->begin();
     _serverStartMs = millis();
     _serverTimeoutMs = timeoutMs; // 0 => no timeout
-    Serial.print("Config: HTTP server started on http://");
-    Serial.print(WiFi.localIP());
-    if (_serverTimeoutMs == 0) {
-        Serial.println("/ (no timeout)");
-    } else {
-        Serial.println("/ (timeout active)");
-    }
+    CONFIG_DEBUG("HTTP server started on http://" + WiFi.localIP().toString() + (timeoutMs == 0 ? " (no timeout)" : " (with timeout)"));
 }
 
 void CConfig::stopConfigServer() {
@@ -148,7 +144,7 @@ void CConfig::stopConfigServer() {
         configServer->stop();
         delete configServer;
         configServer = nullptr;
-        Serial.println("Config: HTTP server stopped");
+        CONFIG_DEBUG("HTTP server stopped");
     }
 }
 
@@ -157,7 +153,7 @@ void CConfig::handleClient() {
         configServer->handleClient();
         // Stop server after timeout, if configured
         if (_serverTimeoutMs > 0 && (millis() - _serverStartMs) >= _serverTimeoutMs) {
-            Serial.println("Config: HTTP server timeout reached, stopping");
+            CONFIG_DEBUG("HTTP server timeout reached, stopping");
             stopConfigServer();
             _serverTimedOut = false; // do not block restarts
         }
@@ -307,7 +303,7 @@ void CConfig::handleWifiDelete() {
         return;
     }
     String ssid = urlDecode(configServer->arg("ssid"));
-    Serial.printf("Config: Request to delete WiFi network '%s'\n", ssid.c_str());
+    CONFIG_DEBUG("Request to delete WiFi network '" + ssid + "'");
 
     if (WifiMgr.removeStoredNetwork(ssid.c_str())) {
         configServer->sendHeader("Location", "/?wifiDeleted=1");
@@ -318,7 +314,7 @@ void CConfig::handleWifiDelete() {
 }
 
 void CConfig::handleWifiDeleteAll() {
-    Serial.println("Config: Request to delete ALL stored WiFi networks");
+    CONFIG_DEBUG("Request to delete ALL stored WiFi networks");
     if (WifiMgr.eraseStoredNetworks()) {
         configServer->sendHeader("Location", "/?wifiAllDeleted=1");
         configServer->send(302);
@@ -416,7 +412,7 @@ bool CConfig::ensureNvsReady() {
     }
     ready = (err == ESP_OK);
     if (!ready && Serial) {
-        Serial.println("Config: NVS init failed");
+        CONFIG_DEBUG("NVS init failed");
     }
     return ready;
 }
