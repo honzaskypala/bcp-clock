@@ -735,6 +735,7 @@ void CWifiMgr::handleConnect() {
 
     WIFIMGR_DEBUG("Portal - User selected SSID: " + ssid);
     WIFIMGR_DEBUG("Portal - Attempting connection...");
+    WIFIMGR_MSG("Connecting to '" + ssid + "'...");
 
     timeSyncFailed_ = false;
     if (attemptConnect(ssid.c_str(), pwd.c_str(), PORTAL_CONNECT_TIMEOUT_MS)) {
@@ -751,10 +752,14 @@ void CWifiMgr::handleConnect() {
         server_.send(200, "text/html", resp);
         delay(500);
         stopPortal();
+        WIFIMGR_MSG("Connected to '" + ssid + "'...");
     } else {
         // Redirect back to root with fail flag so root shows status bar
         server_.sendHeader("Location", "/?fail=1", true);
-        server_.send(302, "text/plain", (timeSyncFailed_ ? NTP_TIME_SYNC_FAIL_MSG : CONNECTION_FAIL_MSG));
+        String failMsg = timeSyncFailed_ ? NTP_TIME_SYNC_FAIL_MSG : CONNECTION_FAIL_MSG;
+        server_.send(302, "text/plain", failMsg);
+        WIFIMGR_DEBUG(failMsg);
+        WIFIMGR_MSG(failMsg);
     }
 }
 
