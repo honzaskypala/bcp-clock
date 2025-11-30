@@ -42,7 +42,11 @@ void ScrollingText::append(const char *text, int16_t color, bool newStart, uint1
     textDimensions(text, &x1, &y1, &w, &h);
     int16_t new_y1 = _min(y1_, y1);
     uint16_t new_h = _max(y1_ + scrollCanvas_->height(), y1 + h) - new_y1;
-    canvasType *newCanvas = new canvasType(scrollCanvas_->width() + rpad_ + lpad + w, new_h);
+#ifdef _UTF8_32BIT_FONT_H_
+    UTF8canvas16 *newCanvas = new UTF8canvas16(scrollCanvas_->width() + rpad_ + lpad + w, new_h);
+#else
+    GFXcanvas16 *newCanvas = new GFXcanvas16(scrollCanvas_->width() + rpad_ + lpad + w, new_h);
+#endif // _UTF8_32BIT_FONT_H_
     newCanvas->fillScreen(0x0000);
     newCanvas->drawRGBBitmap(0, y1_ - new_y1, scrollCanvas_->getBuffer(), scrollCanvas_->width(), scrollCanvas_->height());
     y1_ = new_y1;

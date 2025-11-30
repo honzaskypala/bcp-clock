@@ -16,12 +16,6 @@
 #define DEFAULT_LOOP true
 #define DEFAULT_DRAW true
 
-#ifdef _UTF8CANVAS16_H_
-#define canvasType UTF8canvas16
-#else
-#define canvasType GFXcanvas16
-#endif // _UTF8CANVAS16_H_
-
 class ScrollingText : public GFXanimation {
 public:
     ScrollingText(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont = false, int16_t color = DEFAULT_COLOR, uint16_t lpad = DEFAULT_LPAD, uint16_t rpad = DEFAULT_RPAD, bool loop = DEFAULT_LOOP, bool draw = DEFAULT_DRAW) : GFXanimation(gfx), x_(x), y_(y), gfxFont_(gfxFont), lpad_(lpad), rpad_(rpad), loop_(loop), startPos_(0), pos_(0), newLpad_(-256) {
@@ -51,7 +45,9 @@ public:
 private:
     const GFXfont *gfxFont_;
     bool isSegFont_ = false;
+#ifdef _UTF8_32BIT_FONT_H_
     bool isUTF8Font_ = false;
+#endif // _UTF8_32BIT_FONT_H_
     GFXcanvas16 *scrollCanvas_;
     int16_t x_;
     int16_t y_;   // text baseline as per Adafruit GFX print text methods
