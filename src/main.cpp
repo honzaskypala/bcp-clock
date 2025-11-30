@@ -4,19 +4,52 @@
 // WTFPL license applies
 
 #include <Arduino.h>
-#include <framebuffer.h>
 #include <config.h>
 #include <wifimgr.h>
 #include <bcpevent.h>
 #include <time.h>
-#include "wifimgrmsg.h"
+
+#include <Adafruit_GFX.h>
+#include <FastLED.h>
+#include <FastLED_NeoMatrix.h>
+#include <progress_indicator.h>
+#include <scrolling_text.h>
+#include "wifimgr_msg.h"
+
+#include <f3x5.h>
+#include <f4x6.h>
+
+#define PIN_BUZZER          15
+#define PIN_LED_MATRIX      32
+
+CRGB matrixleds[256];
+FastLED_NeoMatrix matrix(matrixleds, 32, 8, NEO_MATRIX_TOP + NEO_MATRIX_LEFT + NEO_MATRIX_ROWS + NEO_MATRIX_ZIGZAG );
 
 constexpr int COUNTDOWN_TIMER_ID = 3;
 constexpr int COUNTDOWN_TIMER_PERIOD_US = 1000000; // 1 second
 constexpr int DEBOUNCE_DELAY_MS = 500;
 
+#define COLOR_WHITE matrix.Color24to16(CRGB::White)
+#define COLOR_BLACK matrix.Color24to16(CRGB::Black)
+#define COLOR_RED matrix.Color24to16(CRGB::Red)
+#define COLOR_YELLOW matrix.Color24to16(CRGB::Yellow)
+#define COLOR_GREEN matrix.Color24to16(CRGB::Green)
+#define COLOR_MAGENTA matrix.Color24to16(CRGB::Magenta)
+#define COLOR_DEEPSKYBLUE matrix.Color24to16(CRGB::DeepSkyBlue)
+#define COLOR_DARKGRAY matrix.Color(20, 20, 20)
+
+hw_timer_t *animationsTimer = nullptr;
+ProgressIndicator *progressIndicator = nullptr;
+volatile bool updateProgress = false;
+ScrollingText *scrollingText = nullptr;
+volatile bool updateScrollingText = false;
+
 Print *debugOut_ = nullptr;  // Optional debug output
 #define MAIN_DEBUG(msg) if (debugOut_) { debugOut_->print("[Main] "); debugOut_->println(msg); }
+
+const UTF8_32BitFont *defaultFont = &F3x5[0];
+const GFXfont *hmmssFont = &F3x5_Fixed;
+const GFXfont *mmssFont = &F4x6;
 
 enum DisplayState {
     DISPLAY_BOOT,
@@ -29,26 +62,76 @@ enum DisplayState {
 };
 volatile DisplayState displayState = DISPLAY_BOOT;
 
+#define DISPLAY_STATE (displayState == DISPLAY_EVENT_COUNTDOWN ? "COUNTDOWN" : \
+                       displayState == DISPLAY_EVENT_NAME ? "EVENT_NAME" : \
+                       displayState == DISPLAY_EVENT_ROUND ? "EVENT_ROUND" : \
+                       displayState == DISPLAY_SCROLL_ONCE ? "SCROLL_ONCE" : \
+                       displayState == DISPLAY_INVALID_EVENT ? "INVALID_EVENT" : \
+                       displayState == DISPLAY_BOOT ? "BOOT" : \
+                       displayState == DISPLAY_EVENT_NO_UPDATE ? "EVENT_NO_UPDATE" : "UNKNOWN")
+
 hw_timer_t *countdownTimer = nullptr;
 volatile bool updateCountdown = false;
 volatile bool midButtonPressed = false;
 
-void splashScreen(bool showProgress = true) {
-    displayState = DISPLAY_BOOT;
-    int y = showProgress ? 1 : 2;
-    FrameBuffer.textScrollStop();
-    FrameBuffer.progressStop();
-    FrameBuffer.text("BCP", 0, y, "p3x5", CRGB::White, true);
-    FrameBuffer.text("clock", 14, y, "p3x5", CRGB::White, false, !showProgress);
-    if (showProgress) {
-        FrameBuffer.progressStart(-1);
+void ensureAnimationsTimer() {
+    if (animationsTimer == nullptr) {
+        animationsTimer = timerBegin(2, 80, true);
+        timerAttachInterrupt(animationsTimer, []() {
+            if (progressIndicator && progressIndicator->isActive) {
+                updateProgress = true;
+            }
+            if (scrollingText && scrollingText->isActive) {
+                updateScrollingText = true;
+            }
+        }, true);
+        timerAlarmWrite(animationsTimer, 100000, true); // 10 Hz
+        timerAlarmEnable(animationsTimer);
     }
 }
 
+void stopAnimations() {
+    if (scrollingText && scrollingText->isActive) {
+        scrollingText->isActive = false;
+        delete scrollingText;
+        scrollingText = nullptr;
+    }
+    if (progressIndicator && progressIndicator->isActive) {
+        progressIndicator->hide();
+        progressIndicator->isActive = false;
+    }
+}
+
+void splashScreen(bool showProgress = true) {
+    displayState = DISPLAY_BOOT;
+    stopAnimations();
+    matrix.clear();
+    int y = showProgress ? 6 : 7;
+    matrix.setCursor(0, y);
+    matrix.setTextColor(COLOR_WHITE);
+    matrix.print("BCP");
+    int16_t x1, y1;
+    uint16_t w, h;
+    const String msg = "clock";
+    matrix.getTextBounds(msg, 0, y, &x1, &y1, &w, &h);
+    matrix.setCursor((matrix.width() - w), y);  
+    matrix.print("clock");
+    if (showProgress) {
+        if (progressIndicator == nullptr) {
+            ensureAnimationsTimer();
+            progressIndicator = new ProgressIndicator(&matrix, 0, matrix.height() - 1, matrix.width(), COLOR_WHITE, COLOR_BLACK);
+        }
+        progressIndicator->isActive = true;
+    }
+    matrix.show();
+}
+
 void configMessage(bool loop = false) {
-    FrameBuffer.textScrollStop();
-    FrameBuffer.progressStop();
-    FrameBuffer.textScroll("Config page http://" + WiFi.localIP().toString(), 2, "p3x5", CRGB::White, CRGB::Black, 24, loop ? 8 : 32, 100, 3, loop);
+    stopAnimations();
+    matrix.clear();
+    ensureAnimationsTimer();
+    scrollingText = new ScrollingText(&matrix, "Config page http://" + WiFi.localIP().toString(), 0, 7, (const GFXfont *) defaultFont, false, COLOR_WHITE, 24, 8, loop);
+    matrix.show();
 }
 
 // ---- Time countdown using ESP-32 hardware timer ----
@@ -74,12 +157,13 @@ void stopCountdownTimer() {
 }
 
 inline void displayRound(int currentRound, int totalRounds) {
-    CRGB activeColor = CRGB::DeepSkyBlue,
-         inactiveColor = 0x0f0f0f;
+    uint16_t activeColor = COLOR_DEEPSKYBLUE,
+             inactiveColor = COLOR_DARKGRAY;
     const int line = 7;
-    FrameBuffer.hline(0, line, CFrameBuffer::WIDTH, CRGB::Black, false);
-    if (totalRounds < FrameBuffer.WIDTH / 2) {
-        int lineWidth = CFrameBuffer::WIDTH / totalRounds, offset;
+    int displayWidth = matrix.width();
+    matrix.drawFastHLine(0, line, displayWidth, COLOR_BLACK);
+    if (totalRounds < displayWidth / 2) {
+        int lineWidth = displayWidth / totalRounds, offset;
         switch (totalRounds) {
             case 3:
             case 5:
@@ -101,16 +185,16 @@ inline void displayRound(int currentRound, int totalRounds) {
                 offset = 1;
         }
         for (int i = 0; i < totalRounds; i++) {
-            FrameBuffer.hline(i * lineWidth + offset, line, lineWidth - 1, (i == currentRound - 1) ? activeColor : inactiveColor, false);
+            matrix.drawFastHLine(i * lineWidth + offset, line, lineWidth - 1, (i == currentRound - 1) ? activeColor : inactiveColor);
         }
     } else {
-        int t = totalRounds <= FrameBuffer.WIDTH ? totalRounds : FrameBuffer.WIDTH;
-        int start = (FrameBuffer.WIDTH - (t + (t <= FrameBuffer.WIDTH - 2 ? 2 : 0))) / 2;
+        int t = totalRounds <= displayWidth ? totalRounds : displayWidth;
+        int start = (displayWidth - (t + (t <= displayWidth - 2 ? 2 : 0))) / 2;
         for (int i = 0; i < t; i++) {
-            if (totalRounds <= FrameBuffer.WIDTH - 2 && (i == currentRound - 1 || i == currentRound)) {
+            if (totalRounds <= displayWidth - 2 && (i == currentRound - 1 || i == currentRound)) {
                 start++;
             }
-            FrameBuffer.pixel(start + i, line, (i == currentRound - 1) ? activeColor : inactiveColor, false);
+            matrix.drawPixel(start + i, line, (i == currentRound - 1) ? activeColor : inactiveColor);
         }
     }
 }
@@ -124,22 +208,23 @@ void countdownUpdate() {
     long remaining = BCPEvent.roundEndEpoch() - time(nullptr);
     bool dontDisplayHours = BCPEvent.timerLength() <= 3600;
 
-    CRGB color = CRGB::White;
     if (BCPEvent.timerPaused()) {
         // timer is paused
         remaining = BCPEvent.pausedTimeRemaining();
-        color = time(nullptr) % 2 ? CRGB::Magenta : CRGB::Black;
+        matrix.setTextColor(time(nullptr) % 2 ? COLOR_MAGENTA : COLOR_BLACK);
     } else if (remaining <= Config.redThreshold()) {
         // we are below red threshold of the timer
-        color = CRGB::Red;
+        matrix.setTextColor(COLOR_RED);
     } else if (remaining <= Config.yellowThreshold()) {
         // we are below yellow threshold of the timer
-        color = CRGB::Yellow;
+        matrix.setTextColor(COLOR_YELLOW);
     } else if (remaining > BCPEvent.timerLength() || (remaining == BCPEvent.timerLength() && BCPEvent.timerLength() <= 3600)) {
         // event round not yet started, show time to start
-        color = CRGB::Green;
+        matrix.setTextColor(COLOR_GREEN);
         remaining -= BCPEvent.timerLength();
         dontDisplayHours = remaining < 3600 && BCPEvent.timerLength() <= 3600;
+    } else {
+        matrix.setTextColor(COLOR_WHITE);
     }
 
     String out  = remaining < 0 ? "-" : "";;
@@ -149,26 +234,25 @@ void countdownUpdate() {
     int seconds = absoluteTime % 60;
 
     int x, y;
-    String font;
 
     if (dontDisplayHours) {
         // mm:ss
-        font = "p4x6";
+        matrix.setFont(mmssFont);
         x = remaining < 0 ? 1 : 5;
-        y = 0;
+        y = 6;
         if (remaining < -3599) {
-            out = "-XX:XX";
+            out = "-//://";    // To save space in the font, X bitmap mapped to / character
         } else {
             out += String(minutes / 10) + String(minutes % 10) + ":" +
                    String(seconds / 10) + String(seconds % 10);
         }
     } else {
         // h:mm:ss
-        font = "f3x5";
+        matrix.setFont(hmmssFont);
         x = remaining < 0 ? -1 : 3;
         y = 1;
         if (remaining < -35999) {
-            out = "-X:XX:XX";
+            out = "-/://://";  // To save space in the font, X bitmap mapped to / character
         } else {
             out += String(hours) + ":" +
                 String(minutes / 10) + String(minutes % 10) + ":" +
@@ -176,41 +260,61 @@ void countdownUpdate() {
         }
     }
 
-    FrameBuffer.text(out, x, y, font, color, true, false);
+    matrix.clear();
+    matrix.setCursor(x, 6);
+    matrix.print(out);
     displayRound(BCPEvent.currentRound(), BCPEvent.numberOfRounds());
-    FrameBuffer.show();
+    matrix.show();
+    matrix.setFont((GFXfont *) defaultFont);
 }  
 
 // ---- update display after data refresh ----
 
 void displayUpdate(bool afterScrollOnce = false) {
+    MAIN_DEBUG("Updating display, current state: " + String(DISPLAY_STATE));
+
     if (displayState == DISPLAY_SCROLL_ONCE || displayState == DISPLAY_EVENT_NO_UPDATE) {
         return;
     }
 
     if (BCPEvent.valid()) {
+        MAIN_DEBUG("BCP event is valid.");
 
         if (BCPEvent.ended() || !BCPEvent.started()) {
             // event either not started or already ended
             if (displayState != DISPLAY_EVENT_NAME) {
+                MAIN_DEBUG("Displaying event name.");
                 stopCountdownTimer();
-                FrameBuffer.textScroll(BCPEvent.name(), 2, "p3x5", CRGB::White, CRGB::Black, afterScrollOnce ? 32 : 24, afterScrollOnce ? 0 : 8);
+                stopAnimations();
+                matrix.clear();
+                ensureAnimationsTimer();
+                scrollingText = new ScrollingText(&matrix, BCPEvent.name(), 0, 7, defaultFont, true);
+                matrix.show();
                 displayState = DISPLAY_EVENT_NAME;
             }
 
         } else if (BCPEvent.timerLength() <= 0) {
             // no timer, show round only
             if (displayState != DISPLAY_EVENT_ROUND) {
+                MAIN_DEBUG("Displaying event round.");
                 stopCountdownTimer();
-                FrameBuffer.textScrollStop();
-                FrameBuffer.textCentered("Round " + String(BCPEvent.currentRound()), 2, "p3x5", CRGB::White, true, true);
+                stopAnimations();
+                matrix.clear();
+                matrix.setTextColor(COLOR_WHITE);
+                int16_t  x1, y1;
+                uint16_t w, h;
+                String msg = "Round " + String(BCPEvent.currentRound());
+                matrix.getTextBounds(msg, 0, 7, &x1, &y1, &w, &h);
+                matrix.setCursor((matrix.width() - w) / 2, 7);
+                matrix.print(msg);
+                matrix.show();
                 displayState = DISPLAY_EVENT_ROUND;
             }
 
         } else {
             // show countdown
             if (displayState != DISPLAY_EVENT_COUNTDOWN) {
-                FrameBuffer.textScrollStop();
+                stopAnimations();
                 ensureCountdownTimer();
                 displayState = DISPLAY_EVENT_COUNTDOWN;
             }
@@ -219,7 +323,7 @@ void displayUpdate(bool afterScrollOnce = false) {
     } else if (displayState != DISPLAY_INVALID_EVENT) {
         // invalid event ID, start config mode
         stopCountdownTimer();
-        FrameBuffer.textScrollStop();
+        stopAnimations();
         Config.startConfigServer();
         configMessage(true);
         displayState = DISPLAY_INVALID_EVENT;
@@ -230,6 +334,8 @@ void displayUpdate(bool afterScrollOnce = false) {
 
 void eventHandler(void* parameter) {
     while (true) {
+        bool showMatrix;
+        showMatrix = false;
         if (midButtonPressed) {
             static unsigned long lastPress = millis();
             unsigned long now = millis();
@@ -237,7 +343,7 @@ void eventHandler(void* parameter) {
                 lastPress = now;
                 midButtonPressed = false;
                 stopCountdownTimer();
-                FrameBuffer.textScrollStop();
+                stopAnimations();
                 Config.startConfigServer();
                 configMessage();
                 displayState = DISPLAY_SCROLL_ONCE;
@@ -246,18 +352,25 @@ void eventHandler(void* parameter) {
         if (Config.isConfigServerRunning()) {
             Config.handleClient();
         }
-        if (displayState == DISPLAY_SCROLL_ONCE &&!FrameBuffer.isTextScrollActive()) {
+        if (displayState == DISPLAY_SCROLL_ONCE && scrollingText && !scrollingText->isActive) {
             displayState = DISPLAY_BOOT;
             displayUpdate(true);
         }
-        if (FrameBuffer.doTextScrollStep()) {
-            FrameBuffer.textScrollStep();
+        if (updateScrollingText && scrollingText && scrollingText->isActive) {
+            updateScrollingText = false;
+            scrollingText->step(true);
+            showMatrix = true;
         }
-        if (FrameBuffer.doProgressStep()) {
-            FrameBuffer.progressStep();
+        if (updateProgress && progressIndicator && progressIndicator->isActive) {
+            updateProgress = false;
+            progressIndicator->step(true);
+            showMatrix = true;
         }
         if (updateCountdown && displayState == DISPLAY_EVENT_COUNTDOWN) {
             countdownUpdate();
+        }
+        if (showMatrix) {
+            matrix.show();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -271,7 +384,7 @@ inline void ensureEventID() {
         while (Config.eventId() == "") {
             delay(100); // keep server responsive
         }
-        splashScreen(false);
+        splashScreen();
         delay(250); // keep the server responsive for 0.25 second, let the http client receive the response
     }
     Config.stopConfigServer(); // no longer needed
@@ -280,11 +393,18 @@ inline void ensureEventID() {
 // ---- core Arduino functions ----
 
 void setup() {
-    pinMode(15, INPUT_PULLDOWN);  // stop whistle noise
+    pinMode(PIN_BUZZER, INPUT_PULLDOWN);  // stop whistle noise
     pinMode(27, INPUT_PULLUP);    // mid button
     Serial.begin(9600);
     while (!Serial);              // wait for serial port to connect. Needed for native USB
     debugOut_ = &Serial;
+
+    FastLED.addLeds<NEOPIXEL,PIN_LED_MATRIX>(matrixleds, 256);
+    matrix.begin();
+    matrix.setTextWrap(false);
+    // matrix.setBrightness(40);
+    matrix.setTextColor(matrix.Color(255, 255, 255));
+    matrix.setFont((GFXfont *) defaultFont);
 
     xTaskCreatePinnedToCore(
             eventHandler,     // Function to run
@@ -295,9 +415,16 @@ void setup() {
             NULL,             // Task handle
             1                 // Core (0 or 1)
         );
-
+/*
+    delay(5000);
+    ensureAnimationsTimer();
+    scrollingText = new ScrollingText(&matrix, "Přerov...", 0, 7, (const GFXfont *) defaultFont);
+    while (true) {
+        delay(1000);
+    }
+*/
     splashScreen();
-    WifiMgr.connect(digitalRead(27) == LOW, 0, new WifiMgrMsg(), debugOut_);    // if mid button pressed, enforce portal
+    WifiMgr.connect(digitalRead(27) == LOW, 0, new WifiMgrMsg((const GFXfont &) *defaultFont), debugOut_);    // if mid button pressed, enforce portal
     Config.debugOut = debugOut_;
     ensureEventID();
     BCPEvent.setID(Config.eventId());
@@ -310,10 +437,11 @@ void loop() {
         Config.configUpdated = false;
         if (Config.eventId() != BCPEvent.fullId()) {
             displayState = DISPLAY_EVENT_NO_UPDATE;
+            stopAnimations();
             splashScreen();
             BCPEvent.setID(Config.eventId());
             BCPEvent.refreshData();
-            FrameBuffer.progressStop();
+            stopAnimations();
             displayState = DISPLAY_BOOT;
             displayUpdate();
         }
@@ -331,7 +459,7 @@ void loop() {
             }
         }
         if (count == 0) {
-            FrameBuffer.progressStop();
+            stopAnimations();
         }
         displayUpdate();
     }
