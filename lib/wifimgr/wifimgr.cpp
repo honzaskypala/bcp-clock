@@ -875,7 +875,7 @@ void CWifiMgr::startConfigPortal() {
     server_.begin();
     portalActive_ = true;
     WIFIMGR_DEBUG("HTTP portal server started on port 80.");
-    WIFIMGR_MSG("AP mode - Connect to Wi-Fi " + String(AP_SSID) + ", then open http://" + WiFi.softAPIP().toString() + " to configure.");
+    WIFIMGR_MSG("AP mode - Connect to Wi-Fi '" + String(AP_SSID) + "', then open http://" + WiFi.softAPIP().toString() + " to configure.");
 }
 
 void CWifiMgr::stopPortal() {
