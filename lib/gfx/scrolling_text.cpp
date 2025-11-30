@@ -141,6 +141,7 @@ void ScrollingText::textDimensions(const char *str, int16_t *x1, int16_t *y1, ui
 void ScrollingText::charBounds(const unsigned char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) {
     uint32_t cp = c;
 
+#ifdef _UTF8_32BIT_FONT_H_
     if (isUTF8Font_) {
         // handle UTF-8 decoding
         static uint32_t utf8Char = 0;
@@ -169,6 +170,7 @@ void ScrollingText::charBounds(const unsigned char c, int16_t *x, int16_t *y, in
             }
         }
     }
+#endif // _UTF8_32BIT_FONT_H_
 
     const GFXfont *font = gfxFont_;
 
@@ -177,20 +179,26 @@ void ScrollingText::charBounds(const unsigned char c, int16_t *x, int16_t *y, in
         while (font->glyph != nullptr) {
             uint32_t first = font->first;
             uint32_t last = font->last;
+#ifdef _UTF8_32BIT_FONT_H_
             if (isUTF8Font_) {
                 const UTF8_32BitFont *utf8Font = (const UTF8_32BitFont *) font;
                 first = (utf8Font->dFirst != 0) ? utf8Font->dFirst : first;
                 last = (utf8Font->dLast != 0) ? utf8Font->dLast : last;
             }
+#endif // _UTF8_32BIT_FONT_H_
             if (cp >= first && cp <= last) {
                 break;
             } else {
                 // try next segment
+#ifdef _UTF8_32BIT_FONT_H_
                 if (isUTF8Font_) {
                     font = (const GFXfont *) (((const UTF8_32BitFont *) font) + 1);
                 } else {
+#endif // _UTF8_32BIT_FONT_H_
                     font = font + 1;
+#ifdef _UTF8_32BIT_FONT_H_
                 }
+#endif // _UTF8_32BIT_FONT_H_
             }
         }
     }
@@ -205,10 +213,12 @@ void ScrollingText::charBounds(const unsigned char c, int16_t *x, int16_t *y, in
     } else if (cp != '\r') { // Not a carriage return; is normal char
         uint32_t first = pgm_read_word(&font->first),
                  last = pgm_read_word(&font->last);
+#ifdef _UTF8_32BIT_FONT_H_
         if (isUTF8Font_) {
             first = (((const UTF8_32BitFont *) font)->dFirst != 0) ? ((const UTF8_32BitFont *) font)->dFirst : first;
             last = (((const UTF8_32BitFont *) font)->dLast != 0) ? ((const UTF8_32BitFont *) font)->dLast : last;
         }
+#endif // _UTF8_32BIT_FONT_H_
         if ((cp >= first) && (cp <= last)) { // Char present in this font?
             GFXglyph *glyph = pgm_read_glyph_ptr(font, cp - first);
             uint8_t gw = pgm_read_byte(&glyph->width),
