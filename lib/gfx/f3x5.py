@@ -668,6 +668,7 @@ struct['q'] = (3, 5, -4, [0b01110101, 0b10010010])
 struct['y'] = (3, 5, -4, [0b10110101, 0b10010110])
 
 struct['§'] = (3, 7, -6, [0b01110001, 0b01010100, 0b01110000])  # section sign
+struct['£'] = (3, 5, -5, [0b01010011, 0b01001110])  # pound sign
 
 struct['—'] = (4, 1, -3, [0b11110000])  # em dash
 struct['²'] = (2, 4, -6, [0b11011011]) # superscript two
@@ -735,7 +736,7 @@ struct['ú'] = (3, 6, -6, [0b00101000, 0b01011010, 0b11000000]) # u with acute
 struct['û'] = (3, 6, -6, [0b01010100, 0b01011010, 0b11000000]) # u with circumflex
 struct['ü'] = (3, 6, -6, [0b10100010, 0b11011010, 0b11000000]) # u with diaeresis
 struct['ý'] = (3, 7, -6, [0b00101000, 0b01010110, 0b01011000]) # y with acute
-struct['ÿ'] = (3, 7, -6, [0b10100010, 0b01010110, 0b01011000]) # y with diaeresis
+struct['ÿ'] = (3, 7, -6, [0b10100010, 0b11010110, 0b01011000]) # y with diaeresis
 struct['Ā'] = (3, 6, -6, [0b11100001, 0b01011111, 0b01000000]) # A with macron
 struct['ā'] = (3, 6, -6, [0b11100011, 0b00011110, 0b11000000]) # a with macron
 struct['Ă'] = (3, 6, -6, [0b10101001, 0b01011111, 0b01000000]) # A with breve
@@ -786,7 +787,7 @@ struct['İ'] = (3, 6, -6, [0b01000011, 0b10100101, 0b11000000]) # I with dot abo
 struct['Ĳ'] = (4, 5, -5, [0b10011001, 0b10011001, 0b10100000]) # IJ ligature
 struct['ĳ'] = (4, 6, -5, [0b10010000, 0b10011001, 0b10010010]) # ij ligature
 struct['Ĵ'] = (3, 6, -6, [0b01010100, 0b00011010, 0b10000000]) # J with circumflex
-struct['ĵ'] = (3, 7, -6, [0b01010100, 0b00100100, 0b1010000]) # j with circumflex
+struct['ĵ'] = (3, 7, -6, [0b01010100, 0b00100100, 0b10100000]) # j with circumflex
 struct['Ķ'] = (3, 6, -5, [0b10110111, 0b01011010, 0b10000000]) # K with cedilla
 struct['ķ'] = (3, 6, -5, [0b10010010, 0b11101010, 0b10000000]) # k with cedilla
 struct['Ĺ'] = (3, 6, -6, [0b00101000, 0b01001001, 0b11000000]) # L with acute
@@ -833,7 +834,7 @@ struct['ţ'] = (3, 6, -5, [0b01011101, 0b00100010, 0b10000000]) # t with cedilla
 struct['Ť'] = (3, 6, -6, [0b10101011, 0b10100100, 0b10000000]) # T with caron
 struct['ť'] = (4, 6, -6, [0b00010101, 0b11100100, 0b01000010]) # t with caron   ----! make move right only 4 pixels
 struct['Ũ'] = (3, 6, -6, [0b11100010, 0b11011010, 0b11000000]) # U with tilde
-struct['ũ'] = (3, 5, -5, [0b11100010, 0b11011010, 0b11000000]) # u with tilde
+struct['ũ'] = (3, 6, -6, [0b11100010, 0b11011010, 0b11000000]) # u with tilde
 struct['Ū'] = (3, 6, -6, [0b11100010, 0b11011010, 0b11000000]) # U with macron
 struct['ū'] = (3, 6, -6, [0b11100010, 0b11011010, 0b11000000]) # u with macron
 struct['Ŭ'] = (3, 6, -6, [0b10101000, 0b01011010, 0b11000000]) # U with breve
@@ -845,7 +846,7 @@ struct['ű'] = (3, 6, -6, [0b10100010, 0b11011010, 0b11000000]) # u with double 
 struct['Ų'] = (3, 6, -5, [0b10110110, 0b11010110, 0b10000000]) # U with ogonek
 struct['ų'] = (3, 5, -4, [0b10110110, 0b10110100]) # u with ogonek
 struct['Ŵ'] = (3, 6, -6, [0b01010100, 0b01011111, 0b11000000]) # W with circumflex
-struct['ŵ'] = (4, 6, -6, [0b01010100, 0b01011111, 0b11000000]) # w with circum
+struct['ŵ'] = (3, 6, -6, [0b01010100, 0b01011111, 0b11000000]) # w with circum
 struct['Ŷ'] = (3, 6, -6, [0b01010100, 0b01010100, 0b10000000]) # Y with circumflex
 struct['ŷ'] = (3, 7, -6, [0b01010100, 0b01010110, 0b01011000]) # y with circum
 struct['Ÿ'] = (3, 6, -6, [0b10100010, 0b11010100, 0b10000000]) # Y with diaeresis
@@ -872,7 +873,9 @@ struct['њ'] = (4, 4, -4, [0b10101110, 0b10111011]) # Cyrillic nje
 struct['ќ'] = (3, 6, -6, [0b00101000, 0b01011101, 0b01000000]) # Cyrillic kje
 struct['ѝ'] = (3, 6, -6, [0b10001000, 0b01011111, 0b01000000]) # Cyrillic i with grave
 struct['ў'] = (3, 7, -6, [0b10101000, 0b01010110, 0b01011000]) # Cyrillic short u
-struct['џ'] = (4, 5, -4, [0b10110110, 0b11110100]) # Cyrillic dzhe
+struct['џ'] = (3, 5, -4, [0b10110110, 0b11110100]) # Cyrillic dzhe
+struct['Й'] = (3, 6, -6, [0b10101010, 0b11111011, 0b01000000]) # Cyrillic short I
+struct['й'] = (3, 6, -6, [0b10101000, 0b01011111, 0b01000000]) # Cyrillic short i
 
 struct['…'] = (5, 1, -1, [0b10101000]) # ellipsis
 struct['‰'] = (4, 5, -5, [0b10000010, 0b01001000, 0b00110000]) # per mille sign
@@ -1024,7 +1027,7 @@ def find_ending_with():
                 break
     return widest_key, overlap_width
 
-# bitmap size after implementing optimizations: 630 bytes, saving of 44 %
+# bitmap size after implementing optimizations: 636 bytes, saving of 43 %
 
 void = None
 while not all_processed():
