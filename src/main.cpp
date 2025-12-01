@@ -282,7 +282,8 @@ void displayUpdate(bool afterScrollOnce = false) {
 
         if (BCPEvent.ended() || !BCPEvent.started()) {
             // event either not started or already ended
-            if (displayState != DISPLAY_EVENT_NAME) {
+            static String eventName = "";
+            if (displayState != DISPLAY_EVENT_NAME || eventName != BCPEvent.name()) {
                 MAIN_DEBUG("Displaying event name.");
                 stopCountdownTimer();
                 stopAnimations();
@@ -290,12 +291,14 @@ void displayUpdate(bool afterScrollOnce = false) {
                 ensureAnimationsTimer();
                 scrollingText = new ScrollingText(&matrix, BCPEvent.name(), 0, 7, defaultFont, true);
                 matrix.show();
+                eventName = BCPEvent.name();
                 displayState = DISPLAY_EVENT_NAME;
             }
 
         } else if (BCPEvent.timerLength() <= 0) {
             // no timer, show round only
-            if (displayState != DISPLAY_EVENT_ROUND) {
+            static int lastRound = -1;
+            if (displayState != DISPLAY_EVENT_ROUND || lastRound != BCPEvent.currentRound()) {
                 MAIN_DEBUG("Displaying event round.");
                 stopCountdownTimer();
                 stopAnimations();
@@ -308,6 +311,7 @@ void displayUpdate(bool afterScrollOnce = false) {
                 matrix.setCursor((matrix.width() - w) / 2, 7);
                 matrix.print(msg);
                 matrix.show();
+                lastRound = BCPEvent.currentRound();
                 displayState = DISPLAY_EVENT_ROUND;
             }
 
