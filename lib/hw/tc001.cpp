@@ -72,6 +72,7 @@ void Tc001::stopAnimations() {
         scrollingText = nullptr;
     }
     progressStop();
+    delay(20); // ensure any ongoing matrix updates are finished
     stMillis = 0;
     piMillis = 0;
     lMillis = 0;
