@@ -206,31 +206,31 @@ void CConfig::handleConfigRoot() {
                 "</div>"
                 "<input type='submit' />"
                 "</form>";
-    }
 
-    // WiFi networks section
-    page += "<div id='wifi-networks'>"
-            "<label class='section'>Stored WiFi networks</label>";
-    std::vector<String> storedNetworks;
-    if (WifiMgr.listStoredNetworks(storedNetworks) && !storedNetworks.empty()) {
-        page += "<div class='wifi-list'>";
-        for (auto& ssid : storedNetworks) {
-            String escapedSsid = ssid;
-            escapedSsid.replace("'", "\\'");
-            page += "<div class='wifi-row'>"
-                    "<span class='wifi-ssid'>" + ssid + "</span>"
-                    "<a class='wifi-del' href='/wifi/delete?ssid=" + urlEncode(ssid) + "' "
-                    "onclick='return confirm(\"Delete WiFi network " + escapedSsid + "?\");'>👉🗑️</a>"
+        // WiFi networks section
+        page += "<div id='wifi-networks'>"
+                "<label class='section'>Stored WiFi networks</label>";
+        std::vector<String> storedNetworks;
+        if (WifiMgr.listStoredNetworks(storedNetworks) && !storedNetworks.empty()) {
+            page += "<div class='wifi-list'>";
+            for (auto& ssid : storedNetworks) {
+                String escapedSsid = ssid;
+                escapedSsid.replace("'", "\\'");
+                page += "<div class='wifi-row'>"
+                        "<span class='wifi-ssid'>" + ssid + "</span>"
+                        "<a class='wifi-del' href='/wifi/delete?ssid=" + urlEncode(ssid) + "' "
+                        "onclick='return confirm(\"Delete WiFi network " + escapedSsid + "?\");'>👉🗑️</a>"
+                        "</div>";
+            }
+            page += "</div>";
+            page += "<div class='wifi-actions'>"
+                    "<a class='wifi-btn-del-all' href='/wifi/deleteAll' "
+                    "onclick='return confirm(\"Delete ALL stored WiFi networks?\");'>"
+                    "Delete all stored networks</a>"
                     "</div>";
+        } else {
+            page += "<p>No stored WiFi networks.</p>";
         }
-        page += "</div>";
-        page += "<div class='wifi-actions'>"
-                "<a class='wifi-btn-del-all' href='/wifi/deleteAll' "
-                "onclick='return confirm(\"Delete ALL stored WiFi networks?\");'>"
-                "Delete all stored networks</a>"
-                "</div>";
-    } else {
-        page += "<p>No stored WiFi networks.</p>";
     }
 
     page += "</div></body></html>";
