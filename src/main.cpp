@@ -155,6 +155,7 @@ void loop() {
         }
         if (configUpdated) {
             hw->displayState = DISPLAY_ENFORCE_REFRESH;
+            configUpdated = false;
         }
         displayUpdate();
 
