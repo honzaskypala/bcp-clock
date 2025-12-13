@@ -1,4 +1,7 @@
-// You need to implement this interface for each supported hardware platform.
+// Abstract interface for hardware specific implementation
+// You need to implement this interface for your hardware platform.
+// (c) 2025 Honza Skýpala
+// WTFPL license applies
 
 #pragma once
 

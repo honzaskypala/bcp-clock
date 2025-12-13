@@ -1,3 +1,7 @@
+// Simple hardware interface implementation to just print stuff to Serial
+// (c) 2025 Honza Skýpala
+// WTFPL license applies
+
 #pragma once
 
 #include "hw.h"

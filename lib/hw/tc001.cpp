@@ -1,3 +1,7 @@
+// Hardware interface implementation for Ulanzi TC001 desktop clock
+// (c) 2025 Honza Skýpala
+// WTFPL license applies
+
 #include "tc001.h"
 
 #include <f3x5.h>
