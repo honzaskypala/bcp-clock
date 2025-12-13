@@ -32,8 +32,19 @@ void displayUpdate() {
         return;
     }
 
+    static bool wasInvalidEvent = false;
+
     if (BCPEvent.valid()) {
         MAIN_DEBUG("BCP event is valid.");
+
+        if (wasInvalidEvent) {
+            if (Config.isConfigServerRunning()) {
+                // restart config server with timeout
+                Config.stopConfigServer();
+                Config.startConfigServer();
+            }
+            wasInvalidEvent = false;
+        }
 
         bool isEventRunning = BCPEvent.started() && !BCPEvent.ended();
         if (!isEventRunning) {
@@ -62,10 +73,16 @@ void displayUpdate() {
 
         }
 
-    } else if (!Config.isConfigServerRunning()) {
+    } else if (!Config.isConfigServerRunning() || hw->displayState == DISPLAY_ENFORCE_REFRESH) {
         // invalid event ID, start config mode if not already running
-        Config.startConfigServer(true, 0);   //! zkontrolovat, config server by se měl spustit bez timeoutu, ale po uložení buď ukončit, nebo nastavit timeout.
+        hw->displayState = DISPLAY_BOOT;
+        if (Config.isConfigServerRunning()) {
+            // stop existing server first and make sure it is running with no timeout
+            Config.stopConfigServer();
+        }
+        Config.startConfigServer(false, 0);
         hw->configServerMsg("Invalid event ID, please configure.");
+        wasInvalidEvent = true;
     }
 }
 
@@ -78,6 +95,7 @@ inline void ensureEventID() {
             Config.handleClient();
             delay(100); // keep server responsive
         }
+        Config.configUpdated = false;
         hw->displayState = DISPLAY_BOOT;
         hw->splashScreen();
         delay(250); // keep the server responsive for 0.25 second, let the http client receive the response
@@ -107,8 +125,10 @@ void loop() {
 
     bool configUpdated = false;
     if (Config.configUpdated) {
+        MAIN_DEBUG("Configuration updated.");
         Config.configUpdated = false;
         if (Config.eventId() != BCPEvent.fullId()) {
+            MAIN_DEBUG("Event ID changed, updating BCP event.");
             hw->displayState = DISPLAY_DONT_UPDATE;
             delay(50); // let any ongoing display updates finish
             hw->splashScreen();
@@ -125,7 +145,7 @@ void loop() {
         if (BCPEvent.refreshData()) {
             MAIN_DEBUG("BCP event data refreshed successfully");
             failCount = 0;
-        } else {
+        } else if (BCPEvent.valid()) {
             failCount++;
             MAIN_DEBUG("Failed to refresh BCP event data (failure count " + String(failCount) + ")");
             if (failCount >= 5) {

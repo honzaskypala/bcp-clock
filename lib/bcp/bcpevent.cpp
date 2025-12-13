@@ -12,6 +12,7 @@
 
 void CBCPEvent::setID(String newID) {
     fullId_ = newID;
+    validId_ = false;
     const String prefix = "event/";
     int idx = newID.indexOf(prefix);
     if (idx == -1) {
