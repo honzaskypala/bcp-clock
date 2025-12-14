@@ -1,4 +1,4 @@
-// ESP32 WiFi Manager with captive portal for BCP clock
+// ESP32 WiFi Manager with captive portal
 // (c) 2025 Honza Skýpala
 // WTFPL license applies
 
@@ -650,7 +650,7 @@ void CWifiMgr::handleRoot() {
 
     page += "<div class='netHeader'>"
             "<span class='sectionLabel'>Found networks:</span>"
-            "<button class='rescanBtn' type='button' onclick='onRescanClick(this)'><span class='icon'>🔄</span><span>Rescan</span></button>"
+            "<button class='rescanBtn' type='button' onclick='onRescanClick(this)'><span class='icon'>↻</span><span>Rescan</span></button>"
             "</div>";
 
     if (scanCount_ == 0) {

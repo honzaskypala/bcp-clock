@@ -33,7 +33,6 @@
 - [ ] option to show rounds at top / bottom / none
 
 ## WiFi Manager related
-- [ ] change emoji at Refresh button to ↻
 - [ ] add callback to to validate established connection. Move NTP timesync out of WiFi Manager and have it run through the callback.
 - [ ] test for captive portal and consider a failure if we cannot get real public internet response
 
@@ -44,11 +43,11 @@
 
 ## Done
 
+- [x] [WiFiMgr] [Minor] change emoji at Refresh button to ↻
 - [x] [Config] [Bugfix] Handling of invalid event in config form (both entering invalid event as well invalid event stored and entering valid event)
 - [x] [GFX] [Bugfix] Short delay in stopAnimations to get all display routines finish
-- [x] [Config] [Bugfix] Don't display stored networks after configuration saved on startup
 - [x] [Hw] [Refactor] Create Hw abstract interface and Tc001 class to handle hardware-dependent stuff
-- [x] [Main] [Bugfix] Update event name or round number if previously displayed the same
+- [x] [Main] [Bugfix] Update event name or round number if previously displayed the same but different value
 - [x] [GFX] [Refactor] Drop own implementation of framebuffer, instead use Adafruit_GFX, including fonts
 - [x] [WiFiMgr] [Refactor] Use Print object for both user and debug messages
 - [x] [Main] [Feature] Support for paused timer
@@ -57,7 +56,7 @@
 - [x] [Main] [Bugfix] Remove resetting displayState after every data fetch
 - [x] [GFX] [Feature] Support for proportional fonts
 - [x] [Main] [Bugfix] Check for event being valid and bring Config if not
-- [x] [Main] [Refactor] refreshData to return bool indicating success or failure, reboot device after 5 consecutive failures
+- [x] [Main] [Feature] Reboot device after 5 consecutive data fetch failures
 - [x] [WiFiMgr] [Feature] Add RTC support for time synchronization
 - [x] [WiFiMgr] [Bugfix] If connecting to multiple networks and failing on NTP sync, display the error only once after the last network processed
 - [x] [WiFiMgr] [Feature] Enforce WiFi Manager if mid button pressed on starting up the device
