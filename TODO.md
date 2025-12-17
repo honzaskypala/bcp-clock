@@ -25,15 +25,12 @@
 
 ## Config related
 - [ ] Text fields to get ⨂ at the right end to erase the content
-- [ ] Move button Delete all stored networks to top right of the section Stored networks
 - [ ] option to have config web password protected
 - [ ] refresh interval configurable
 - [ ] option to use small font always (even when displaying mm:ss only)
 - [ ] option to show rounds at top / bottom / none
 
 ## WiFi Manager related
-- [ ] Remove Submit button value, so it is eventually localized
-- [ ] Move button Delete all stored networks to top right of the section Stored networks
 - [ ] add callback to to validate established connection. Move NTP timesync out of WiFi Manager and have it run through the callback.
 - [ ] test for captive portal and consider a failure if we cannot get real public internet response
 
@@ -43,7 +40,8 @@
 - [ ] Refactor change String to char * where it mekes sense
 
 ## Done
-- [x] [Config] [Improvement] Align the Config web page appearance with WiFi Manager web config, displaying nice on tablets and computers (so far optimized for cell phones only)
+- [x] [WiFiMgr] [Minor] Move button to delete all stored networks to the same line as section header, far right; this is for the user to not mistake the button with the main submit button of the form
+- [x] [Config] [Minor] Align the Config web page appearance with WiFi Manager web config, displaying nice on tablets and computers (so far optimized for cell phones only)
 - [x] [WiFiMgr] [Minor] change emoji at Refresh button to ↻
 - [x] [Config] [Bugfix] Handling of invalid event in config form (both entering invalid event as well invalid event stored and entering valid event)
 - [x] [GFX] [Bugfix] Short delay in stopAnimations to get all display routines finish

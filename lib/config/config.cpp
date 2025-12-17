@@ -171,10 +171,10 @@ void CConfig::handleConfigRoot() {
     }
     
     String page = "<!DOCTYPE html><html><head>"
-                  "<title>BCP-clock config</title>"
-                  "<meta charset='utf-8'>"
-                  "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
-                  "<style>" + getCss() + "</style>"
+                    "<title>BCP-clock config</title>"
+                    "<meta charset='utf-8'>"
+                    "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                    "<style>" + getCss() + "</style>"
                   "</head><body>"
                   "<h1>BCP-clock config</h1>"
 
@@ -183,48 +183,51 @@ void CConfig::handleConfigRoot() {
 
                   // the main form of config page
                   "<form method='POST' action='/config'>"
-                  "<div id='event' class='row'>"
-                  "<label for='event'>Event:</label>"
-                  "<input type='text' name='event' placeholder='Enter event ID or event URL' value='" + event_ + "' />"
-                  "</div>"
-                  "<label class='section'>Colour thresholds</label>"
-                  "<div id='yellow' class='row'>"
-                  "<label for='yellow'>Yellow:</label>"
-                  "<input type='text' name='yellow' value='" + secondsToTime(yellow_) + "' />"
-                  "</div>"
-                  "<div id='red' class='row'>"
-                  "<label for='red'>Red:</label>"
-                  "<input type='text' name='red' value='" + secondsToTime(red_) + "' />"
-                  "</div>"
-                  "<label class='section'>Network</label>"
-                  "<div id='hostname' class='row'>"
-                  "<label for='hostname'>Hostname:</label>"
-                  "<input type='text' name='hostname' value='" + hostname_ + "' />"
-                  "</div>"
-                  "<input type='submit' />"
+                    "<div id='event' class='row'>"
+                      "<label for='event'>Event:</label>"
+                      "<input type='text' name='event' placeholder='Enter event ID or event URL' value='" + event_ + "' />"
+                    "</div>"
+                    "<label class='section'>Colour thresholds</label>"
+                    "<div id='yellow' class='row'>"
+                      "<label for='yellow'>Yellow:</label>"
+                      "<input type='text' name='yellow' value='" + secondsToTime(yellow_) + "' />"
+                    "</div>"
+                    "<div id='red' class='row'>"
+                      "<label for='red'>Red:</label>"
+                      "<input type='text' name='red' value='" + secondsToTime(red_) + "' />"
+                    "</div>"
+                    "<label class='section'>Network</label>"
+                    "<div id='hostname' class='row'>"
+                      "<label for='hostname'>Hostname:</label>"
+                      "<input type='text' name='hostname' value='" + hostname_ + "' />"
+                    "</div>"
+                    "<input type='submit' />"
                   "</form>";
 
     // WiFi networks section
-    page += "<div id='wifi-networks'>"
-            "<label class='section'>Stored WiFi networks</label>";
     std::vector<String> storedNetworks;
-    if (WifiMgr.listStoredNetworks(storedNetworks) && !storedNetworks.empty()) {
+    bool haveNetworksStored = WifiMgr.listStoredNetworks(storedNetworks) && !storedNetworks.empty();
+    page += "<div id='wifi-networks'>"
+              "<div class='wifi-header'>"
+                "<h2>Stored Wi-Fi networks</h2>";
+        if (haveNetworksStored) {
+            page += "<a class='wifi-btn-del-all' href='/wifi/deleteAll' "
+                        "onclick='return confirm(\"Delete ALL stored WiFi networks?\");'>"
+                        "Delete all 👉🗑️</a>";
+        }
+    page += "</div>";
+    if (haveNetworksStored) {
         page += "<div class='wifi-list'>";
         for (auto& ssid : storedNetworks) {
             String escapedSsid = ssid;
             escapedSsid.replace("'", "\\'");
             page += "<div class='wifi-row'>"
-                    "<span class='wifi-ssid'>" + ssid + "</span>"
-                    "<a class='wifi-del' href='/wifi/delete?ssid=" + urlEncode(ssid) + "' "
-                    "onclick='return confirm(\"Delete WiFi network " + escapedSsid + "?\");'>👉🗑️</a>"
+                      "<span class='wifi-ssid'>" + ssid + "</span>"
+                      "<a class='wifi-del' href='/wifi/delete?ssid=" + urlEncode(ssid) + "' "
+                        "onclick='return confirm(\"Delete WiFi network " + escapedSsid + "?\");'>👉🗑️</a>"
                     "</div>";
         }
         page += "</div>";
-        page += "<div class='wifi-actions'>"
-                "<a class='wifi-btn-del-all' href='/wifi/deleteAll' "
-                "onclick='return confirm(\"Delete ALL stored WiFi networks?\");'>"
-                "Delete all stored networks</a>"
-                "</div>";
     } else {
         page += "<p>No stored WiFi networks.</p>";
     }
@@ -235,7 +238,7 @@ void CConfig::handleConfigRoot() {
 }
 
 inline String CConfig::getCss() const {
-    return ".status,h1{color:#fff;text-align:center}.status,.wifi-actions,h1,label.section{text-align:center}body{font-family:Arial,Helvetica,sans-serif;margin:0 auto;padding:1em;max-width:51em}h1{background-color:#601860;padding:.4em .3em;margin:.5em 0 .3em;font-size:2.2em;letter-spacing:.5px}.status{background-color:green;display:block;margin:auto auto 1em;width:50%;padding:.5em}div:empty{display:none}form{padding:.5em 0 1.2em}.row{display:flex;align-items:center;margin:22px 0 12px;flex-wrap:nowrap}label{min-width:6.5em;font-size:1.3em}input[type=text]{width:100%;font-size:18px;padding:10px 12px;border:1px solid #888;border-radius:4px}label.section{display:block;margin:1em 0 .5em;border-top:1px solid #000;width:100%;padding:.7em 0 .3em;font-size:x-large;font-weight:400}label[for=red],label[for=yellow]{background:#000;padding:.5em 0 .4em .4em;min-width:6.2em}input[type=button],input[type=submit]{display:block;font-size:x-large;margin:2em auto;padding:14px 24px;cursor:pointer;min-width:60%;max-width:600px;font-weight:700;border:1px solid #777;border-radius:6px}.row#yellow{margin-bottom:2px}.row#red{margin-top:0}label[for=yellow]{color:#ff0}label[for=red]{color:red}.wifi-list{margin:.5em 1em}.wifi-row{display:flex;justify-content:space-between;align-items:center;padding:.5em;border:1px solid #ccc;border-radius:4px;margin-bottom:.5em}.wifi-ssid{overflow:hidden;text-overflow:ellipsis}.wifi-del{text-decoration:none;color:red;font-weight:700;padding:.2em .5em}.wifi-del:hover{background-color:#fee;border-radius:3px}.wifi-actions{margin:1em}.wifi-btn-del-all{display:inline-block;padding:.5em 1em;background-color:#eaeaea;color:#111;text-decoration:none;border:1px solid #777;border-radius:4px;cursor:pointer}.wifi-btn-del-all:hover{filter:brightness(.95)}@media (max-width:700px){body{max-width:22em}h1{font-size:1.8em;padding:.5em 0;margin-bottom:.5em}form{padding:0;font-size:1.5em}.row#event{flex-wrap:wrap;margin-top:.5em}.row label{min-width:0;max-width:5.5em;padding-top:.4em;padding-bottom:.4em}.row#red label,.row#yellow label{max-width:5.2em}label{width:100%;font-size:.9em}label.section{margin:.5em 0 0;padding-bottom:0}input[type=text]{width:94%;border-color:#000}input[type=button],input[type=submit]{font-size:1em;width:100%}#wifi-networks label.section{padding:1em 0}.wifi-list{margin:.5em 0}.wifi-row{font-size:1.2em}.wifi-btn-del-all{font-size:1.2em;padding:.5em 1em;width:90%}}";
+    return ".status,h1{color:#fff;text-align:center}.status,h1,label.section{text-align:center}body{font-family:Arial,Helvetica,sans-serif;margin:0 auto;padding:1em;max-width:51em}h1{background-color:#601860;padding:.4em .3em;margin:.5em 0 .3em;font-size:2.2em;letter-spacing:.5px}.status{background-color:green;display:block;margin:auto auto 1em;width:50%;padding:.5em}div:empty{display:none}form{padding:.5em 0 1.2em}.row{display:flex;align-items:center;margin:22px 0 12px;flex-wrap:nowrap}label{min-width:6.5em;font-size:1.3em}input[type='text']{width:100%;font-size:18px;padding:10px 12px;border:1px solid #888;border-radius:4px}label.section{display:block;margin:1em 0 .5em;border-top:1px solid #000;width:100%;padding:.7em 0 .3em;font-size:x-large;font-weight:400}label[for='red'],label[for='yellow']{background:#000;padding:.5em 0 .4em .4em;min-width:6.2em}input[type='button'],input[type='submit']{display:block;font-size:x-large;margin:2em auto;padding:14px 24px;cursor:pointer;min-width:60%;max-width:600px;font-weight:700;border:1px solid #777;border-radius:6px}.row#yellow{margin-bottom:2px}.row#red{margin-top:0}label[for='yellow']{color:#ff0}label[for='red']{color:red}#wifi-networks{width:100%;border-top:1px solid #000}.wifi-header{display:flex;justify-content:space-between;align-items:center;padding:1em 0}.wifi-header h2{margin:0}.wifi-list{margin:.5em 1em}.wifi-row{display:flex;justify-content:space-between;align-items:center;padding:.5em;border:1px solid #ccc;border-radius:4px;margin-bottom:.5em}.wifi-ssid{overflow:hidden;text-overflow:ellipsis}.wifi-del{text-decoration:none;color:red;font-weight:700;padding:.2em .5em}.wifi-del:hover{background-color:#fee;border-radius:3px}.wifi-btn-del-all{display:inline-block;padding:.5em 1em;background-color:#eaeaea;color:#111;text-decoration:none;border:1px solid #777;border-radius:4px;cursor:pointer;font-weight:700;color:red}.wifi-btn-del-all:hover{filter:brightness(.95)}@media (max-width:700px){body{max-width:22em}h1{font-size:1.8em;padding:.5em 0;margin-bottom:.5em}form{padding:0;font-size:1.5em}.row#event{flex-wrap:wrap;margin-top:.5em}.row label{min-width:0;max-width:5.5em;padding-top:.4em;padding-bottom:.4em}.row#red label,.row#yellow label{max-width:5.2em}label{width:100%;font-size:.9em}label.section{margin:.5em 0 0;padding-bottom:0}input[type='text']{width:94%;border-color:#000}input[type='button'],input[type='submit']{font-size:1em;width:100%}.wifi-header{flex-direction:column;align-items:stretch}.wifi-header h2{text-align:left}.wifi-list{margin:.5em 0}.wifi-row{font-size:1.2em}.wifi-btn-del-all{font-size:1.2em;padding:.5em 1em;text-align:right;margin:.5em 0 0 auto}}";
 }
 
 void CConfig::handleConfigPost() {
