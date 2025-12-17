@@ -205,7 +205,7 @@ void CConfig::handleConfigRoot() {
                   "</form>";
 
     page += WifiMgr.storedWifisHTML();
-    page += "</div></body></html>";
+    page += "</body></html>";
     
     configServer->send(200, "text/html", page);
 }

@@ -673,7 +673,7 @@ void CWifiMgr::handleRoot() {
             "</script>";
 
     page += storedWifisHTML();
-    page += "</div></body></html>";
+    page += "</body></html>";
     server_.send(200, "text/html", page);
 }
 
