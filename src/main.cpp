@@ -98,7 +98,7 @@ void setup() {
         hw->reboot();
     }
     Config.debugOut = debugOut_;
-    Config.erase(); // for testing only - remove in production
+    // Config.erase(); // for testing only - remove in production
     BCPEvent.setID(Config.eventId());
 }
 
