@@ -100,15 +100,13 @@ void CConfig::erase() {
 
 // ---- Configuration HTTP server ----
 
-void CConfig::startConfigServer(bool atStartup, unsigned long timeoutMs) {
+void CConfig::startConfigServer(unsigned long timeoutMs) {
     // If already running, just update timeout and reset the start time
     if (configServer != nullptr) {
         _serverTimeoutMs = timeoutMs;      // 0 => no timeout
         _serverStartMs = millis();         // reset timer window
         return;
     }
-    atStartup_ = atStartup;
-    
     configServer = new WebServer(80);
     
     configServer->on("/", HTTP_GET, [this]() { handleConfigRoot(); });
@@ -178,59 +176,57 @@ void CConfig::handleConfigRoot() {
                   "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
                   "<style>" + getCss() + "</style>"
                   "</head><body>"
-                  "<h1>BCP-clock config</h1>";
-    
-    if (status.length() > 0) {
-        page += "<div class='status'>" + status + "</div>";
-    }
-    
-    if (event_ == "" || !configServer->hasArg("saved") || !atStartup_) {
-        page += "<form method='POST' action='/config'>"
-                "<div id='event' class='row'>"
-                "<label for='event'>Event:</label>"
-                "<input type='text' name='event' placeholder='Enter event ID or event URL' value='" + event_ + "' />"
-                "</div>"
-                "<label class='section'>Colour thresholds</label>"
-                "<div id='yellow' class='row'>"
-                "<label for='yellow'>Yellow:</label>"
-                "<input type='text' name='yellow' value='" + secondsToTime(yellow_) + "' />"
-                "</div>"
-                "<div id='red' class='row'>"
-                "<label for='red'>Red:</label>"
-                "<input type='text' name='red' value='" + secondsToTime(red_) + "' />"
-                "</div>"
-                "<label class='section'>Network</label>"
-                "<div id='hostname' class='row'>"
-                "<label for='hostname'>Hostname:</label>"
-                "<input type='text' name='hostname' value='" + hostname_ + "' />"
-                "</div>"
-                "<input type='submit' />"
-                "</form>";
+                  "<h1>BCP-clock config</h1>"
 
-        // WiFi networks section
-        page += "<div id='wifi-networks'>"
-                "<label class='section'>Stored WiFi networks</label>";
-        std::vector<String> storedNetworks;
-        if (WifiMgr.listStoredNetworks(storedNetworks) && !storedNetworks.empty()) {
-            page += "<div class='wifi-list'>";
-            for (auto& ssid : storedNetworks) {
-                String escapedSsid = ssid;
-                escapedSsid.replace("'", "\\'");
-                page += "<div class='wifi-row'>"
-                        "<span class='wifi-ssid'>" + ssid + "</span>"
-                        "<a class='wifi-del' href='/wifi/delete?ssid=" + urlEncode(ssid) + "' "
-                        "onclick='return confirm(\"Delete WiFi network " + escapedSsid + "?\");'>👉🗑️</a>"
-                        "</div>";
-            }
-            page += "</div>";
-            page += "<div class='wifi-actions'>"
-                    "<a class='wifi-btn-del-all' href='/wifi/deleteAll' "
-                    "onclick='return confirm(\"Delete ALL stored WiFi networks?\");'>"
-                    "Delete all stored networks</a>"
+                  // status of saving the config
+                  "<div class='status'>" + status + "</div>"
+
+                  // the main form of config page
+                  "<form method='POST' action='/config'>"
+                  "<div id='event' class='row'>"
+                  "<label for='event'>Event:</label>"
+                  "<input type='text' name='event' placeholder='Enter event ID or event URL' value='" + event_ + "' />"
+                  "</div>"
+                  "<label class='section'>Colour thresholds</label>"
+                  "<div id='yellow' class='row'>"
+                  "<label for='yellow'>Yellow:</label>"
+                  "<input type='text' name='yellow' value='" + secondsToTime(yellow_) + "' />"
+                  "</div>"
+                  "<div id='red' class='row'>"
+                  "<label for='red'>Red:</label>"
+                  "<input type='text' name='red' value='" + secondsToTime(red_) + "' />"
+                  "</div>"
+                  "<label class='section'>Network</label>"
+                  "<div id='hostname' class='row'>"
+                  "<label for='hostname'>Hostname:</label>"
+                  "<input type='text' name='hostname' value='" + hostname_ + "' />"
+                  "</div>"
+                  "<input type='submit' />"
+                  "</form>";
+
+    // WiFi networks section
+    page += "<div id='wifi-networks'>"
+            "<label class='section'>Stored WiFi networks</label>";
+    std::vector<String> storedNetworks;
+    if (WifiMgr.listStoredNetworks(storedNetworks) && !storedNetworks.empty()) {
+        page += "<div class='wifi-list'>";
+        for (auto& ssid : storedNetworks) {
+            String escapedSsid = ssid;
+            escapedSsid.replace("'", "\\'");
+            page += "<div class='wifi-row'>"
+                    "<span class='wifi-ssid'>" + ssid + "</span>"
+                    "<a class='wifi-del' href='/wifi/delete?ssid=" + urlEncode(ssid) + "' "
+                    "onclick='return confirm(\"Delete WiFi network " + escapedSsid + "?\");'>👉🗑️</a>"
                     "</div>";
-        } else {
-            page += "<p>No stored WiFi networks.</p>";
         }
+        page += "</div>";
+        page += "<div class='wifi-actions'>"
+                "<a class='wifi-btn-del-all' href='/wifi/deleteAll' "
+                "onclick='return confirm(\"Delete ALL stored WiFi networks?\");'>"
+                "Delete all stored networks</a>"
+                "</div>";
+    } else {
+        page += "<p>No stored WiFi networks.</p>";
     }
 
     page += "</div></body></html>";
@@ -261,9 +257,7 @@ void CConfig::handleConfigPost() {
     configServer->sendHeader("Location", "/?saved=1");
     configServer->send(303);
 
-    if (!atStartup_) {
-        configUpdated = true;
-    } 
+    configUpdated = true;
 }
 
 void CConfig::handleWifiDelete() {

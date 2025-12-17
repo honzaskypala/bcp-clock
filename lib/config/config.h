@@ -20,7 +20,7 @@ public:
     void erase();
     
     // ---- Configuration HTTP server ----
-    void startConfigServer(bool atStartup = false, unsigned long timeoutMs = 5UL * 60UL * 1000UL); // default 5 minutes; 0 = no timeout
+    void startConfigServer(unsigned long timeoutMs = 5UL * 60UL * 1000UL); // default 5 minutes; 0 = no timeout
     void stopConfigServer();
     void handleClient(); // pump HTTP requests
     bool isConfigServerRunning() const { return configServer != nullptr; }
@@ -43,7 +43,6 @@ private:
     
     // ---- Configuration HTTP server ----
     WebServer* configServer = nullptr;
-    bool atStartup_ = false;
     void handleConfigRoot();
     void handleConfigPost();
     void handleWifiDelete();

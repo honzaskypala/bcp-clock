@@ -80,27 +80,10 @@ void displayUpdate() {
             // stop existing server first and make sure it is running with no timeout
             Config.stopConfigServer();
         }
-        Config.startConfigServer(false, 0);
+        Config.startConfigServer(0);
         hw->configServerMsg("Invalid event ID, please configure.");
         wasInvalidEvent = true;
     }
-}
-
-inline void ensureEventID() {
-    // Config.erase(); // for testing only - remove in production
-    if (Config.eventId() == "") {
-        hw->configServerMsg("No event ID configured, starting config server.");
-        Config.startConfigServer(true, 0);
-        while (Config.eventId() == "") {
-            Config.handleClient();
-            delay(100); // keep server responsive
-        }
-        Config.configUpdated = false;
-        hw->displayState = DISPLAY_BOOT;
-        hw->splashScreen();
-        delay(250); // keep the server responsive for 0.25 second, let the http client receive the response
-    }
-    Config.stopConfigServer(); // no longer needed
 }
 
 // ---- core Arduino functions ----
@@ -115,7 +98,7 @@ void setup() {
         hw->reboot();
     }
     Config.debugOut = debugOut_;
-    ensureEventID();
+    Config.erase(); // for testing only - remove in production
     BCPEvent.setID(Config.eventId());
 }
 
