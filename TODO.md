@@ -24,7 +24,6 @@
 - [ ] rainbow effect on screen, option to limit it on a clipped area
 
 ## Config related
-- [ ] Text fields to get ⨂ at the right end to erase the content
 - [ ] option to have config web password protected
 - [ ] refresh interval configurable
 - [ ] option to use small font always (even when displaying mm:ss only)
@@ -40,6 +39,7 @@
 - [ ] Refactor change String to char * where it mekes sense
 
 ## Done
+- [x] [Config] [Feature] Event field gets ⨂ at the right end to erase the content
 - [x] [WiFiMgr] [Minor] Move button to delete all stored networks to the same line as section header, far right; this is for the user to not mistake the button with the main submit button of the form
 - [x] [Config] [Minor] Align the Config web page appearance with WiFi Manager web config, displaying nice on tablets and computers (so far optimized for cell phones only)
 - [x] [WiFiMgr] [Minor] change emoji at Refresh button to ↻
