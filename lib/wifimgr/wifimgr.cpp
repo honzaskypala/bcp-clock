@@ -580,16 +580,48 @@ const char* CWifiMgr::wifiAuthModeToString(uint8_t m) {
 void CWifiMgr::handleRoot() {
     bool showFail = server_.hasArg("fail");
 
-    std::vector<String> storedSsids;
-    bool haveCreds = listStoredNetworks(storedSsids);
-
     String page;
     page.reserve(17000);
     page += "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Wi-Fi Setup</title>";
     page += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
     page += "<style>"
-            "html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif}.wrap{padding:18px;max-width:820px;margin:0 auto}.banner{background:#5b1b66;color:#fff;font-weight:800;text-align:center;padding:14px 10px;margin:18px 0 10px 0;font-size:36px;line-height:1.15;letter-spacing:.5px}.status{font-size:18px;font-weight:600;text-align:center;padding:10px 12px;border-radius:4px;margin:0 0 18px 0}.status-error{background:#c3002f;color:#fff}fieldset{border:0;padding:0;margin:0 0 20px 0}legend{display:none}label.ssid{display:flex;align-items:center;gap:10px;font-size:22px;margin:10px 0}input[type=radio]{width:20px;height:20px}.rssi{color:#666;font-size:12px;margin-left:8px}.row{display:flex;align-items:center;gap:16px;margin:22px 0 12px 0;flex-wrap:nowrap}.row label{flex:0 0 120px;font-size:20px}input[type=password]{flex:1 1 auto;width:100%;font-size:18px;padding:10px 12px;border:1px solid #888;border-radius:4px;box-sizing:border-box}.actions{margin-top:26px;display:flex;justify-content:center}.btnSubmit{display:inline-flex;align-items:center;justify-content:center;min-width:60%;max-width:600px;font-size:26px;font-weight:700;padding:14px 24px;border-radius:6px;border:1px solid #777;background:#eaeaea;color:#111;text-align:center;text-decoration:none;cursor:pointer}.btnSubmit:disabled{opacity:.65;cursor:default}@keyframes spin{to{transform:rotate(360deg)}}.btnSubmit .waitIcon{display:none;margin-left:10px}.btnSubmit.spinning .waitIcon{display:inline-block;animation:spin .8s linear infinite}.btnSubmit.spinning .btnText{opacity:.8}.netHeader{display:flex;justify-content:space-between;align-items:center;margin:6px 0 4px 0}.sectionLabel{font-size:18px;font-weight:700;color:#222}.rescanBtn{font-size:14px;font-weight:600;padding:6px 14px;border:1px solid #777;background:#eaeaea;color:#111;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:6px}.rescanBtn:hover{filter:brightness(.95)}.rescanBtn .icon{display:inline-block}.rescanBtn.spinning .icon{animation:spin .8s linear infinite}.storedHeader{display:flex;justify-content:space-between;align-items:center;padding:2em 0 1em;border-top:1px solid #000}.storedHeader h2{margin:0}.storedBlock{margin-top:34px}.storedRow{display:flex;justify-content:space-between;align-items:center;border:1px solid #ccc;border-radius:4px;padding:8px 12px;margin-bottom:8px}.storedSSID{font-size:16px;overflow:hidden;text-overflow:ellipsis}a.del{display:inline-block;text-decoration:none;font-size:22px;line-height:1}a#delnetworks{font-size:initial;min-width:auto;color:red;padding:0.5em 1em}a.del:hover{filter:brightness(.85)}@media (max-width:580px){.banner{font-size:30px;padding:12px 8px;margin:12px 0 10px 0}.row{flex-wrap:wrap}.row label{flex:0 0 auto;margin-bottom:6px}input[type=password]{width:100%}.btnSubmit{min-width:100%;max-width:none;width:100%}.sectionLabel{font-size:16px}.status{font-size:16px}.storedHeader{flex-direction:column;align-items:stretch}.storedHeader h2{text-align:left}a#delnetworks{font-size:initial;width:auto;min-width:auto;margin:.5em 0 0 auto}}"
-            "</style>";
+            "html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif}"
+            ".wrap{padding:18px;max-width:820px;margin:0 auto}"
+            ".banner{background:#5b1b66;color:#fff;font-weight:800;text-align:center;padding:14px 10px;margin:18px 0 10px 0;font-size:36px;line-height:1.15;letter-spacing:.5px}"
+            ".status{font-size:18px;font-weight:600;text-align:center;padding:10px 12px;border-radius:4px;margin:0 0 18px 0}"
+            ".status-error{background:#c3002f;color:#fff}"
+            "fieldset{border:0;padding:0;margin:0 0 20px 0}"
+            "legend{display:none}"
+            "label.ssid{display:flex;align-items:center;gap:10px;font-size:22px;margin:10px 0}"
+            "input[type=radio]{width:20px;height:20px}"
+            ".rssi{color:#666;font-size:12px;margin-left:8px}"
+            ".row{display:flex;align-items:center;gap:16px;margin:22px 0 12px 0;flex-wrap:nowrap}"
+            ".row label{flex:0 0 120px;font-size:20px}"
+            "input[type=password]{flex:1 1 auto;width:100%;font-size:18px;padding:10px 12px;border:1px solid #888;border-radius:4px;box-sizing:border-box}"
+            ".actions{margin-top:26px;display:flex;justify-content:center}"
+            ".btnSubmit{display:inline-flex;align-items:center;justify-content:center;min-width:60%;max-width:600px;font-size:26px;font-weight:700;padding:14px 24px;border-radius:6px;border:1px solid #777;background:#eaeaea;color:#111;text-align:center;text-decoration:none;cursor:pointer}"
+            ".btnSubmit:disabled{opacity:.65;cursor:default}"
+            "@keyframes spin{to{transform:rotate(360deg)}}"
+            ".btnSubmit .waitIcon{display:none;margin-left:10px}"
+            ".btnSubmit.spinning .waitIcon{display:inline-block;animation:spin .8s linear infinite}"
+            ".btnSubmit.spinning .btnText{opacity:.8}"
+            ".netHeader{display:flex;justify-content:space-between;align-items:center;margin:6px 0 4px 0}"
+            ".sectionLabel{font-size:18px;font-weight:700;color:#222}"
+            ".rescanBtn{font-size:14px;font-weight:600;padding:6px 14px;border:1px solid #777;background:#eaeaea;color:#111;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:6px}"
+            ".rescanBtn:hover{filter:brightness(.95)}"
+            ".rescanBtn .icon{display:inline-block}"
+            ".rescanBtn.spinning .icon{animation:spin .8s linear infinite}"
+            "@media (max-width:580px){"
+                ".banner{font-size:30px;padding:12px 8px;margin:12px 0 10px 0}"
+                ".row{flex-wrap:wrap}"
+                ".row label{flex:0 0 auto;margin-bottom:6px}"
+                "input[type=password]{width:100%}"
+                ".btnSubmit{min-width:100%;max-width:none;width:100%}"
+                ".sectionLabel{font-size:16px}"
+                ".status{font-size:16px}"
+            "}"
+            + storedWifisCSS()
+            + "</style>";
     page += "</head><body><div class='wrap'>";
     page += "<div class='banner'>BCP-clock Wi‑Fi Setup</div>";
 
@@ -630,29 +662,6 @@ void CWifiMgr::handleRoot() {
                 "</div>";
     }
     page += "</fieldset></form>";
-
-    // Stored networks
-    bool haveStoredNetworks = haveCreds && !storedSsids.empty();
-    page += "<div class='storedBlock'>"
-              "<div class='storedHeader'>"
-                "<h2>Stored Wi-Fi networks</h2>";
-    if (haveStoredNetworks) {
-        page += "<a class='btnSubmit' id='delnetworks' href='/deleteAll' onclick='return confirm(\"Delete ALL stored SSIDs and passwords?\");'>Delete all 👉🗑️</a>";
-    }
-    page += "</div>";  // storedHeader
-    if (haveStoredNetworks) {
-        for (auto& s : storedSsids) {
-            page += "<div class='storedRow'>"
-                    "<div class='storedSSID'>" + htmlEscape(s) + "</div>"
-                    "<a class='del' href='/delete?ssid=" + urlEncode(s) +
-                    "' title='Delete' onclick='return confirm(\"Delete SSID " + htmlEscape(s) + "?\");'>👉🗑️</a>"
-                    "</div>";
-        }
-    } else {
-        page += "<p>No networks stored.</p>";
-    }
-    page += "</div>";  // storedBlock
-
     page += "<script>"
             "function onRescanClick(btn){"
                 "if(btn.classList.contains('spinning')) return;"
@@ -663,8 +672,53 @@ void CWifiMgr::handleRoot() {
             "}"
             "</script>";
 
+    page += storedWifisHTML();
     page += "</div></body></html>";
     server_.send(200, "text/html", page);
+}
+
+String CWifiMgr::storedWifisHTML() {
+    std::vector<String> storedSsids;
+    bool haveCreds = listStoredNetworks(storedSsids);
+    bool haveStoredNetworks = haveCreds && !storedSsids.empty();
+
+    String page = "<div class='storedBlock'>" \
+              "<div class='storedHeader'>" \
+                "<h2>Stored Wi-Fi networks</h2>"; \
+    if (haveStoredNetworks) { \
+        page += "<a class='btnSubmit' id='delnetworks' href='/deleteAll' onclick='return confirm(\"Delete ALL stored SSIDs and passwords?\");'>Delete all 👉🗑️</a>"; \
+    } \
+    page += "</div>";  /* storedHeader */ \
+    if (haveStoredNetworks) {  \
+        for (auto& s : storedSsids) { \
+            page += "<div class='storedRow'>" \
+                    "<div class='storedSSID'>" + htmlEscape(s) + "</div>" \
+                    "<a class='del' href='/delete?ssid=" + urlEncode(s) + \
+                    "' title='Delete' onclick='return confirm(\"Delete SSID " + htmlEscape(s) + "?\");'>👉🗑️</a>" \
+                    "</div>"; \
+        } \
+    } else { \
+        page += "<p>No networks stored.</p>"; \
+    } \
+    page += "</div>"; /* storedBlock */
+    return page;
+}
+
+String CWifiMgr::storedWifisCSS() {
+    return 
+        ".storedHeader{display:flex;justify-content:space-between;align-items:center;padding:2em 0 1em;border-top:1px solid #000}"
+        ".storedHeader h2{margin:0}"
+        ".storedBlock{margin-top:34px}"
+        ".storedRow{display:flex;justify-content:space-between;align-items:center;border:1px solid #ccc;border-radius:4px;padding:8px 12px;margin-bottom:8px}"
+        ".storedSSID{font-size:16px;overflow:hidden;text-overflow:ellipsis}"
+        "a.del{display:inline-block;text-decoration:none;font-size:22px;line-height:1}"
+        "a#delnetworks{display:inline-flex;margin:0;font-size:initial;min-width:auto;color:red;padding:0.5em 1em}"
+        "a.del:hover{filter:brightness(.85)}"
+        "@media (max-width:580px){"
+            ".storedHeader{flex-direction:column;align-items:stretch}"
+            ".storedHeader h2{text-align:left}"
+            "a#delnetworks{font-size:initial;width:auto;min-width:auto;margin:.5em 0 0 auto}"
+        "}";
 }
 
 void CWifiMgr::handleRescan() {

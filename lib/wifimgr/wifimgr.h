@@ -20,6 +20,9 @@ public:
     bool removeStoredNetwork(const char* ssid);
     inline bool timeSyncFailed() const { return timeSyncFailed_; }
 
+    String storedWifisHTML();
+    String storedWifisCSS();
+
 private:
     Print *debugOut_ = nullptr;  // Optional debug output
     Print *usrMsg_   = &Serial;  // Optional user messages output
