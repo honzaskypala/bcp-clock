@@ -710,6 +710,7 @@ String CWifiMgr::storedWifisCSS() {
         ".storedHeader h2{margin:0}"
         ".storedBlock{margin-top:34px}"
         ".storedRow{display:flex;justify-content:space-between;align-items:center;border:1px solid #ccc;border-radius:4px;padding:8px 12px;margin-bottom:8px}"
+        ".storedBlock .storedRow:nth-of-type(odd){background-color:#f0f9ff}"
         ".storedSSID{font-size:16px;overflow:hidden;text-overflow:ellipsis}"
         "a.del{display:inline-block;text-decoration:none;font-size:22px;line-height:1}"
         "a#delnetworks{display:inline-flex;margin:0;font-size:initial;min-width:auto;color:red;padding:0.5em 1em;align-items:center;justify-content:center;font-weight:700;border-radius:6px;border:1px solid #777;text-align:center;text-decoration:none;cursor:pointer;background:#eaeaea}"
