@@ -22,6 +22,7 @@ public:
     virtual bool ensureConnection() = 0;
 
     static volatile DisplayState displayState;
+    static volatile bool enforceUpdate;
 
     virtual void displayEventName(const CBCPEvent& event) = 0;
     virtual void displayEventRound(const CBCPEvent& event) = 0;

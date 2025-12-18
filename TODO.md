@@ -3,15 +3,14 @@
 ## main related
 - [ ] offline mode, just run countdown from configurable time
 - [ ] chess clock functionality
-- [ ] Low battery warning
+- [ ] [Low battery warning](https://github.com/rroels/ulanzi_tc001_hardware?tab=readme-ov-file#battery-voltage-example-2-mapped-value)
 
 ## TC001 hardware related
-- [ ] make pressing right button refresh data and update display immediately
 - [ ] bliking every 0.5 sec instead of 1 sec
 - [ ] blink red (over time) always
 - [ ] blink green (time to start) last 2 minutes
 - [ ] display brightness configurable
-- [ ] beep at passing thresholds
+- [ ] [beep](https://github.com/rroels/ulanzi_tc001_hardware?tab=readme-ov-file#example-code-buzzer) at passing thresholds
 - [ ] support for rounds >= 10 hours (double digit hours)
 - [ ] show finished tables + config top / bottom / none
 
@@ -39,6 +38,7 @@
 - [ ] Refactor change String to char * where it mekes sense
 
 ## Done
+- [x] [Hw] [Feature] Pressing right button refreshes data and updates display immediately
 - [x] [Config] [Feature] Event field gets ⨂ at the right end to erase the content
 - [x] [WiFiMgr] [Minor] Move button to delete all stored networks to the same line as section header, far right; this is for the user to not mistake the button with the main submit button of the form
 - [x] [Config] [Minor] Align the Config web page appearance with WiFi Manager web config, displaying nice on tablets and computers (so far optimized for cell phones only)

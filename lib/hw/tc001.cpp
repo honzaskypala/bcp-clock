@@ -12,6 +12,7 @@
 
 #define PIN_BUZZER          15
 #define PIN_MID_BUTTON      27
+#define PIN_RIGHT_BUTTON    14
 #define PIN_LED_MATRIX      32
 
 #define COLOR_WHITE matrix.Color24to16(CRGB::White)
@@ -27,8 +28,6 @@
 #define PROGRESS_INDICATOR_SPEED 100 // milliseconds per step
 
 constexpr int DEBOUNCE_DELAY_MS = 500;
-
-volatile DisplayState Hw::displayState = DISPLAY_BOOT;
 
 CRGB Tc001::matrixleds[256];
 FastLED_NeoMatrix Tc001::matrix = FastLED_NeoMatrix(Tc001::matrixleds, 32, 8, NEO_MATRIX_TOP + NEO_MATRIX_LEFT + NEO_MATRIX_ROWS + NEO_MATRIX_ZIGZAG);
@@ -48,6 +47,7 @@ bool Tc001::midButtonPressed = false;
 Tc001::Tc001(Print *debugOut) : debugOut_(debugOut) {
     pinMode(PIN_BUZZER, INPUT_PULLDOWN);      // stop whistle noise
     pinMode(PIN_MID_BUTTON, INPUT_PULLUP);    // mid button
+    pinMode(PIN_RIGHT_BUTTON, INPUT_PULLUP);  // right button
     Serial.begin(9600);
     while (!Serial);
 
@@ -267,9 +267,10 @@ void Tc001::reboot() {
 }
 
 bool Tc001::ensureConnection() {
-    bool retValue = WifiMgr.connect(digitalRead(27) == LOW, 0, this, debugOut_);    // if mid button pressed, enforce portal
+    bool retValue = WifiMgr.connect(digitalRead(PIN_MID_BUTTON) == LOW, 0, this, debugOut_);    // if mid button pressed, enforce portal
     if (retValue) {
-        attachInterrupt(27, []() { midButtonPressed = true; }, FALLING);
+        attachInterrupt(PIN_MID_BUTTON, []() { midButtonPressed = true; }, FALLING);
+        attachInterrupt(PIN_RIGHT_BUTTON, []() { enforceUpdate = true; }, FALLING);
     }
     return retValue;
 }

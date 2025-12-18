@@ -122,8 +122,9 @@ void loop() {
         }
     }
 
-    if (lastDataRefresh == 0 || millis() - lastDataRefresh >= DATA_REFRESH_INTERVAL_MS) {
+    if (lastDataRefresh == 0 || millis() - lastDataRefresh >= DATA_REFRESH_INTERVAL_MS || hw->enforceUpdate) {
         MAIN_DEBUG("Refreshing BCP event data...");
+        hw->enforceUpdate = false;
         lastDataRefresh = millis();
         if (BCPEvent.refreshData()) {
             MAIN_DEBUG("BCP event data refreshed successfully");
