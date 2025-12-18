@@ -235,7 +235,7 @@ inline String CConfig::getCss() const {
         "input[type='text']{width:100%;font-size:18px;padding:10px 12px;border:1px solid #888;border-radius:4px}"
         "label.section{display:block;margin:1em 0 .5em;border-top:1px solid #000;width:100%;padding:.7em 0 .3em;font-size:x-large;font-weight:400}"
         "label[for='red'],label[for='yellow']{background:#000;padding:.5em 0 .4em .4em;min-width:6.2em}"
-        "input[type='button'],input[type='submit'],a#delnetworks{display:block;margin:2em auto;align-items:center;justify-content:center;min-width:60%;max-width:600px;font-size:26px;font-weight:700;padding:14px 24px;border-radius:6px;border:1px solid #777;background:#eaeaea;color:#111;text-align:center;text-decoration:none;cursor:pointer}"
+        "input[type='button'],input[type='submit'],a#delnetworks{display:block;font-size:x-large;margin:2em auto;padding:14px 24px;cursor:pointer;min-width:60%;max-width:600px;font-weight:700;border:1px solid #777;border-radius:6px}"
         ".row#yellow{margin-bottom:2px}"
         ".row#red{margin-top:0}"
         ".input-wrapper{position:relative;flex:1}"
