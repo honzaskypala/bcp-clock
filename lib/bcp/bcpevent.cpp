@@ -73,11 +73,7 @@ void CBCPEvent::handleEventOverviewPayload(const String& payload) {
         numberOfRounds_ = doc["status"]["numberOfRounds"].as<int>();
         currentRound_ = doc["status"]["currentRound"].as<int>();
         if (currentRound_ != pastRound) {
-            timerLength_ = 0;
-            roundStartTime_ = "";
-            roundEndTime_ = "";
-            roundStartEpoch_ = 0;
-            roundEndEpoch_ = 0;
+            clearTimerData();
         }
     }
 }
@@ -87,13 +83,30 @@ void CBCPEvent::fetchTimerData() {
     int status = BCPRest("/timer?round=" + String(currentRound_), payload);
     if (status == HTTP_CODE_OK) {
         handleEventTimerPayload(payload);
+    } else if (status == HTTP_CODE_NOT_FOUND) {
+        clearTimerData();  // BCP returns 200 {} for no timer now; 404 handled in case that changes
     }
+    // other errors (connection, 5xx): keep the last timer data
+}
+
+void CBCPEvent::clearTimerData() {
+    timerLength_ = 0;
+    roundStartTime_ = "";
+    roundEndTime_ = "";
+    roundStartEpoch_ = 0;
+    roundEndEpoch_ = 0;
+    timerPaused_ = false;
+    pausedTimeRemaining_ = 0;
 }
 
 void CBCPEvent::handleEventTimerPayload(const String& payload) {
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
     if (!error) {
+        if (!doc["timerLength"].is<int>()) {
+            clearTimerData();  // round without timer: BCP returns {}
+            return;
+        }
         timerLength_ = doc["timerLength"].as<int>();
         roundStartTime_ = doc["startTime"].as<String>();
         struct tm stm = {};

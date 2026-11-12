@@ -82,6 +82,7 @@ private:
     bool timerPaused_ = false;
     uint32_t pausedTimeRemaining_ = 0;
     void fetchTimerData();
+    void clearTimerData();
     void handleEventTimerPayload(const String& payload);
 
     // ---- Snapshot of event data surviving a soft reboot ----

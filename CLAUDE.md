@@ -103,6 +103,7 @@ server with no timeout and scrolls "Config page http://<IP>".
 ### BCP API
 - `GET https://newprod-api.bestcoastpairings.com/v1/events/<id>/overview` → `name`, `status.started/ended/numberOfRounds/currentRound`.
 - `GET .../timer?round=<n>` → `timerLength`, `startTime`, `endTime` (UTC ISO), `timerPaused`, `pausedTimeRemaining`.
+  A round without a timer (also a non-existent round) returns `200 {}`, not 404. BCP has no way to cancel a started timer.
 - Header `client-id: web-app`; TLS without cert validation (`setInsecure()`). Unofficial API.
 - 404 on overview = invalid event ID (counts as a "successful" fetch, not a failure).
 
