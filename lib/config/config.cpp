@@ -15,6 +15,22 @@ static const long DEF_YELLOW = 600; // seconds
 static const long DEF_RED    = 0;   // seconds
 static const String DEF_HOSTNAME = "BCP-clock";
 static constexpr const char* CONFIG_NS = "config";
+static constexpr unsigned int MAX_HOSTNAME_LEN = 32;   // ESP-IDF netif limit
+
+// Keep only characters valid in a hostname (letters, digits, inner hyphens), fall back to the default
+static String sanitizeHostname(const String& name) {
+    String out;
+    for (unsigned int i = 0; i < name.length() && out.length() < MAX_HOSTNAME_LEN; i++) {
+        char c = name[i];
+        if (isalnum(static_cast<unsigned char>(c)) || (c == '-' && out.length() > 0)) {
+            out += c;
+        }
+    }
+    while (out.endsWith("-")) {
+        out.remove(out.length() - 1);
+    }
+    return out.length() > 0 ? out : DEF_HOSTNAME;
+}
 
 // ---- Constructor: load configuration from persistent storage ----
 
@@ -47,7 +63,7 @@ CConfig::CConfig() {
         }
         yellow_   = y;
         red_      = r;
-        hostname_ = prefs.getString("hostname", hostname_);
+        hostname_ = sanitizeHostname(prefs.getString("hostname", hostname_));
         prefs.end();
         CONFIG_DEBUG("Preferences loaded");
     } else {
@@ -210,7 +226,7 @@ void CConfig::handleConfigRoot() {
     page += WebUI::sectionHeader("Network");
     page += "<div class='row'>"
                 "<label for='hostname'>Hostname:</label>"
-                "<input type='text' id='hostname' name='hostname' value='" + WebUI::htmlEscape(hostname_) + "'>"
+                "<input type='text' id='hostname' name='hostname' maxlength='32' value='" + WebUI::htmlEscape(hostname_) + "'>"
             "</div>"
             "<div class='actions'><button class='btn btnMain' type='submit'>Save</button></div>"
             "</form>"
@@ -240,7 +256,7 @@ void CConfig::handleConfigPost() {
         red_ = timeToSeconds(configServer->arg("red"));
     }
     if (configServer->hasArg("hostname")) {
-        hostname_ = configServer->arg("hostname");
+        hostname_ = sanitizeHostname(configServer->arg("hostname"));
     }
     
     savePreferences();

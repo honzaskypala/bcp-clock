@@ -57,7 +57,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 
 | Path | Purpose |
 |---|---|
-| `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display state decisions (`displayUpdate()`), reboot after 5 consecutive fetch failures |
+| `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display state decisions (`displayUpdate()`), reboot after 5 consecutive fetch failures, mDNS `<hostname>.local` |
 | `src/devconsole.*` | Serial command console, dev build only |
 | `tools/` | Mac-side dev helpers: `devmon.py` (persistent serial monitor), `devcmd.sh` (send console command) |
 | `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: parses event ID from ID or URL, calls BCP REST API |

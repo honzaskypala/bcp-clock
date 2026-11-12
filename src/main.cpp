@@ -5,6 +5,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <config.h>
 #include <bcpevent.h>
 #include <hw.h>
@@ -20,6 +21,17 @@ Print *debugOut_ = nullptr;  // Optional debug output
 #define MAIN_DEBUG(msg) if (debugOut_) { debugOut_->print("[Main] "); debugOut_->println(msg); }
 
 Hw *hw;
+String mdnsHostname;  // hostname announced over mDNS
+
+// ---- mDNS: the config page is also reachable at http://<hostname>.local ----
+void startMdns() {
+    mdnsHostname = Config.hostname();
+    if (MDNS.begin(mdnsHostname.c_str())) {
+        MAIN_DEBUG("mDNS started: http://" + mdnsHostname + ".local");
+    } else {
+        MAIN_DEBUG("mDNS start failed");
+    }
+}
 
 // ---- update display after data refresh ----
 // The display state is set by the Hw implementation; here it is only read to avoid redrawing
@@ -99,12 +111,14 @@ void setup() {
 #endif
     hw = &Tc001::getInstance(debugOut_);
     hw->splashScreen();
+    WiFi.setHostname(Config.hostname().c_str());   // must be set before WiFi starts
     if (!hw->ensureConnection()) {
         MAIN_DEBUG("Connection not established, rebooting in 5 seconds...");
         delay(5000);
         hw->reboot();
     }
     Config.debugOut = debugOut_;
+    startMdns();
     // Config.erase(); // for testing only - remove in production
     BCPEvent.setID(Config.eventId());
     if (BCPEvent.valid()) {
@@ -119,6 +133,12 @@ void loop() {
     if (Config.configUpdated) {
         MAIN_DEBUG("Configuration updated.");
         Config.configUpdated = false;
+        if (Config.hostname() != mdnsHostname) {
+            MAIN_DEBUG("Hostname changed, restarting mDNS.");
+            WiFi.setHostname(Config.hostname().c_str());   // DHCP hostname applies at the next WiFi connection
+            MDNS.end();
+            startMdns();
+        }
         if (Config.eventId() != BCPEvent.fullId()) {
             MAIN_DEBUG("Event ID changed, updating BCP event.");
             hw->splashScreen();

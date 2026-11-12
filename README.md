@@ -158,7 +158,8 @@ pio device monitor -b 9600    # optional: serial console
 
 ## Configuration
 
-The configuration page is available at `http://<IP of the clock>`:
+The configuration page is available at `http://<IP of the clock>`, or at `http://bcp-clock.local`
+(the hostname setting followed by `.local`):
 
 - automatically, with no time limit, while the configured event is missing or invalid;
 - after pressing the **middle button**, for 5 minutes.
@@ -168,7 +169,7 @@ The configuration page is available at `http://<IP of the clock>`:
 | Event | BCP event URL (e.g. `https://www.bestcoastpairings.com/event/AbCdEf123456`) or just the event ID | empty |
 | Yellow | Remaining time below which the countdown turns yellow, as `m:ss` or `h:mm:ss` | `10:00` |
 | Red | Remaining time below which the countdown turns red, as `m:ss` or `h:mm:ss` | `0:00` |
-| Hostname | Device hostname (stored, not applied yet) | `BCP-clock` |
+| Hostname | Device name in the network: shown in the router's client list and used for the `.local` address of the configuration page. Letters, digits and hyphens, up to 32 characters. A change of the router name applies at the next WiFi connection. | `BCP-clock` |
 
 The same page lists the **stored WiFi networks**, where you can delete individual networks or all of
 them. To add a new network, hold the **middle button** while powering on the clock to open the WiFi
