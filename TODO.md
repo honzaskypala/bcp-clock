@@ -15,7 +15,6 @@
 - [ ] show finished tables + config top / bottom / none
 
 ## GFX related
-- [ ] check progress indicator, it looks like it moves between -1 and 30 instead of 0 and 31
 - [ ] add negative chars to the font, eg. 🅽
 - [ ] [emojis](https://unicode.org/emoji/charts/full-emoji-list.html) support
 - [ ] emoji graphens support, eg. country flags
@@ -39,6 +38,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [Hw] [Bugfix] Progress indicator moves between columns 0 and 31 (was -1 and 30)
 - [x] [Config] [Feature] Hostname setting applied: DHCP hostname and mDNS (config page at `http://<hostname>.local`), sanitized to letters, digits and hyphens
 - [x] [General] [Feature] Dev build: `portal` console command (reboot into captive portal), portal HTTP request logging; README notes iPhone Auto-Login for the captive portal
 - [x] [Config] [Refactor] Captive portal and config page share one page template and CSS (lib/webui); main buttons labelled Save / Connect; styled "Connected" page

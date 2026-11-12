@@ -284,7 +284,7 @@ void Tc001::drawCountdown(const CBCPEvent& event) {
 
 void Tc001::progressStart() {
     if (progressIndicator == nullptr) {
-        progressIndicator = new ProgressIndicator(&matrix, -1, matrix.height() - 1, matrix.width(), COLOR_WHITE, COLOR_BLACK);
+        progressIndicator = new ProgressIndicator(&matrix, 0, matrix.height() - 1, matrix.width(), COLOR_WHITE, COLOR_BLACK);
     }
     progressIndicator->isActive = true;
 }
