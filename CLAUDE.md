@@ -65,8 +65,9 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 | `lib/hw/tc001.*` | `Tc001` singleton: the TC001 implementation (matrix, buttons, display task, fonts) |
 | `lib/config/` | `CConfig` singleton `Config`: settings in NVS + on-demand HTTP config server |
 | `lib/wifimgr/` | `CWifiMgr` global `WifiMgr`: multi-network WiFi manager with captive portal, NTP + RTC time sync |
+| `lib/webui/` | Shared look of the web pages (captive portal, config page): page template, common CSS, `htmlEscape` |
 | `lib/gfx/` | Adafruit_GFX helpers: `ScrollingText`, `ProgressIndicator`, `UTF8canvas16`, fonts |
-| `lib/*/*.html`, `wifimgr.css` | Gitignored, formatted copies of the generated pages used for styling; the real HTML/CSS is inlined as strings in the `.cpp` files |
+| `lib/*/*.html`, `wifimgr.css` | Gitignored, formatted copies of the generated pages used for styling, older than `lib/webui`; the real HTML/CSS is inlined as strings in the `.cpp` files |
 
 ## Runtime architecture
 

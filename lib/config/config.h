@@ -47,7 +47,6 @@ private:
     void handleConfigPost();
     void handleWifiDelete();
     void handleWifiDeleteAll();
-    inline String getCss() const;
     static String urlEncode(const String& in);
 
     // ---- HTTP server timeout tracking ----

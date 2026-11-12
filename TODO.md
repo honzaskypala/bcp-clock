@@ -39,6 +39,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [Config] [Refactor] Captive portal and config page share one page template and CSS (lib/webui); main buttons labelled Save / Connect; styled "Connected" page
 - [x] [Hw] [Bugfix] Countdown redrawn once per second on the second change instead of ~47 times per second (stopAnimations() reset the redraw timer)
 - [x] [Hw] [Refactor] Display state only says what is shown and is set only by the Hw implementation (CONFIG_REQUIRED / CONFIG_MESSAGE instead of DONT_UPDATE / ENFORCE_REFRESH, redrawRequested flag, Hw::displayCountdown()); Hw methods use the event parameter; unused serial.h removed
 - [x] [BCP] [Bugfix] Timer data (incl. pause state) cleared on round change, for a round without timer (`{}`) and on 404; connection errors keep the last timer data

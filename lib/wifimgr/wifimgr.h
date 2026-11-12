@@ -21,8 +21,6 @@ public:
     inline bool timeSyncFailed() const { return timeSyncFailed_; }
 
     String storedWifisHTML();
-    String storedWifisCSS();
-    static String htmlEscape(const String& in);
 
 private:
     Print *debugOut_ = nullptr;  // Optional debug output

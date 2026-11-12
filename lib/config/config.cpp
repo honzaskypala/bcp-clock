@@ -6,6 +6,7 @@
 #include <Preferences.h>
 #include <nvs_flash.h>
 #include <wifimgr.h>
+#include <webui.h>
 
 #define CONFIG_DEBUG(msg) if (debugOut) { debugOut->print("[Config] "); debugOut->println(msg); }
 
@@ -171,98 +172,61 @@ void CConfig::handleConfigRoot() {
         status = "All WiFi networks deleted";
     }
     
-    String page = "<!DOCTYPE html><html><head>"
-                      "<title>BCP-clock config</title>"
-                      "<meta charset='utf-8'>"
-                      "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
-                      "<style>" + getCss() + "</style>"
-                  "</head><body>"
-                  "<h1>BCP-clock config</h1>"
+    String page = WebUI::pageStart("BCP-clock config",
+            "label[for=yellow],label[for=red]{display:flex;align-items:center;background:#000;padding:0 8px;box-sizing:border-box}"
+            ".row.threshold{align-items:stretch}"
+            "label[for=yellow]{color:#ff0}"
+            "label[for=red]{color:red}"
+            ".row.threshold{margin:4px 0}"
+            ".input-wrapper{position:relative;flex:1 1 auto}"
+            ".clear-text{display:none}"
+            "@media (pointer:coarse){"
+                ".input-wrapper input{padding-right:2.5rem}"
+                ".clear-text{display:block;position:absolute;right:.7rem;top:50%;transform:translateY(-50%);text-decoration:none;cursor:pointer;color:grey}"
+            "}");
+    page.reserve(9000);
 
-                  // status of saving the config
-                  "<div class='status'>" + status + "</div>"
+    if (status.length() > 0) {
+        page += "<div class='status ok'>" + status + "</div>";
+    }
 
-                  // the main form of config page
-                  "<form method='POST' action='/config'>"
-                      "<div id='event' class='row'>"
-                          "<label for='event'>Event:</label>"
-                          "<div class='input-wrapper'>"
-                              "<input type='text' name='event' placeholder='Enter event ID or event URL' value='" + CWifiMgr::htmlEscape(event_) + "' />"
-                              "<a class='clear-text' onclick='clearInput(this);return false;'>⨂</a>"
-                          "</div>"
-                      "</div>"
-                      "<label class='section'>Colour thresholds</label>"
-                      "<div id='yellow' class='row'>"
-                          "<label for='yellow'>Yellow:</label>"
-                          "<input type='text' name='yellow' value='" + secondsToTime(yellow_) + "' />"
-                      "</div>"
-                      "<div id='red' class='row'>"
-                          "<label for='red'>Red:</label>"
-                          "<input type='text' name='red' value='" + secondsToTime(red_) + "' />"
-                      "</div>"
-                      "<label class='section'>Network</label>"
-                      "<div id='hostname' class='row'>"
-                          "<label for='hostname'>Hostname:</label>"
-                          "<input type='text' name='hostname' value='" + CWifiMgr::htmlEscape(hostname_) + "' />"
-                      "</div>"
-                      "<input type='submit' />"
-                  "</form>"
-                  "<script>"
-                      "function clearInput(el) {"
-                          "const wrapper=el.closest('.input-wrapper');"
-                          "const input=wrapper.querySelector('input');"
-                          "input.value='';"
-                          "input.focus();"
-                      "}"
-                  "</script>";
+    page += "<form method='POST' action='/config'>"
+                "<div class='row'>"
+                    "<label for='event'>Event:</label>"
+                    "<div class='input-wrapper'>"
+                        "<input type='text' id='event' name='event' placeholder='Enter event ID or event URL' value='" + WebUI::htmlEscape(event_) + "'>"
+                        "<a class='clear-text' onclick='clearInput(this);return false;'>⨂</a>"
+                    "</div>"
+                "</div>";
+    page += WebUI::sectionHeader("Colour thresholds");
+    page += "<div class='row threshold'>"
+                "<label for='yellow'>Yellow:</label>"
+                "<input type='text' id='yellow' name='yellow' value='" + secondsToTime(yellow_) + "'>"
+            "</div>"
+            "<div class='row threshold'>"
+                "<label for='red'>Red:</label>"
+                "<input type='text' id='red' name='red' value='" + secondsToTime(red_) + "'>"
+            "</div>";
+    page += WebUI::sectionHeader("Network");
+    page += "<div class='row'>"
+                "<label for='hostname'>Hostname:</label>"
+                "<input type='text' id='hostname' name='hostname' value='" + WebUI::htmlEscape(hostname_) + "'>"
+            "</div>"
+            "<div class='actions'><button class='btn btnMain' type='submit'>Save</button></div>"
+            "</form>"
+            "<script>"
+                "function clearInput(el) {"
+                    "const wrapper=el.closest('.input-wrapper');"
+                    "const input=wrapper.querySelector('input');"
+                    "input.value='';"
+                    "input.focus();"
+                "}"
+            "</script>";
 
     page += WifiMgr.storedWifisHTML();
-    page += "</body></html>";
-    
-    configServer->send(200, "text/html", page);
-}
+    page += WebUI::pageEnd();
 
-inline String CConfig::getCss() const {
-    return
-        ".status,h1{color:#fff;text-align:center}"
-        ".status,h1,label.section{text-align:center}"
-        "body{font-family:Arial,Helvetica,sans-serif;margin:0 auto;padding:1em;max-width:51em}"
-        "h1{background-color:#601860;padding:.4em .3em;margin:.5em 0 .3em;font-size:2.2em;letter-spacing:.5px}"
-        ".status{background-color:green;display:block;margin:auto auto 1em;width:50%;padding:.5em}"
-        "div:empty{display:none}"
-        "form{padding:.5em 0 1.2em}"
-        ".row{display:flex;align-items:center;margin:22px 0 12px;flex-wrap:nowrap}"
-        "label{min-width:6.5em;font-size:1.3em}"
-        "input[type='text']{width:100%;font-size:18px;padding:10px 12px;border:1px solid #888;border-radius:4px}"
-        "label.section{display:block;margin:1em 0 .5em;border-top:1px solid #000;width:100%;padding:.7em 0 .3em;font-size:x-large;font-weight:400}"
-        "label[for='red'],label[for='yellow']{background:#000;padding:.5em 0 .4em .4em;min-width:6.2em}"
-        "input[type='button'],input[type='submit'],a#delnetworks{display:block;font-size:x-large;margin:2em auto;padding:14px 24px;cursor:pointer;min-width:60%;max-width:600px;font-weight:700;border:1px solid #777;border-radius:6px}"
-        ".row#yellow{margin-bottom:2px}"
-        ".row#red{margin-top:0}"
-        ".input-wrapper{position:relative;flex:1}"
-        ".input-wrapper input{width:100%;box-sizing:border-box}"
-        ".clear-text{display:none}"
-        "@media (pointer: coarse){"
-            ".input-wrapper input{padding-right:2.5rem}"
-            ".clear-text{display:block;position:absolute;right:0.7rem;top:50%;transform:translateY(-50%);text-decoration:none;cursor:pointer;color:grey}"
-        "}"
-        "label[for='yellow']{color:#ff0}"
-        "label[for='red']{color:red}"
-        "@media (max-width:580px){"
-            "body{max-width:22em}"
-            "h1{font-size:1.8em;padding:.5em 0;margin-bottom:.5em}"
-            "form{padding:0;font-size:1.5em}"
-            ".row#event{flex-wrap:wrap;margin-top:.5em}"
-            ".row label{min-width:0;max-width:5.5em;padding-top:.4em;padding-bottom:.4em}"
-            ".row#red label,.row#yellow label{max-width:5.2em}"
-            "label{width:100%;font-size:.9em}"
-            "label.section{margin:.5em 0 0;padding-bottom:0}"
-            "input[type='text']{width:94%;border-color:#000}"
-            "input[type='button'],input[type='submit'],a#delnetworks{font-size:1em;width:100%}"
-            ".input-wrapper{width:98%;flex:auto}"
-            ".input-wrapper input{width:100%}"
-        "}"
-        + WifiMgr.storedWifisCSS();
+    configServer->send(200, "text/html", page);
 }
 
 void CConfig::handleConfigPost() {
