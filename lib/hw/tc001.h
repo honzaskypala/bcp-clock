@@ -35,6 +35,7 @@ public:
 
     virtual void displayEventName(const CBCPEvent& event) override;
     virtual void displayEventRound(const CBCPEvent& event) override;
+    virtual void displayCountdown(const CBCPEvent& event) override;
 
     static void eventHandler(void * parameter);
 
@@ -71,14 +72,17 @@ private:
 
     static bool midButtonPressed;
 
-    static void displayCountdown(const CBCPEvent& event);
+    static const CBCPEvent *countdownEvent;  // event drawn by eventHandler in DISPLAY_EVENT_COUNTDOWN
+    static void drawCountdown(const CBCPEvent& event);
     static void displayRoundWithCountdown(int currentRound, int totalRounds);
 
     static void progressStart();
     static void progressStep();
     static void progressStop();
 
-    static void configServerMsg(const char *msg, bool loop = true);
+    // loop = true: invalid event ID, message + looping address (DISPLAY_CONFIG_REQUIRED);
+    // loop = false: config server started by the user, address scrolled once (DISPLAY_CONFIG_MESSAGE)
+    static void configServerMsg(const char *msg, bool loop);
 
 // ---- Print interface ----
 public:

@@ -15,20 +15,6 @@
 
 static long timeShift_ = 0;  // total seconds the system clock was shifted by "timeshift"
 
-// ---- Helpers ----
-
-static const char *displayStateName(DisplayState state) {
-    switch (state) {
-        case DISPLAY_BOOT: return "BOOT";
-        case DISPLAY_EVENT_NAME: return "EVENT_NAME";
-        case DISPLAY_EVENT_ROUND: return "EVENT_ROUND";
-        case DISPLAY_EVENT_COUNTDOWN: return "EVENT_COUNTDOWN";
-        case DISPLAY_DONT_UPDATE: return "DONT_UPDATE";
-        case DISPLAY_ENFORCE_REFRESH: return "ENFORCE_REFRESH";
-    }
-    return "UNKNOWN";
-}
-
 // ---- Commands ----
 
 static void cmdHelp() {

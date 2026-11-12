@@ -61,9 +61,8 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 | `src/devconsole.*` | Serial command console, dev build only |
 | `tools/` | Mac-side dev helpers: `devmon.py` (persistent serial monitor), `devcmd.sh` (send console command) |
 | `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: parses event ID from ID or URL, calls BCP REST API |
-| `lib/hw/hw.h` | Abstract `Hw` interface + `DisplayState` enum (static volatile `displayState`, `enforceUpdate`) |
+| `lib/hw/hw.h` | Abstract `Hw` interface + `DisplayState` enum (static volatile `displayState`, `enforceUpdate`, `redrawRequested`) |
 | `lib/hw/tc001.*` | `Tc001` singleton: the TC001 implementation (matrix, buttons, display task, fonts) |
-| `lib/hw/serial.h` | `Serial_hw`: a Serial-only `Hw` implementation (hardcoded SSID). Leftover, not used anywhere |
 | `lib/config/` | `CConfig` singleton `Config`: settings in NVS + on-demand HTTP config server |
 | `lib/wifimgr/` | `CWifiMgr` global `WifiMgr`: multi-network WiFi manager with captive portal, NTP + RTC time sync |
 | `lib/gfx/` | Adafruit_GFX helpers: `ScrollingText`, `ProgressIndicator`, `UTF8canvas16`, fonts |
@@ -75,20 +74,27 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 - **Arduino `loop()`** (main task): config change handling, data refresh, `displayUpdate()`, `delay(10)`.
 - **`Tc001::eventHandler`** FreeRTOS task (`xTaskCreatePinnedToCore`, core 1, priority 1, 8 KB stack),
   runs every 10 ms: mid-button handling, `Config.handleClient()`, scrolling text / progress indicator
-  steps, and redrawing the countdown once per second when `displayState == DISPLAY_EVENT_COUNTDOWN`.
-- Both contexts draw to the same `FastLED_NeoMatrix` and share `scrollingText`/`progressIndicator`
-  pointers without a mutex. Synchronisation is done by `displayState` (`DISPLAY_DONT_UPDATE` pauses
-  display updates from `loop()`) plus short `delay(20..50)` calls. Keep this in mind when touching display code.
+  steps, and redrawing the countdown when `displayState == DISPLAY_EVENT_COUNTDOWN` (intended once per
+  second, but `stopAnimations()` resets `lMillis`, so in fact on every 10 ms iteration).
+- Both contexts draw to the same `FastLED_NeoMatrix` and share `scrollingText`/`progressIndicator`.
+  All display access in `tc001.cpp` goes through a recursive mutex (`DisplayLock`); keep new drawing
+  code inside it and keep slow work (HTTP, config server) outside.
 
 ### Display state machine (`DisplayState` in `hw.h`)
-- `BOOT` — splash / config message.
+`displayState` says what is shown. Only the `Hw` implementation sets it (each `display*()` /
+`splashScreen()` / `configServerMsg()` method sets its state); `main.cpp` only reads it to skip
+redrawing what is already shown.
+- `BOOT` — splash screen or connection messages (also while the event ID is not verified yet).
 - `EVENT_NAME` — event not running (not started or ended): scrolling event name.
 - `EVENT_ROUND` — event running, no timer for the current round: "Round N".
 - `EVENT_COUNTDOWN` — timer active; `eventHandler` redraws every second. Colours: green = time to round
   start, white = running, yellow/red = below configured thresholds, blinking magenta = paused.
   Bottom row shows round progress (`displayRoundWithCountdown`).
-- `DONT_UPDATE` — config server message is shown; when its non-looping scroll finishes, the task switches to `ENFORCE_REFRESH`.
-- `ENFORCE_REFRESH` — makes `loop()` call `displayUpdate()` without fetching data.
+- `CONFIG_REQUIRED` — invalid event ID: red message once, then the config page address loops; config
+  server runs with no timeout.
+- `CONFIG_MESSAGE` — config server started by the Mid button: the address scrolls once, data refreshes
+  do not redraw meanwhile; when it finishes, `eventHandler` sets `Hw::redrawRequested` and `loop()`
+  calls `displayUpdate()` without fetching data.
 
 ### Buttons (TC001 pins)
 - Mid (GPIO 27): held at boot → force WiFi captive portal; pressed at runtime → start config server (5 min timeout).

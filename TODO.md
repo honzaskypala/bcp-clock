@@ -39,6 +39,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [Hw] [Refactor] Display state only says what is shown and is set only by the Hw implementation (CONFIG_REQUIRED / CONFIG_MESSAGE instead of DONT_UPDATE / ENFORCE_REFRESH, redrawRequested flag, Hw::displayCountdown()); Hw methods use the event parameter; unused serial.h removed
 - [x] [BCP] [Bugfix] Timer data (incl. pause state) cleared on round change, for a round without timer (`{}`) and on 404; connection errors keep the last timer data
 - [x] [Hw] [Bugfix] No crash (division by zero) when the event has a running timer but zero rounds; the round indicator is skipped
 - [x] [Hw] [Bugfix] Invalid event ID message shown in red before the looping config page address; no extra static text print in the message display

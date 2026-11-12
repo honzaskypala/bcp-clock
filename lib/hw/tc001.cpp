@@ -54,6 +54,7 @@ public:
     DisplayLock& operator=(const DisplayLock&) = delete;
 };
 
+const CBCPEvent* Tc001::countdownEvent = nullptr;
 ProgressIndicator* Tc001::progressIndicator = nullptr;
 ScrollingText* Tc001::scrollingText = nullptr;
 bool Tc001::midButtonPressed = false;
@@ -98,6 +99,7 @@ void Tc001::stopAnimations() {
 
 void Tc001::splashScreen(bool showProgress) {
     DisplayLock lock;
+    displayState = DISPLAY_BOOT;
     stopAnimations();
     matrix.clear();
     int y = showProgress ? 6 : 7;
@@ -118,6 +120,7 @@ void Tc001::splashScreen(bool showProgress) {
 
 void Tc001::configServerMsg(const char *msg, bool loop) {
     DisplayLock lock;
+    displayState = loop ? DISPLAY_CONFIG_REQUIRED : DISPLAY_CONFIG_MESSAGE;
     stopAnimations();
     matrix.clear();
     String msgStr = "Config page http://" + WiFi.localIP().toString();
@@ -186,7 +189,7 @@ void Tc001::displayEventName(const CBCPEvent& event) {
     displayState = DISPLAY_EVENT_NAME;
     stopAnimations();
     matrix.clear();
-    scrollingText = new ScrollingText(&matrix, BCPEvent.name(), 0, 7, defaultFont, true);
+    scrollingText = new ScrollingText(&matrix, event.name(), 0, 7, defaultFont, true);
     matrix.show();
 }
 
@@ -198,7 +201,7 @@ void Tc001::displayEventRound(const CBCPEvent& event) {
     matrix.setTextColor(COLOR_WHITE);
     int16_t  x1, y1;
     uint16_t w, h;
-    String msg = "Round " + String(BCPEvent.currentRound());
+    String msg = "Round " + String(event.currentRound());
     matrix.getTextBounds(msg, 0, 7, &x1, &y1, &w, &h);
     matrix.setCursor((matrix.width() - w) / 2, 7);
     matrix.print(msg);
@@ -206,12 +209,19 @@ void Tc001::displayEventRound(const CBCPEvent& event) {
 }
 
 void Tc001::displayCountdown(const CBCPEvent& event) {
-    long remaining = BCPEvent.roundEndEpoch() - time(nullptr);
-    bool dontDisplayHours = BCPEvent.timerLength() <= 3600;
+    DisplayLock lock;
+    stopAnimations();  // also resets lMillis, so eventHandler draws the countdown right away
+    countdownEvent = &event;
+    displayState = DISPLAY_EVENT_COUNTDOWN;
+}
 
-    if (BCPEvent.timerPaused()) {
+void Tc001::drawCountdown(const CBCPEvent& event) {
+    long remaining = event.roundEndEpoch() - time(nullptr);
+    bool dontDisplayHours = event.timerLength() <= 3600;
+
+    if (event.timerPaused()) {
         // timer is paused
-        remaining = BCPEvent.pausedTimeRemaining();
+        remaining = event.pausedTimeRemaining();
         matrix.setTextColor(time(nullptr) % 2 ? COLOR_MAGENTA : COLOR_BLACK);
     } else if (remaining <= Config.redThreshold()) {
         // we are below red threshold of the timer
@@ -219,11 +229,11 @@ void Tc001::displayCountdown(const CBCPEvent& event) {
     } else if (remaining <= Config.yellowThreshold()) {
         // we are below yellow threshold of the timer
         matrix.setTextColor(COLOR_YELLOW);
-    } else if (remaining > BCPEvent.timerLength() || (remaining == BCPEvent.timerLength() && BCPEvent.timerLength() <= 3600)) {
+    } else if (remaining > event.timerLength() || (remaining == event.timerLength() && event.timerLength() <= 3600)) {
         // event round not yet started, show time to start
         matrix.setTextColor(COLOR_GREEN);
-        remaining -= BCPEvent.timerLength();
-        dontDisplayHours = remaining < 3600 && BCPEvent.timerLength() <= 3600;
+        remaining -= event.timerLength();
+        dontDisplayHours = remaining < 3600 && event.timerLength() <= 3600;
     } else {
         matrix.setTextColor(COLOR_WHITE);
     }
@@ -264,7 +274,7 @@ void Tc001::displayCountdown(const CBCPEvent& event) {
     matrix.clear();
     matrix.setCursor(x, 6);
     matrix.print(out);
-    displayRoundWithCountdown(BCPEvent.currentRound(), BCPEvent.numberOfRounds());
+    displayRoundWithCountdown(event.currentRound(), event.numberOfRounds());
     matrix.show();
     matrix.setFont((GFXfont *) defaultFont);
 }
@@ -346,7 +356,6 @@ void Tc001::eventHandler(void * parameter) {
                 lastPress = now;
                 midButtonPressed = false;
                 DisplayLock lock;
-                displayState = DISPLAY_DONT_UPDATE;
                 stopAnimations();
                 Config.startConfigServer();
                 configServerMsg("", false);
@@ -360,10 +369,11 @@ void Tc001::eventHandler(void * parameter) {
         {
             DisplayLock lock;  // released before vTaskDelay()
 
-            if (displayState == DISPLAY_DONT_UPDATE && scrollingText && !scrollingText->isActive) {
+            if (displayState == DISPLAY_CONFIG_MESSAGE && scrollingText && !scrollingText->isActive) {
+                // config page address scrolled once, let main redraw the event data
                 delete scrollingText;
                 scrollingText = nullptr;
-                displayState = DISPLAY_ENFORCE_REFRESH;
+                redrawRequested = true;
             }
 
             if (scrollingText && scrollingText->isActive && (stMillis == 0 || millis() - stMillis > SCROLLING_TEXT_SPEED)) {
@@ -378,10 +388,10 @@ void Tc001::eventHandler(void * parameter) {
                 showMatrix = true;
             }
 
-            if (displayState == DISPLAY_EVENT_COUNTDOWN && (lMillis == 0 || millis() - lMillis > 1000)) {
+            if (displayState == DISPLAY_EVENT_COUNTDOWN && countdownEvent && (lMillis == 0 || millis() - lMillis > 1000)) {
                 lMillis = (lMillis == 0) ? millis() : lMillis + 1000;
                 stopAnimations();
-                displayCountdown(BCPEvent);
+                drawCountdown(*countdownEvent);
                 showMatrix = true;
             }
 

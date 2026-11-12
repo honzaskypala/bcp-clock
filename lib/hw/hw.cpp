@@ -7,3 +7,4 @@
 
 volatile DisplayState Hw::displayState = DISPLAY_BOOT;
 volatile bool Hw::enforceUpdate = false;
+volatile bool Hw::redrawRequested = false;
