@@ -70,7 +70,8 @@ private:
 
     // we need our own drawBitmap(), as the methods in Adafruit GFX work only
     // with 1-bit bitmaps, not with 16-bit color bitmaps as used in our canvas
-    void drawBitmap(int16_t x, int16_t y, uint16_t *bitmap, uint16_t w, uint16_t h);
+    // draws w x h pixels of a bitmap whose rows are stride pixels long
+    void drawBitmap(int16_t x, int16_t y, const uint16_t *bitmap, uint16_t w, uint16_t h, uint16_t stride);
 
     inline GFXglyph *pgm_read_glyph_ptr(const GFXfont *gfxFont, uint8_t c) {
 #ifdef __AVR__

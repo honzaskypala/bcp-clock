@@ -94,7 +94,7 @@ void displayUpdate() {
             Config.stopConfigServer();
         }
         Config.startConfigServer(0);
-        hw->configServerMsg("Invalid event ID, please configure.");
+        hw->configServerMsg("Invalid event ID");
         wasInvalidEvent = true;
     }
 }

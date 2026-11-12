@@ -90,29 +90,34 @@ void ScrollingText::draw() {
     }
     drawPos += lpad_;
     if (drawPos < displayWidth && drawPos + scrollCanvas_->width() > 0) {
-        drawBitmap(drawPos, y1_, scrollCanvas_->getBuffer(), scrollCanvas_->width(), scrollCanvas_->height());
+        drawBitmap(drawPos, y1_, scrollCanvas_->getBuffer(), scrollCanvas_->width(), scrollCanvas_->height(), scrollCanvas_->width());
     }
     drawPos += scrollCanvas_->width();
     if (drawPos < displayWidth && drawPos + rpad_ > 0) {    
         gfx_->fillRect(_max(drawPos, 0), y1_, _min(rpad_, rpad_ + drawPos), scrollCanvas_->height(), 0x0000);
     }
     if (loop_) {
+        // next copy of the looped part: it starts at startPos_ with the left padding used after
+        // the restart, so the transition to the restarted text is seamless
+        uint16_t loopLpad = (newLpad_ != -256) ? newLpad_ : lpad_;
         drawPos += rpad_;
         if (drawPos < displayWidth) {
-            gfx_->fillRect(_max(drawPos, 0), y1_, _min(lpad_, lpad_ + drawPos), scrollCanvas_->height(), 0x0000);
+            gfx_->fillRect(_max(drawPos, 0), y1_, _min(loopLpad, loopLpad + drawPos), scrollCanvas_->height(), 0x0000);
         }
-        drawPos += lpad_;
+        drawPos += loopLpad;
         if (drawPos < displayWidth) {
-            drawBitmap(drawPos, y1_, scrollCanvas_->getBuffer(), _max(scrollCanvas_->width(), displayWidth), scrollCanvas_->height());
+            drawBitmap(drawPos, y1_, scrollCanvas_->getBuffer() + startPos_, scrollCanvas_->width() - startPos_,
+                       scrollCanvas_->height(), scrollCanvas_->width());
         }
     }
 }
 
-void ScrollingText::drawBitmap(int16_t x, int16_t y, uint16_t *bitmap, uint16_t w, uint16_t h) {
+void ScrollingText::drawBitmap(int16_t x, int16_t y, const uint16_t *bitmap, uint16_t w, uint16_t h, uint16_t stride) {
     gfx_->startWrite();
     for (uint16_t j = 0; j < h; j++, y++) {
+        const uint16_t *row = bitmap + j * stride;
         for (uint16_t i = 0; i < w; i++) {
-            gfx_->writePixel(x + i, y, *bitmap++);
+            gfx_->writePixel(x + i, y, row[i]);
         }
     }
     gfx_->endWrite();

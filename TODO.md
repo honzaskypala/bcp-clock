@@ -39,6 +39,8 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [Hw] [Bugfix] Invalid event ID message shown in red before the looping config page address; no extra static text print in the message display
+- [x] [GFX] [Bugfix] Looping scrolling text with appended part (newStart) no longer flashes the first part before restarting; bitmap drawn with correct row stride
 - [x] [Config] [Bugfix] Config page: no double URL decoding of form values, HTML-escaped values in the form, deleting stored WiFi networks works again (route mismatch) and uses the DELETE method in both config page and captive portal
 - [x] [Hw] [Bugfix] Display mutex: loop() and eventHandler no longer draw to the matrix or delete animations concurrently; UTF-8 decoder state per object instead of static
 - [x] [Main] [Bugfix] Recover from WiFi/BCP outages: reboot only on connection errors with WiFi up, keep event data across reboot (RTC memory), config page only for invalid event ID, captive portal times out after 5 min and retries stored networks

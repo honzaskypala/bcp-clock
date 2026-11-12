@@ -121,7 +121,13 @@ void Tc001::configServerMsg(const char *msg, bool loop) {
     stopAnimations();
     matrix.clear();
     String msgStr = "Config page http://" + WiFi.localIP().toString();
-    scrollingText = new ScrollingText(&matrix, msgStr.c_str(), 0, 7, (const GFXfont *) defaultFont, false, COLOR_WHITE, 24, 8, loop);
+    if (msg != nullptr && msg[0] != '\0') {
+        // red message shown once, then the config page address keeps looping
+        scrollingText = new ScrollingText(&matrix, msg, 0, 7, (const GFXfont *) defaultFont, false, COLOR_RED, 24, 0, loop);
+        scrollingText->append(msgStr, COLOR_WHITE, true, 24, 8);
+    } else {
+        scrollingText = new ScrollingText(&matrix, msgStr.c_str(), 0, 7, (const GFXfont *) defaultFont, false, COLOR_WHITE, 24, 8, loop);
+    }
     matrix.show();
 }
 
@@ -422,7 +428,6 @@ size_t Tc001::write(uint8_t c) {
                 matrix.clear();
                 scrollingText = new ScrollingText(&matrix, buffer, 0, 7, (const GFXfont *) defaultFont);
             }
-            matrix.print(buffer);
             if (initMsg_.length() == 0) initMsg_ = String(buffer);
         }
 
