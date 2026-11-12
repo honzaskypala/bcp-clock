@@ -129,6 +129,6 @@ is an older draft.
 
 - Remote: `https://github.com/honzaskypala/bcp-clock` (branch `main`; old local branches `unnest`,
   `adafruit_gfx` and one stash on `adafruit_gfx`). `gh` CLI is authenticated; git credential helper is
-  `osxkeychain` (push not yet verified, fallback: `git -c credential.helper='!gh auth git-credential' push`).
+  `osxkeychain` and plain `git push` works.
 - `.gitignore` ignores itself, so changes to it are local only.
 - The repo history up to commit f7299192 contains the original MicroPython version.
