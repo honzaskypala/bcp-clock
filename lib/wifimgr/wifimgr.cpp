@@ -533,26 +533,6 @@ String CWifiMgr::htmlEscape(const String& in) {
     return out;
 }
 
-String CWifiMgr::urlEncode(const String& in) {
-    String out;
-    out.reserve(in.length() * 3);
-    const char* hex = "0123456789ABCDEF";
-    for (size_t i = 0; i < in.length(); ++i) {
-        uint8_t c = (uint8_t)in[i];
-        if ((c >= 'a' && c <= 'z') ||
-            (c >= 'A' && c <= 'Z') ||
-            (c >= '0' && c <= '9') ||
-            c == '-' || c == '_' || c == '.' || c == '~') {
-            out += (char)c;
-        } else {
-            out += '%';
-            out += hex[(c >> 4) & 0xF];
-            out += hex[c & 0xF];
-        }
-    }
-    return out;
-}
-
 const char* CWifiMgr::wifiAuthModeToString(uint8_t m) {
     // Cast to known enum for safety
     wifi_auth_mode_t mode = static_cast<wifi_auth_mode_t>(m);
@@ -694,21 +674,33 @@ String CWifiMgr::storedWifisHTML() {
               "<div class='storedHeader'>" \
                 "<h2>Stored Wi-Fi networks</h2>"; \
     if (haveStoredNetworks) { \
-        page += "<a class='btnSubmit' id='delnetworks' href='/deleteAll' onclick='return confirm(\"Delete ALL stored SSIDs and passwords?\");'>Delete all 👉🗑️</a>"; \
+        page += "<a class='btnSubmit' id='delnetworks' href='#' onclick='delAll();return false;'>Delete all 👉🗑️</a>"; \
     } \
     page += "</div>";  /* storedHeader */ \
     if (haveStoredNetworks) {  \
         for (auto& s : storedSsids) { \
             page += "<div class='storedRow'>" \
                     "<div class='storedSSID'>" + htmlEscape(s) + "</div>" \
-                    "<a class='del' href='/delete?ssid=" + urlEncode(s) + \
-                    "' title='Delete' onclick='return confirm(\"Delete SSID " + htmlEscape(s) + "?\");'>👉🗑️</a>" \
+                    "<a class='del' href='#' data-ssid='" + htmlEscape(s) + "' title='Delete'" \
+                    " onclick='delNet(this.dataset.ssid);return false;'>👉🗑️</a>" \
                     "</div>"; \
         } \
     } else { \
         page += "<p>No networks stored.</p>"; \
     } \
     page += "</div>"; /* storedBlock */
+    // Deletion uses the DELETE method: a cross-site page cannot send it without a CORS preflight,
+    // which the device does not answer
+    page += "<script>"
+                "function delReq(url,msg,next){"
+                    "if(!confirm(msg))return;"
+                    "fetch(url,{method:'DELETE'})"
+                        ".then(function(r){return r.text().then(function(t){if(r.ok)location.href=next;else alert(t);});})"
+                        ".catch(function(e){alert(e);});"
+                "}"
+                "function delNet(s){delReq('/delete?ssid='+encodeURIComponent(s),'Delete SSID '+s+'?','/?wifiDeleted=1');}"
+                "function delAll(){delReq('/deleteAll','Delete ALL stored SSIDs and passwords?','/?wifiAllDeleted=1');}"
+            "</script>";
     return page;
 }
 
@@ -789,10 +781,9 @@ void CWifiMgr::handleDelete() {
 
     bool ok = removeStoredNetwork(ssid.c_str());
     if (ok) {
-        server_.sendHeader("Location", "/", true);
-        server_.send(302, "text/plain", "Deleted. Redirecting...");
+        server_.send(200, "text/plain", "Deleted");
     } else {
-        server_.send(200, "text/plain", "Delete failed or SSID not found. Return to /.");
+        server_.send(404, "text/plain", "Delete failed or SSID not found");
     }
 }
 
@@ -800,10 +791,9 @@ void CWifiMgr::handleDeleteAll() {
     WIFIMGR_DEBUG("Portal - Request to delete ALL stored SSIDs.");
     bool ok = eraseStoredNetworks();
     if (ok) {
-        server_.sendHeader("Location", "/", true);
-        server_.send(302, "text/plain", "All deleted. Redirecting...");
+        server_.send(200, "text/plain", "All deleted");
     } else {
-        server_.send(200, "text/plain", "Delete-all failed. Return to /.");
+        server_.send(500, "text/plain", "Delete all failed");
     }
 }
 
@@ -875,8 +865,8 @@ void CWifiMgr::startConfigPortal() {
     server_.on("/",          [this]() { handleRoot(); });
     server_.on("/connect",   HTTP_POST, [this]() { handleConnect(); });
     server_.on("/rescan",    HTTP_GET,  [this]() { handleRescan(); });
-    server_.on("/delete",    HTTP_GET,  [this]() { handleDelete(); });
-    server_.on("/deleteAll", HTTP_GET,  [this]() { handleDeleteAll(); });
+    server_.on("/delete",    HTTP_DELETE, [this]() { handleDelete(); });
+    server_.on("/deleteAll", HTTP_DELETE, [this]() { handleDeleteAll(); });
 
     server_.on("/generate_204",        [this]() { handleCaptive(); });
     server_.on("/gen_204",             [this]() { handleCaptive(); });

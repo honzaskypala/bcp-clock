@@ -48,7 +48,6 @@ private:
     void handleWifiDelete();
     void handleWifiDeleteAll();
     inline String getCss() const;
-    String urlDecode(const String& str) const;
     static String urlEncode(const String& in);
 
     // ---- HTTP server timeout tracking ----
@@ -59,7 +58,6 @@ private:
     // ---- Helpers ----
     String secondsToTime(long seconds) const;
     long timeToSeconds(const String& time) const;
-    static uint8_t h2int(char c);
     bool ensureNvsReady();
 };
 

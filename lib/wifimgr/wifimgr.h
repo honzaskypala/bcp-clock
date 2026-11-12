@@ -22,6 +22,7 @@ public:
 
     String storedWifisHTML();
     String storedWifisCSS();
+    static String htmlEscape(const String& in);
 
 private:
     Print *debugOut_ = nullptr;  // Optional debug output
@@ -64,8 +65,6 @@ private:
     bool timeSyncFailed_ = false;
 
     // ---- Helpers ----
-    static String htmlEscape(const String& in);
-    static String urlEncode(const String& in);
     static inline bool isOpenEncryption(int enc) { return enc == WIFI_AUTH_OPEN; }
     static const char* wifiAuthModeToString(uint8_t m);
 

@@ -111,8 +111,9 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
     
     configServer->on("/", HTTP_GET, [this]() { handleConfigRoot(); });
     configServer->on("/config", HTTP_POST, [this]() { handleConfigPost(); });
-    configServer->on("/wifi/delete", HTTP_GET, [this]() { handleWifiDelete(); });
-    configServer->on("/wifi/deleteAll", HTTP_GET, [this]() { handleWifiDeleteAll(); });
+    // same paths as the captive portal, the stored networks HTML is shared (WifiMgr.storedWifisHTML())
+    configServer->on("/delete", HTTP_DELETE, [this]() { handleWifiDelete(); });
+    configServer->on("/deleteAll", HTTP_DELETE, [this]() { handleWifiDeleteAll(); });
 
     // Handle accidental GET on /config by redirecting to root
     configServer->on("/config", HTTP_GET, [this]() {
@@ -186,7 +187,7 @@ void CConfig::handleConfigRoot() {
                       "<div id='event' class='row'>"
                           "<label for='event'>Event:</label>"
                           "<div class='input-wrapper'>"
-                              "<input type='text' name='event' placeholder='Enter event ID or event URL' value='" + event_ + "' />"
+                              "<input type='text' name='event' placeholder='Enter event ID or event URL' value='" + CWifiMgr::htmlEscape(event_) + "' />"
                               "<a class='clear-text' onclick='clearInput(this);return false;'>⨂</a>"
                           "</div>"
                       "</div>"
@@ -202,7 +203,7 @@ void CConfig::handleConfigRoot() {
                       "<label class='section'>Network</label>"
                       "<div id='hostname' class='row'>"
                           "<label for='hostname'>Hostname:</label>"
-                          "<input type='text' name='hostname' value='" + hostname_ + "' />"
+                          "<input type='text' name='hostname' value='" + CWifiMgr::htmlEscape(hostname_) + "' />"
                       "</div>"
                       "<input type='submit' />"
                   "</form>"
@@ -266,16 +267,16 @@ inline String CConfig::getCss() const {
 
 void CConfig::handleConfigPost() {
     if (configServer->hasArg("event")) {
-        event_ = urlDecode(configServer->arg("event"));
+        event_ = configServer->arg("event");
     }
     if (configServer->hasArg("yellow")) {
-        yellow_ = timeToSeconds(urlDecode(configServer->arg("yellow")));
+        yellow_ = timeToSeconds(configServer->arg("yellow"));
     }
     if (configServer->hasArg("red")) {
-        red_ = timeToSeconds(urlDecode(configServer->arg("red")));
+        red_ = timeToSeconds(configServer->arg("red"));
     }
     if (configServer->hasArg("hostname")) {
-        hostname_ = urlDecode(configServer->arg("hostname"));
+        hostname_ = configServer->arg("hostname");
     }
     
     savePreferences();
@@ -291,48 +292,23 @@ void CConfig::handleWifiDelete() {
         configServer->send(400, "text/plain", "Missing ssid parameter");
         return;
     }
-    String ssid = urlDecode(configServer->arg("ssid"));
+    String ssid = configServer->arg("ssid");
     CONFIG_DEBUG("Request to delete WiFi network '" + ssid + "'");
 
     if (WifiMgr.removeStoredNetwork(ssid.c_str())) {
-        configServer->sendHeader("Location", "/?wifiDeleted=1");
-        configServer->send(302);
+        configServer->send(200, "text/plain", "Deleted");
     } else {
-        configServer->send(200, "text/plain", "Delete failed or network not found");
+        configServer->send(404, "text/plain", "Delete failed or network not found");
     }
 }
 
 void CConfig::handleWifiDeleteAll() {
     CONFIG_DEBUG("Request to delete ALL stored WiFi networks");
     if (WifiMgr.eraseStoredNetworks()) {
-        configServer->sendHeader("Location", "/?wifiAllDeleted=1");
-        configServer->send(302);
+        configServer->send(200, "text/plain", "All deleted");
     } else {
-        configServer->send(200, "text/plain", "Delete all failed");
+        configServer->send(500, "text/plain", "Delete all failed");
     }
-}
-
-String CConfig::urlDecode(const String& str) const {
-    String decoded = "";
-    char c;
-    char code0;
-    char code1;
-    for (unsigned int i = 0; i < str.length(); i++) {
-        c = str.charAt(i);
-        if (c == '+') {
-            decoded += ' ';
-        } else if (c == '%') {
-            if (i + 2 < str.length()) {
-                code0 = str.charAt(++i);
-                code1 = str.charAt(++i);
-                c = (h2int(code0) << 4) | h2int(code1);
-                decoded += c;
-            }
-        } else {
-            decoded += c;
-        }
-    }
-    return decoded;
 }
 
 String CConfig::urlEncode(const String& in) {
@@ -380,14 +356,6 @@ long CConfig::timeToSeconds(const String& time) const {
     long m = t.substring(0, colonPos).toInt();
     long s = t.substring(colonPos + 1).toInt();
     return m * 60 + s;
-}
-
-// Add function used by urlDecode()
-inline uint8_t CConfig::h2int(char c) {
-    if (c >= '0' && c <= '9') return static_cast<uint8_t>(c - '0');
-    if (c >= 'a' && c <= 'f') return static_cast<uint8_t>(10 + c - 'a');
-    if (c >= 'A' && c <= 'F') return static_cast<uint8_t>(10 + c - 'A');
-    return 0; // invalid hex char
 }
 
 // Ensure NVS is initialized before using Preferences
