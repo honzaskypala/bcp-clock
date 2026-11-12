@@ -57,6 +57,8 @@ private:
     uint16_t totalWidth_;
     uint16_t startPos_, pos_;
     bool loop_;
+    uint32_t utf8Char_ = 0;           // UTF-8 decoder state for charBounds()
+    uint8_t utf8BytesExpected_ = 0;
 
     void _ScrollingText(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont, int16_t color, uint16_t lpad, uint16_t rpad, bool loop, bool draw);
 

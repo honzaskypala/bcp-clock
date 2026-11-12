@@ -131,7 +131,6 @@ void loop() {
         if (Config.eventId() != BCPEvent.fullId()) {
             MAIN_DEBUG("Event ID changed, updating BCP event.");
             hw->displayState = DISPLAY_DONT_UPDATE;
-            delay(50); // let any ongoing display updates finish
             hw->splashScreen();
             BCPEvent.setID(Config.eventId());
             lastDataRefresh = 0; // force data refresh

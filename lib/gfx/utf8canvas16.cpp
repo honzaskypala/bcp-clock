@@ -18,8 +18,6 @@ void UTF8canvas16::setFont(const UTF8_32BitFont *utf8Font, bool segmented) {
 size_t UTF8canvas16::write(uint8_t c) {
     const GFXfont *font = gfxFont;
     uint32_t cp = c;
-    static uint32_t utf8Char = 0;
-    static uint8_t utf8BytesExpected = 0;
 
     if (isUTF8Font_) {
         if (c < 0x80) {
@@ -27,33 +25,33 @@ size_t UTF8canvas16::write(uint8_t c) {
             return GFXcanvas16::write(c);
         } else if ((c & 0xE0) == 0xC0) {
             // start of 2-byte sequence
-            utf8Char = c & 0x1F;
-            utf8BytesExpected = 1;
+            utf8Char_ = c & 0x1F;
+            utf8BytesExpected_ = 1;
             return 0;
         } else if ((c & 0xF0) == 0xE0) {
             // start of 3-byte sequence
-            utf8Char = c & 0x0F;
-            utf8BytesExpected = 2;
+            utf8Char_ = c & 0x0F;
+            utf8BytesExpected_ = 2;
             return 0;
         } else if ((c & 0xF8) == 0xF0) {
             // start of 4-byte sequence
-            utf8Char = c & 0x07;
-            utf8BytesExpected = 3;
+            utf8Char_ = c & 0x07;
+            utf8BytesExpected_ = 3;
             return 0;
-        } else if ((c & 0xC0) == 0x80 && utf8BytesExpected > 0) {
+        } else if ((c & 0xC0) == 0x80 && utf8BytesExpected_ > 0) {
             // continuation byte
-            utf8Char = (utf8Char << 6) | (c & 0x3F);
-            utf8BytesExpected--;
-            if (utf8BytesExpected == 0) {
-                cp = utf8Char;
-                utf8Char = 0;
+            utf8Char_ = (utf8Char_ << 6) | (c & 0x3F);
+            utf8BytesExpected_--;
+            if (utf8BytesExpected_ == 0) {
+                cp = utf8Char_;
+                utf8Char_ = 0;
             } else {
                 return 0; // still not complete
             }
         } else {
             // invalid byte, reset state
-            utf8Char = 0;
-            utf8BytesExpected = 0;
+            utf8Char_ = 0;
+            utf8BytesExpected_ = 0;
             return 0;
         }
     }
@@ -100,6 +98,6 @@ size_t UTF8canvas16::write(uint8_t c) {
             break;
         }
     }
-    utf8Char = 0;
+    utf8Char_ = 0;
     return res;
 }

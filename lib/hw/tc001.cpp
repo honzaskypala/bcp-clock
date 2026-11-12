@@ -41,6 +41,19 @@ unsigned long Tc001::stMillis = 0;
 unsigned long Tc001::piMillis = 0;
 unsigned long Tc001::lMillis = 0;
 
+// ---- Display lock ----
+// The matrix and the animations are used by both loop() and eventHandler (same core and priority,
+// so they preempt each other). All display access goes through this recursive mutex.
+static SemaphoreHandle_t displayMutex = nullptr;  // created in the Tc001 constructor
+
+class DisplayLock {
+public:
+    DisplayLock() { xSemaphoreTakeRecursive(displayMutex, portMAX_DELAY); }
+    ~DisplayLock() { xSemaphoreGiveRecursive(displayMutex); }
+    DisplayLock(const DisplayLock&) = delete;
+    DisplayLock& operator=(const DisplayLock&) = delete;
+};
+
 ProgressIndicator* Tc001::progressIndicator = nullptr;
 ScrollingText* Tc001::scrollingText = nullptr;
 bool Tc001::midButtonPressed = false;
@@ -59,6 +72,7 @@ Tc001::Tc001(Print *debugOut) : debugOut_(debugOut) {
     matrix.setTextColor(matrix.Color(255, 255, 255));
     matrix.setFont((GFXfont *) defaultFont);
 
+    displayMutex = xSemaphoreCreateRecursiveMutex();
     xTaskCreatePinnedToCore(
             eventHandler,     // Function to run
             "EventHandler",   // Task name
@@ -77,13 +91,13 @@ void Tc001::stopAnimations() {
         scrollingText = nullptr;
     }
     progressStop();
-    delay(20); // ensure any ongoing matrix updates are finished
     stMillis = 0;
     piMillis = 0;
     lMillis = 0;
 }
 
 void Tc001::splashScreen(bool showProgress) {
+    DisplayLock lock;
     stopAnimations();
     matrix.clear();
     int y = showProgress ? 6 : 7;
@@ -103,6 +117,7 @@ void Tc001::splashScreen(bool showProgress) {
 }
 
 void Tc001::configServerMsg(const char *msg, bool loop) {
+    DisplayLock lock;
     stopAnimations();
     matrix.clear();
     String msgStr = "Config page http://" + WiFi.localIP().toString();
@@ -158,6 +173,7 @@ void Tc001::displayRoundWithCountdown(int currentRound, int totalRounds) {
 }
 
 void Tc001::displayEventName(const CBCPEvent& event) {
+    DisplayLock lock;
     displayState = DISPLAY_EVENT_NAME;
     stopAnimations();
     matrix.clear();
@@ -166,6 +182,7 @@ void Tc001::displayEventName(const CBCPEvent& event) {
 }
 
 void Tc001::displayEventRound(const CBCPEvent& event) {
+    DisplayLock lock;
     displayState = DISPLAY_EVENT_ROUND;
     stopAnimations();
     matrix.clear();
@@ -272,6 +289,7 @@ void Tc001::reboot() {
 // '.' off, ':' dim, W white, R red, G green, B blue, Y yellow, M magenta, C cyan
 // Stored values are gamma corrected, so channels are compared relative to the strongest one.
 void Tc001::dumpScreen(Print& out) {
+    DisplayLock lock;
     for (int y = 0; y < matrix.height(); y++) {
         char line[33];
         for (int x = 0; x < matrix.width(); x++) {
@@ -318,6 +336,7 @@ void Tc001::eventHandler(void * parameter) {
             if (now - lastPress >= DEBOUNCE_DELAY_MS) {
                 lastPress = now;
                 midButtonPressed = false;
+                DisplayLock lock;
                 displayState = DISPLAY_DONT_UPDATE;
                 stopAnimations();
                 Config.startConfigServer();
@@ -329,33 +348,37 @@ void Tc001::eventHandler(void * parameter) {
             Config.handleClient();
         }
 
-        if (displayState == DISPLAY_DONT_UPDATE && scrollingText && !scrollingText->isActive) {
-            delete scrollingText;
-            scrollingText = nullptr;
-            displayState = DISPLAY_ENFORCE_REFRESH;
-        }
+        {
+            DisplayLock lock;  // released before vTaskDelay()
 
-        if (scrollingText && scrollingText->isActive && (stMillis == 0 || millis() - stMillis > SCROLLING_TEXT_SPEED)) {
-            stMillis = (stMillis == 0) ? millis() : stMillis + SCROLLING_TEXT_SPEED;
-            scrollingText->step(true);
-            showMatrix = true;
-        }
+            if (displayState == DISPLAY_DONT_UPDATE && scrollingText && !scrollingText->isActive) {
+                delete scrollingText;
+                scrollingText = nullptr;
+                displayState = DISPLAY_ENFORCE_REFRESH;
+            }
 
-        if (progressIndicator && progressIndicator->isActive && (piMillis == 0 || millis() - piMillis > PROGRESS_INDICATOR_SPEED)) {
-            piMillis = (piMillis == 0) ? millis() : piMillis + PROGRESS_INDICATOR_SPEED;
-            progressStep();
-            showMatrix = true;
-        }
+            if (scrollingText && scrollingText->isActive && (stMillis == 0 || millis() - stMillis > SCROLLING_TEXT_SPEED)) {
+                stMillis = (stMillis == 0) ? millis() : stMillis + SCROLLING_TEXT_SPEED;
+                scrollingText->step(true);
+                showMatrix = true;
+            }
 
-        if (displayState == DISPLAY_EVENT_COUNTDOWN && (lMillis == 0 || millis() - lMillis > 1000)) {
-            lMillis = (lMillis == 0) ? millis() : lMillis + 1000;
-            stopAnimations();
-            displayCountdown(BCPEvent);
-            showMatrix = true;
-        }
+            if (progressIndicator && progressIndicator->isActive && (piMillis == 0 || millis() - piMillis > PROGRESS_INDICATOR_SPEED)) {
+                piMillis = (piMillis == 0) ? millis() : piMillis + PROGRESS_INDICATOR_SPEED;
+                progressStep();
+                showMatrix = true;
+            }
 
-        if (showMatrix) {
-            matrix.show();
+            if (displayState == DISPLAY_EVENT_COUNTDOWN && (lMillis == 0 || millis() - lMillis > 1000)) {
+                lMillis = (lMillis == 0) ? millis() : lMillis + 1000;
+                stopAnimations();
+                displayCountdown(BCPEvent);
+                showMatrix = true;
+            }
+
+            if (showMatrix) {
+                matrix.show();
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -365,6 +388,7 @@ void Tc001::eventHandler(void * parameter) {
 size_t Tc001::write(uint8_t c) {
     if (c == '\n' || bufferIndex >= sizeof(buffer) - 1) {
         buffer[bufferIndex] = '\0';
+        DisplayLock lock;
 
         if (strncmp(buffer, "Error:", 6) == 0) {
             // Error message, display in red

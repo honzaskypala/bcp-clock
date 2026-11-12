@@ -19,6 +19,8 @@ public:
 private:
     bool isFontSegmented_ = false;
     bool isUTF8Font_ = false;
+    uint32_t utf8Char_ = 0;           // UTF-8 decoder state for write()
+    uint8_t utf8BytesExpected_ = 0;
 };
 
 #endif // _UTF8CANVAS16_H_

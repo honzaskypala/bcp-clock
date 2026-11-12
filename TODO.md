@@ -39,6 +39,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [Hw] [Bugfix] Display mutex: loop() and eventHandler no longer draw to the matrix or delete animations concurrently; UTF-8 decoder state per object instead of static
 - [x] [Main] [Bugfix] Recover from WiFi/BCP outages: reboot only on connection errors with WiFi up, keep event data across reboot (RTC memory), config page only for invalid event ID, captive portal times out after 5 min and retries stored networks
 - [x] [General] [Feature] Dev build (`pio run -e dev`) with debug output and serial console (status, screen dump, buttons, timeshift, fake event data)
 - [x] [Hw] [Feature] Pressing right button refreshes data and updates display immediately

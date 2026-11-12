@@ -125,6 +125,10 @@ void ScrollingText::textDimensions(const char *str, int16_t *x1, int16_t *y1, ui
     *width = *height = 0;
     int16_t minx = 0x7FFF, miny = 0x7FFF, maxx = -1, maxy = -1;
     // Bound rect is intentionally initialized inverted, so 1st char sets it
+#ifdef _UTF8_32BIT_FONT_H_
+    utf8Char_ = 0;
+    utf8BytesExpected_ = 0;
+#endif // _UTF8_32BIT_FONT_H_
 
     uint8_t c; // Current character
     while ((c = *str++)) {
@@ -148,27 +152,25 @@ void ScrollingText::charBounds(const unsigned char c, int16_t *x, int16_t *y, in
 #ifdef _UTF8_32BIT_FONT_H_
     if (isUTF8Font_) {
         // handle UTF-8 decoding
-        static uint32_t utf8Char = 0;
-        static uint8_t utf8BytesExpected = 0;
         if ((c & 0xE0) == 0xC0) { // 2-byte sequence
-            utf8Char = c & 0x1F;
-            utf8BytesExpected = 1;
+            utf8Char_ = c & 0x1F;
+            utf8BytesExpected_ = 1;
             return;
         } else if ((c & 0xF0) == 0xE0) { // 3-byte sequence
-            utf8Char = c & 0x0F;
-            utf8BytesExpected = 2;
+            utf8Char_ = c & 0x0F;
+            utf8BytesExpected_ = 2;
             return;
         } else if ((c & 0xF8) == 0xF0) { // 4-byte sequence
-            utf8Char = c & 0x07;
-            utf8BytesExpected = 3;
+            utf8Char_ = c & 0x07;
+            utf8BytesExpected_ = 3;
             return;
-        } else if ((c & 0xC0) == 0x80 && utf8BytesExpected > 0) { // continuation byte
-            utf8Char = (utf8Char << 6) | (c & 0x3F);
-            utf8BytesExpected--;
-            if (utf8BytesExpected == 0) {
+        } else if ((c & 0xC0) == 0x80 && utf8BytesExpected_ > 0) { // continuation byte
+            utf8Char_ = (utf8Char_ << 6) | (c & 0x3F);
+            utf8BytesExpected_--;
+            if (utf8BytesExpected_ == 0) {
                 // complete character
-                cp = utf8Char;
-                utf8Char = 0;
+                cp = utf8Char_;
+                utf8Char_ = 0;
             } else {
                 return; // still not complete
             }
