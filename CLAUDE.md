@@ -37,7 +37,7 @@ PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
   matrix: `.` off, `:` dim, letters = colour), `refresh`, `mid`, `timeshift <sec>`,
   `fake <mode> [sec] [length] [round/rounds]` (fake event data: `name`, `round`, `start`, `run`, `pause`,
   `over`, `off`; BCP is not contacted while active), `bcpfail on|off` (simulated BCP connection errors),
-  `reboot`.
+  `portal` (reboot into the captive portal), `reboot`.
 - Helpers in `tools/`: run `~/.platformio/penv/bin/python tools/devmon.py` in the background (keeps the port
   open so the device is not reset, logs to `.pio/dev.log`, reads commands from `.pio/dev.fifo`), then
   `tools/devcmd.sh <command>` sends a command and prints the response. Stop devmon before flashing.

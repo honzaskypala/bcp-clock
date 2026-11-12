@@ -147,7 +147,7 @@ pio device monitor -b 9600    # optional: serial console
 4. **Choose your WiFi network** and enter its password. The clock connects and synchronises its time.
 5. With no event configured yet, the clock scrolls **`Config page http://<IP>`**. Open that address
    from a device in the same network.
-6. **Paste the event** (the URL of the event page in BCP, or just its ID) and press Submit.
+6. **Paste the event** (the URL of the event page in BCP, or just its ID) and press Save.
 7. The clock shows the event name, the round, or the countdown, depending on the state of the event.
 
 <!-- TODO PICTURE: Phone screenshot of the WiFi setup (captive portal) page.
@@ -201,6 +201,7 @@ All settings are stored in the ESP32's non-volatile memory and survive reboots a
 | Problem | What to do |
 |---|---|
 | The WiFi setup portal opens on every start | No stored network is in range, or the clock connected but could not synchronise time (`Error: NTP time sync failed`). Check that the network has internet access. |
+| The setup page does not open by itself on iPhone | In Settings → Wi-Fi → ⓘ next to `BCP-clock`, turn on **Auto-Login**, then forget the network and connect again. Or open the address shown on the display in the browser. |
 | `Invalid event ID, please configure.` | The event was not found in BCP. Open the configuration page and check the event URL or ID. |
 | The clock reboots by itself | It could not fetch data 5 times in a row (about 5 minutes) and restarts to recover. Check the WiFi network and internet access. |
 | Upload or serial monitor fails | Connect the clock directly, without a USB hub, and use a data cable. |

@@ -309,6 +309,14 @@ void Tc001::reboot() {
 #ifdef BCP_DEV
 uint32_t Tc001::countdownDraws = 0;
 
+static constexpr uint32_t FORCE_PORTAL_MAGIC = 0xB0C1F0CE;
+RTC_NOINIT_ATTR static uint32_t forcePortalFlag;  // survives ESP.restart()
+
+void Tc001::rebootToPortal() {
+    forcePortalFlag = FORCE_PORTAL_MAGIC;
+    reboot();
+}
+
 // Prints the LED matrix as ASCII, one character per pixel:
 // '.' off, ':' dim, W white, R red, G green, B blue, Y yellow, M magenta, C cyan
 // Stored values are gamma corrected, so channels are compared relative to the strongest one.
@@ -341,6 +349,10 @@ void Tc001::dumpScreen(Print& out) {
 
 bool Tc001::ensureConnection() {
     bool enforcePortal = digitalRead(PIN_MID_BUTTON) == LOW;   // if mid button pressed, enforce portal with no timeout
+#ifdef BCP_DEV
+    if (forcePortalFlag == FORCE_PORTAL_MAGIC) enforcePortal = true;
+    forcePortalFlag = 0;
+#endif
     bool retValue = WifiMgr.connect(enforcePortal, enforcePortal ? 0 : PORTAL_TIMEOUT_MS, this, debugOut_);
     if (retValue) {
         attachInterrupt(PIN_MID_BUTTON, []() { midButtonPressed = true; }, FALLING);

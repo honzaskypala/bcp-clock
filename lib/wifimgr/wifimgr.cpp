@@ -548,7 +548,17 @@ const char* CWifiMgr::wifiAuthModeToString(uint8_t m) {
 }
 
 // ---------- HTTP Handlers ----------
+#ifdef BCP_DEV
+// Logs portal requests, e.g. to see which captive portal detection URLs a phone requests
+#define WIFIMGR_LOG_REQUEST(handler) WIFIMGR_DEBUG(String("Portal request [") + handler + "] " + \
+        (server_.method() == HTTP_GET ? "GET " : "other ") + server_.hostHeader() + server_.uri() + \
+        " UA: " + server_.header("User-Agent"))
+#else
+#define WIFIMGR_LOG_REQUEST(handler)
+#endif
+
 void CWifiMgr::handleRoot() {
+    WIFIMGR_LOG_REQUEST("root");
     lastPortalActivityMs_ = millis();
     bool showFail = server_.hasArg("fail");
 
@@ -718,6 +728,7 @@ void CWifiMgr::handleDeleteAll() {
 }
 
 void CWifiMgr::handleCaptive() {
+    WIFIMGR_LOG_REQUEST("captive");
     server_.sendHeader("Cache-Control", "no-cache");
     server_.send(200, "text/html",
                  "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Redirect</title>"
@@ -726,6 +737,7 @@ void CWifiMgr::handleCaptive() {
 }
 
 void CWifiMgr::handleNotFound() {
+    WIFIMGR_LOG_REQUEST("notFound");
     server_.sendHeader("Location", "/", true);
     server_.send(302, "text/plain", "Redirecting to portal...");
 }
@@ -797,6 +809,10 @@ void CWifiMgr::startConfigPortal() {
     server_.on("/favicon.ico",         [this]() { handleCaptive(); });
 
     server_.onNotFound([this]() { handleNotFound(); });
+#ifdef BCP_DEV
+    const char *logHeaders[] = {"User-Agent"};
+    server_.collectHeaders(logHeaders, 1);
+#endif
 
     server_.begin();
     portalActive_ = true;

@@ -49,6 +49,7 @@ public:
     static void simulateMidButton() { midButtonPressed = true; }
     static void dumpScreen(Print& out);
     static uint32_t countdownDraws;  // number of countdown redraws since boot
+    void rebootToPortal();           // reboot and start the captive portal as if Mid was held
 #endif
 
 private:

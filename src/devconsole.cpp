@@ -31,6 +31,7 @@ static void cmdHelp() {
     Serial.println("                    run (sec remaining), pause (sec remaining), over (sec over time), off");
     Serial.println("                    defaults: sec=300, length=9000, round 3/5");
     Serial.println("  bcpfail on|off    simulate BCP connection errors (counts toward reboot, reset by reboot)");
+    Serial.println("  portal            reboot into the captive portal (= Mid held at boot)");
     Serial.println("  reboot            restart the device");
 }
 
@@ -133,6 +134,7 @@ static void execute(const String& line, Hw *hw) {
         BCPEvent.setFailNetwork(arg == "on");
         Serial.printf("BCP connection errors %s\n", BCPEvent.failNetwork() ? "on" : "off");
     }
+    else if (cmd == "portal") { Serial.println("Rebooting into portal..."); Serial.flush(); static_cast<Tc001 *>(hw)->rebootToPortal(); }
     else if (cmd == "reboot") { Serial.println("Rebooting..."); Serial.flush(); hw->reboot(); }
     else Serial.println("Unknown command, type help");
 }
