@@ -36,6 +36,7 @@
 - [ ] Refactor all code, method names to verbNouns()
 - [ ] Refactor code, unnest
 - [ ] Refactor change String to char * where it mekes sense
+- [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
 - [x] [Hw] [Feature] Pressing right button refreshes data and updates display immediately
