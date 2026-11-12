@@ -74,8 +74,8 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 - **Arduino `loop()`** (main task): config change handling, data refresh, `displayUpdate()`, `delay(10)`.
 - **`Tc001::eventHandler`** FreeRTOS task (`xTaskCreatePinnedToCore`, core 1, priority 1, 8 KB stack),
   runs every 10 ms: mid-button handling, `Config.handleClient()`, scrolling text / progress indicator
-  steps, and redrawing the countdown when `displayState == DISPLAY_EVENT_COUNTDOWN` (intended once per
-  second, but `stopAnimations()` resets `lMillis`, so in fact on every 10 ms iteration).
+  steps, and redrawing the countdown when `displayState == DISPLAY_EVENT_COUNTDOWN` (once per second,
+  when `time(nullptr)` changes; the dev console `status` shows the redraw count).
 - Both contexts draw to the same `FastLED_NeoMatrix` and share `scrollingText`/`progressIndicator`.
   All display access in `tc001.cpp` goes through a recursive mutex (`DisplayLock`); keep new drawing
   code inside it and keep slow work (HTTP, config server) outside.

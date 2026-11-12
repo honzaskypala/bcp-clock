@@ -48,6 +48,7 @@ public:
 public:
     static void simulateMidButton() { midButtonPressed = true; }
     static void dumpScreen(Print& out);
+    static uint32_t countdownDraws;  // number of countdown redraws since boot
 #endif
 
 private:
@@ -67,7 +68,8 @@ private:
 
     static ProgressIndicator *progressIndicator;
     static ScrollingText *scrollingText;
-    static unsigned long stMillis, piMillis, lMillis;
+    static unsigned long stMillis, piMillis;
+    static time_t countdownDrawnAt;  // time(nullptr) of the last countdown redraw, 0 = redraw now
     static void stopAnimations();
 
     static bool midButtonPressed;

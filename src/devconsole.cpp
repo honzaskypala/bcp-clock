@@ -43,7 +43,7 @@ static void cmdStatus(Hw *hw) {
     Serial.printf("wifi: %s, ssid: %s, ip: %s, rssi: %d dBm\n",
                   WiFi.isConnected() ? "connected" : "disconnected",
                   WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
-    Serial.printf("display state: %s\n", displayStateName(hw->displayState));
+    Serial.printf("display state: %s, countdown draws: %u\n", displayStateName(hw->displayState), Tc001::countdownDraws);
     Serial.printf("config server: %s\n", Config.isConfigServerRunning() ? "running" : "stopped");
     Serial.printf("config: event=%s yellow=%ld red=%ld\n",
                   Config.eventId().c_str(), Config.yellowThreshold(), Config.redThreshold());

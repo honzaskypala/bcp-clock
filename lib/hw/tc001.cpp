@@ -39,7 +39,7 @@ const GFXfont* Tc001::mmssFont = &F4x6;
 
 unsigned long Tc001::stMillis = 0;
 unsigned long Tc001::piMillis = 0;
-unsigned long Tc001::lMillis = 0;
+time_t Tc001::countdownDrawnAt = 0;
 
 // ---- Display lock ----
 // The matrix and the animations are used by both loop() and eventHandler (same core and priority,
@@ -94,7 +94,7 @@ void Tc001::stopAnimations() {
     progressStop();
     stMillis = 0;
     piMillis = 0;
-    lMillis = 0;
+    countdownDrawnAt = 0;
 }
 
 void Tc001::splashScreen(bool showProgress) {
@@ -210,12 +210,15 @@ void Tc001::displayEventRound(const CBCPEvent& event) {
 
 void Tc001::displayCountdown(const CBCPEvent& event) {
     DisplayLock lock;
-    stopAnimations();  // also resets lMillis, so eventHandler draws the countdown right away
+    stopAnimations();  // also resets countdownDrawnAt, so eventHandler draws the countdown right away
     countdownEvent = &event;
     displayState = DISPLAY_EVENT_COUNTDOWN;
 }
 
 void Tc001::drawCountdown(const CBCPEvent& event) {
+#ifdef BCP_DEV
+    countdownDraws++;
+#endif
     long remaining = event.roundEndEpoch() - time(nullptr);
     bool dontDisplayHours = event.timerLength() <= 3600;
 
@@ -304,6 +307,8 @@ void Tc001::reboot() {
 }
 
 #ifdef BCP_DEV
+uint32_t Tc001::countdownDraws = 0;
+
 // Prints the LED matrix as ASCII, one character per pixel:
 // '.' off, ':' dim, W white, R red, G green, B blue, Y yellow, M magenta, C cyan
 // Stored values are gamma corrected, so channels are compared relative to the strongest one.
@@ -388,9 +393,9 @@ void Tc001::eventHandler(void * parameter) {
                 showMatrix = true;
             }
 
-            if (displayState == DISPLAY_EVENT_COUNTDOWN && countdownEvent && (lMillis == 0 || millis() - lMillis > 1000)) {
-                lMillis = (lMillis == 0) ? millis() : lMillis + 1000;
-                stopAnimations();
+            // redraw the countdown once per second, right after the second changes
+            if (displayState == DISPLAY_EVENT_COUNTDOWN && countdownEvent && time(nullptr) != countdownDrawnAt) {
+                countdownDrawnAt = time(nullptr);
                 drawCountdown(*countdownEvent);
                 showMatrix = true;
             }
