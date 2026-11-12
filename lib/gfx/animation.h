@@ -9,9 +9,10 @@
 class GFXanimation {
 public:
     GFXanimation(Adafruit_GFX *gfx) : gfx_(gfx) {};
+    virtual ~GFXanimation() = default;
     virtual void step(bool draw = true);
     virtual void draw();
-    bool isActive;
+    bool isActive = false;
 
 protected:
     Adafruit_GFX *gfx_;

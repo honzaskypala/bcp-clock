@@ -47,12 +47,10 @@ private:
     void handleConfigPost();
     void handleWifiDelete();
     void handleWifiDeleteAll();
-    static String urlEncode(const String& in);
 
     // ---- HTTP server timeout tracking ----
     unsigned long _serverStartMs;   // millis() when server started/reset
     unsigned long _serverTimeoutMs; // 0 = no timeout
-    bool _serverTimedOut;           // kept for compatibility, not used to block restarts
 
     // ---- Helpers ----
     String secondsToTime(long seconds) const;

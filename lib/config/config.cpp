@@ -171,7 +171,6 @@ void CConfig::handleClient() {
         if (_serverTimeoutMs > 0 && (millis() - _serverStartMs) >= _serverTimeoutMs) {
             CONFIG_DEBUG("HTTP server timeout reached, stopping");
             stopConfigServer();
-            _serverTimedOut = false; // do not block restarts
         }
     }
 }
@@ -289,26 +288,6 @@ void CConfig::handleWifiDeleteAll() {
     } else {
         configServer->send(500, "text/plain", "Delete all failed");
     }
-}
-
-String CConfig::urlEncode(const String& in) {
-    String out;
-    out.reserve(in.length() * 3);
-    const char* hex = "0123456789ABCDEF";
-    for (size_t i = 0; i < in.length(); ++i) {
-        uint8_t c = (uint8_t)in[i];
-        if ((c >= 'a' && c <= 'z') ||
-            (c >= 'A' && c <= 'Z') ||
-            (c >= '0' && c <= '9') ||
-            c == '-' || c == '_' || c == '.' || c == '~') {
-            out += (char)c;
-        } else {
-            out += '%';
-            out += hex[(c >> 4) & 0xF];
-            out += hex[c & 0xF];
-        }
-    }
-    return out;
 }
 
 // ---- Helpers ----

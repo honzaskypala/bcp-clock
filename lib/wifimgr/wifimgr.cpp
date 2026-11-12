@@ -20,6 +20,7 @@ static const byte DNS_PORT = 53;
 static const char* NTP_SERVER = "pool.ntp.org";
 static const long GMT_OFFSET_SEC = 0;
 static const int DAYLIGHT_OFFSET_SEC = 3600;
+static const uint32_t MIN_PLAUSIBLE_EPOCH = 1763487357;   // 2025-11-18, older RTC time is considered invalid
 static constexpr const char* PREFS_NS       = "wificreds";
 static constexpr const char* PREFS_LIST_KEY = "__ssids";
 constexpr const char* CONNECTION_FAIL_MSG = "Error: Connection failed";
@@ -491,7 +492,7 @@ bool CWifiMgr::syncTime(uint32_t timeoutMs) {
             rtc.adjust(DateTime((uint32_t) time(nullptr)));  // Update RTC time
         }
         return true;
-    } else if (rtc.begin() && rtc.now().unixtime() > 1763487357) {
+    } else if (rtc.begin() && rtc.now().unixtime() > MIN_PLAUSIBLE_EPOCH) {
         WIFIMGR_DEBUG("NTP sync failed, but RTC has valid time. Using RTC time.");
         struct timeval tv;
         tv.tv_sec = rtc.now().unixtime();

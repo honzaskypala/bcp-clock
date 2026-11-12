@@ -128,7 +128,7 @@ void setup() {
 
 void loop() {
     static int failCount = 0;
-    static time_t lastDataRefresh = 0;
+    static unsigned long lastDataRefresh = 0;   // millis() of the last refresh, 0 = refresh now
 
     if (Config.configUpdated) {
         MAIN_DEBUG("Configuration updated.");
