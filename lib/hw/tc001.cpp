@@ -141,6 +141,9 @@ void Tc001::displayRoundWithCountdown(int currentRound, int totalRounds) {
     const int line = 7;
     int displayWidth = matrix.width();
     matrix.drawFastHLine(0, line, displayWidth, COLOR_BLACK);
+    if (totalRounds <= 0) {
+        return;  // number of rounds unknown, show the countdown only
+    }
     if (totalRounds < displayWidth / 2) {
         int lineWidth = displayWidth / totalRounds, offset;
         switch (totalRounds) {

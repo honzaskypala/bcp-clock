@@ -39,6 +39,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [Hw] [Bugfix] No crash (division by zero) when the event has a running timer but zero rounds; the round indicator is skipped
 - [x] [Hw] [Bugfix] Invalid event ID message shown in red before the looping config page address; no extra static text print in the message display
 - [x] [GFX] [Bugfix] Looping scrolling text with appended part (newStart) no longer flashes the first part before restarting; bitmap drawn with correct row stride
 - [x] [Config] [Bugfix] Config page: no double URL decoding of form values, HTML-escaped values in the form, deleting stored WiFi networks works again (route mismatch) and uses the DELETE method in both config page and captive portal
