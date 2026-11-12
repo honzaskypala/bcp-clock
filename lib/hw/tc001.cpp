@@ -266,6 +266,36 @@ void Tc001::reboot() {
     ESP.restart();
 }
 
+#ifdef BCP_DEV
+// Prints the LED matrix as ASCII, one character per pixel:
+// '.' off, ':' dim, W white, R red, G green, B blue, Y yellow, M magenta, C cyan
+// Stored values are gamma corrected, so channels are compared relative to the strongest one.
+void Tc001::dumpScreen(Print& out) {
+    for (int y = 0; y < matrix.height(); y++) {
+        char line[33];
+        for (int x = 0; x < matrix.width(); x++) {
+            const CRGB& c = matrixleds[matrix.XY(x, y)];
+            uint8_t maxChannel = max(c.r, max(c.g, c.b));
+            uint8_t threshold = maxChannel / 2;
+            bool r = c.r > threshold, g = c.g > threshold, b = c.b > threshold;
+            char ch;
+            if (maxChannel == 0) ch = '.';
+            else if (maxChannel < 16) ch = ':';
+            else if (r && g && b) ch = 'W';
+            else if (r && g) ch = 'Y';
+            else if (r && b) ch = 'M';
+            else if (g && b) ch = 'C';
+            else if (r) ch = 'R';
+            else if (g) ch = 'G';
+            else ch = 'B';
+            line[x] = ch;
+        }
+        line[matrix.width()] = '\0';
+        out.println(line);
+    }
+}
+#endif
+
 bool Tc001::ensureConnection() {
     bool retValue = WifiMgr.connect(digitalRead(PIN_MID_BUTTON) == LOW, 0, this, debugOut_);    // if mid button pressed, enforce portal
     if (retValue) {

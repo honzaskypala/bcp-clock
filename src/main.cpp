@@ -8,6 +8,9 @@
 #include <bcpevent.h>
 #include <hw.h>
 #include <tc001.h>
+#ifdef BCP_DEV
+#include "devconsole.h"
+#endif
 
 #define DATA_REFRESH_INTERVAL_MS 60000 // 60 seconds
 
@@ -89,7 +92,9 @@ void displayUpdate() {
 // ---- core Arduino functions ----
 
 void setup() {
-    // debugOut_ = &Serial;
+#ifdef BCP_DEV
+    debugOut_ = &Serial;
+#endif
     hw = &Tc001::getInstance(debugOut_);
     hw->splashScreen();
     if (!hw->ensureConnection()) {
@@ -147,6 +152,9 @@ void loop() {
         displayUpdate();
     }
 
+#ifdef BCP_DEV
+    devConsoleTick(hw);
+#endif
     hw->tick();
     delay(10);
 }

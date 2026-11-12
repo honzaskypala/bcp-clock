@@ -39,6 +39,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [General] [Feature] Dev build (`pio run -e dev`) with debug output and serial console (status, screen dump, buttons, timeshift, fake event data)
 - [x] [Hw] [Feature] Pressing right button refreshes data and updates display immediately
 - [x] [Config] [Feature] Event field gets ⨂ at the right end to erase the content
 - [x] [WiFiMgr] [Minor] Move button to delete all stored networks to the same line as section header, far right; this is for the user to not mistake the button with the main submit button of the form

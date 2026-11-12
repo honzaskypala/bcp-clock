@@ -42,6 +42,13 @@ public:
 
     virtual void reboot() override;
 
+#ifdef BCP_DEV
+// ---- Development helpers (dev build only) ----
+public:
+    static void simulateMidButton() { midButtonPressed = true; }
+    static void dumpScreen(Print& out);
+#endif
+
 private:
     Print *debugOut_ = nullptr;
     void debugPrintln(const String& msg) {

@@ -17,20 +17,38 @@ MicroPython version (see README.md).
 PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
 
 ```sh
-~/.platformio/penv/bin/pio run                    # build (env nodemcu-32s)
-~/.platformio/penv/bin/pio run -t upload          # flash over USB
+~/.platformio/penv/bin/pio run                    # build production (env nodemcu-32s, default)
+~/.platformio/penv/bin/pio run -t upload          # flash production over USB
+~/.platformio/penv/bin/pio run -e dev -t upload   # flash dev build (debug output + console)
 ~/.platformio/penv/bin/pio device monitor -b 9600 # serial console
 ```
 
-- Board profile is `nodemcu-32s` (the TC001 is ESP32-WROOM based).
-- Flash usage is ~83 % of the 1.25 MB app partition. Watch the size when adding features/fonts/HTML.
-- Debug output is off by default. Enable it by uncommenting `debugOut_ = &Serial;` in `setup()` in
-  `src/main.cpp`; the pointer is passed to all modules.
+- Board profile is `nodemcu-32s` (the TC001 is ESP32-WROOM based). `upload_speed = 115200`: the CH340
+  USB-serial bridge is unreliable at higher rates.
+- Flash usage is ~83 % of the 1.25 MB app partition (dev build ~87 %). Watch the size when adding
+  features/fonts/HTML.
+- Opening or closing the serial port resets the ESP32 (auto-reset circuit), even with DTR/RTS low.
+
+### Dev build (`-e dev`, `BCP_DEV` define)
+- All development code is inside `#ifdef BCP_DEV`; the production build must stay byte-identical without it.
+- Debug output (`debugOut_ = &Serial`, passed to all modules) is enabled only in the dev build.
+- Serial command console (`src/devconsole.cpp`, called from `loop()`), 9600 baud, one command per line,
+  each response ends with `[Console] done`. `help` lists commands: `status`, `screen` (ASCII dump of the
+  matrix: `.` off, `:` dim, letters = colour), `refresh`, `mid`, `timeshift <sec>`,
+  `fake <mode> [sec] [length] [round/rounds]` (fake event data: `name`, `round`, `start`, `run`, `pause`,
+  `over`, `off`; BCP is not contacted while active), `reboot`.
+- Helpers in `tools/`: run `~/.platformio/penv/bin/python tools/devmon.py` in the background (keeps the port
+  open so the device is not reset, logs to `.pio/dev.log`, reads commands from `.pio/dev.fifo`), then
+  `tools/devcmd.sh <command>` sends a command and prints the response. Stop devmon before flashing.
+- The config web server (started by `mid`) is reachable from the Mac over WiFi at the device IP
+  (see `status`), so config changes can be made via HTTP.
 - `reset.py` (gitignored) defines a custom `reset` target via esptool; it is not wired into
   `platformio.ini` (`extra_scripts`).
 - There are no unit tests (`test/` is the PlatformIO placeholder). Verification = build + run on device.
 - Claude may flash the device and read its serial output. USB is reliable when the TC001 is plugged
   directly into the MacBook, unreliable through a USB hub. If upload/monitor fails, suspect the hub first.
+- In 2025 the device occasionally froze after flashing. Recovery: hold Left + Right to power off, power on
+  again, flash again.
 
 ## Layout
 
@@ -39,6 +57,8 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 | Path | Purpose |
 |---|---|
 | `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display state decisions (`displayUpdate()`), reboot after 5 consecutive fetch failures |
+| `src/devconsole.*` | Serial command console, dev build only |
+| `tools/` | Mac-side dev helpers: `devmon.py` (persistent serial monitor), `devcmd.sh` (send console command) |
 | `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: parses event ID from ID or URL, calls BCP REST API |
 | `lib/hw/hw.h` | Abstract `Hw` interface + `DisplayState` enum (static volatile `displayState`, `enforceUpdate`) |
 | `lib/hw/tc001.*` | `Tc001` singleton: the TC001 implementation (matrix, buttons, display task, fonts) |

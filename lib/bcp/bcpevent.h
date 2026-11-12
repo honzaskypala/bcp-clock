@@ -34,6 +34,17 @@ public:
     inline bool timerPaused() const { return timerPaused_; }
     inline uint32_t pausedTimeRemaining() const { return pausedTimeRemaining_; }
 
+#ifdef BCP_DEV
+    // ---- Fake data for testing (dev build only) ----
+    // Replaces event data; refreshData() does not contact BCP until clearFakeData()
+    void setFakeData(bool started, int currentRound, int numberOfRounds, uint32_t timerLength,
+                     time_t roundEndEpoch, bool paused, uint32_t pausedTimeRemaining);
+    void clearFakeData() { fake_ = false; }
+    inline bool fake() const { return fake_; }
+private:
+    bool fake_ = false;
+#endif
+
 private:
     // ---- Singleton related ----
     CBCPEvent();

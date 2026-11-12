@@ -33,6 +33,9 @@ void CBCPEvent::setID(String newID) {
 // ---- Refresh data from BCP API ----
 
 bool CBCPEvent::refreshData() {
+#ifdef BCP_DEV
+    if (fake_) return true;
+#endif
     if (id_.length() == 0) return false;
 
     String payload;
@@ -122,6 +125,28 @@ int CBCPEvent::BCPRest(const String& endpoint, String& outPayload) {
 
     return status;
 }
+
+#ifdef BCP_DEV
+// ---- Fake data for testing ----
+
+void CBCPEvent::setFakeData(bool started, int currentRound, int numberOfRounds, uint32_t timerLength,
+                            time_t roundEndEpoch, bool paused, uint32_t pausedTimeRemaining) {
+    fake_ = true;
+    validId_ = true;
+    name_ = "Fake event";
+    started_ = started;
+    ended_ = false;
+    currentRound_ = currentRound;
+    numberOfRounds_ = numberOfRounds;
+    timerLength_ = timerLength;
+    roundEndEpoch_ = roundEndEpoch;
+    roundStartEpoch_ = roundEndEpoch - timerLength;
+    roundStartTime_ = "";
+    roundEndTime_ = "";
+    timerPaused_ = paused;
+    pausedTimeRemaining_ = pausedTimeRemaining;
+}
+#endif
 
 // ---- Helper methods ----
 
