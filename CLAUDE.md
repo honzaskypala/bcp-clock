@@ -72,7 +72,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 ## Runtime architecture
 
 ### Two execution contexts
-- **Arduino `loop()`** (main task): config change handling, data refresh, `displayUpdate()`, `delay(10)`.
+- **Arduino `loop()`** (main task, core 1 = `CONFIG_ARDUINO_RUNNING_CORE`): config change handling, data refresh, `displayUpdate()`, `delay(10)`.
 - **`Tc001::eventHandler`** FreeRTOS task (`xTaskCreatePinnedToCore`, core 1, priority 1, 8 KB stack),
   runs every 10 ms: mid-button handling, `Config.handleClient()`, scrolling text / progress indicator
   steps, and redrawing the countdown when `displayState == DISPLAY_EVENT_COUNTDOWN` (once per second,
@@ -80,6 +80,9 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 - Both contexts draw to the same `FastLED_NeoMatrix` and share `scrollingText`/`progressIndicator`.
   All display access in `tc001.cpp` goes through a recursive mutex (`DisplayLock`); keep new drawing
   code inside it and keep slow work (HTTP, config server) outside.
+- Both tasks run on core 1 with the same priority, so FreeRTOS time-slices them; a blocking HTTPS
+  request in `loop()` does not stop the countdown redraw (measured 1 redraw/s during fetches). Core 0
+  is left to the WiFi stack on purpose: the display task next to it risks FastLED flicker.
 
 ### Display state machine (`DisplayState` in `hw.h`)
 `displayState` says what is shown. Only the `Hw` implementation sets it (each `display*()` /

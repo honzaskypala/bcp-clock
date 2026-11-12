@@ -38,6 +38,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [General] [Docs] Documented that loop() and the display task both run on Core 1 (time-sliced); Core 0 is left to the WiFi stack
 - [x] [WiFiMgr] [Minor] Time zone set to plain UTC (no daylight offset), so logged times match the console and BCP times
 - [x] [General] [Refactor] Code review cleanup: unused urlEncode and _serverTimedOut removed, lastDataRefresh typed as millis(), named RTC plausibility constant, GFXanimation virtual destructor and isActive default
 - [x] [Hw] [Bugfix] Progress indicator moves between columns 0 and 31 (was -1 and 30)
@@ -78,7 +79,7 @@
 - [x] [WiFiMgr] [Feature] Button to delete all stored networks in WiFi config
 - [x] [Config] [Feature] Read/write config to persistent storage instead of filesystem
 - [x] [GFX] [Refactor] One hardware timer for animations
-- [x] [GFX] [Refactor] Run GFX updates in separate thread on Core 1, so it is not blocked by code on Core 0
+- [x] [GFX] [Refactor] Run GFX updates in a separate FreeRTOS task, so they are not blocked by data fetching in loop() (both run on Core 1, time-sliced)
 - [x] [General] [Refactor] Rewrite from scratch in [Arduino C++](https://docs.arduino.cc/arduino-cloud/guides/arduino-c/) / [PlatformIO](https://platformio.org/) to mitigate limitations of [microPython](https://micropython.org/)
 - [x] [Main] [Feature] Mid button to start Config http server
 - [x] [WiFiMgr] [Refactor] Config webserver as separate module loaded on demand to save resources
