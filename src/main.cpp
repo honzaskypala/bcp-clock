@@ -4,6 +4,7 @@
 // WTFPL license applies
 
 #include <Arduino.h>
+#include <WiFi.h>
 #include <config.h>
 #include <bcpevent.h>
 #include <hw.h>
@@ -13,6 +14,7 @@
 #endif
 
 #define DATA_REFRESH_INTERVAL_MS 60000 // 60 seconds
+#define MAX_CONNECTION_FAILURES 5      // reboot after this many consecutive connection errors (stuck TLS/HTTP)
 
 Print *debugOut_ = nullptr;  // Optional debug output
 #define MAIN_DEBUG(msg) if (debugOut_) { debugOut_->print("[Main] "); debugOut_->println(msg); }
@@ -76,6 +78,14 @@ void displayUpdate() {
 
         }
 
+    } else if (!BCPEvent.invalid()) {
+        // event ID not verified yet (no response from BCP), keep the splash screen
+        if (hw->displayState != DISPLAY_BOOT) {
+            MAIN_DEBUG("Event ID not verified yet, displaying splash screen.");
+            hw->splashScreen();
+            hw->displayState = DISPLAY_BOOT;
+        }
+
     } else if (!Config.isConfigServerRunning() || hw->displayState == DISPLAY_ENFORCE_REFRESH) {
         // invalid event ID, start config mode if not already running
         hw->displayState = DISPLAY_BOOT;
@@ -105,6 +115,9 @@ void setup() {
     Config.debugOut = debugOut_;
     // Config.erase(); // for testing only - remove in production
     BCPEvent.setID(Config.eventId());
+    if (BCPEvent.valid()) {
+        MAIN_DEBUG("Event data restored from snapshot.");
+    }
 }
 
 void loop() {
@@ -134,13 +147,23 @@ void loop() {
         if (BCPEvent.refreshData()) {
             MAIN_DEBUG("BCP event data refreshed successfully");
             failCount = 0;
-        } else if (BCPEvent.valid()) {
+        } else if (WiFi.status() != WL_CONNECTED) {
+            // WiFi outage: keep displaying the last data, rebooting would not help
+            MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting");
+            WiFi.reconnect();
+        } else if (BCPEvent.lastStatus() < 0) {
+            // connection error while WiFi is up, may be stuck TLS/HTTP
             failCount++;
-            MAIN_DEBUG("Failed to refresh BCP event data (failure count " + String(failCount) + ")");
-            if (failCount >= 5) {
-                MAIN_DEBUG("Too many consecutive failures, rebooting device");
+            MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()) +
+                       " (failure count " + String(failCount) + ")");
+            if (failCount >= MAX_CONNECTION_FAILURES) {
+                MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
                 hw->reboot();
             }
+        } else if (BCPEvent.lastStatus() > 0) {
+            // server responded (e.g. 5xx), the connection works
+            failCount = 0;
+            MAIN_DEBUG("Failed to refresh BCP event data, HTTP status " + String(BCPEvent.lastStatus()));
         }
         if (configUpdated) {
             hw->displayState = DISPLAY_ENFORCE_REFRESH;

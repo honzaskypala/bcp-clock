@@ -76,6 +76,7 @@ private:
     DNSServer dnsServer_;
     WebServer server_{80};
     bool portalActive_ = false;
+    uint32_t lastPortalActivityMs_ = 0;  // millis() of portal start or last page load, for the portal timeout
 
     // ---- Wi-Fi scan results ----
     int*     scanIdx_   = nullptr;

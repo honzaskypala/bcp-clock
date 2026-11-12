@@ -44,6 +44,7 @@ static void cmdHelp() {
     Serial.println("                    modes: name (not started), round (no timer), start (sec to round start),");
     Serial.println("                    run (sec remaining), pause (sec remaining), over (sec over time), off");
     Serial.println("                    defaults: sec=300, length=9000, round 3/5");
+    Serial.println("  bcpfail on|off    simulate BCP connection errors (counts toward reboot, reset by reboot)");
     Serial.println("  reboot            restart the device");
 }
 
@@ -60,8 +61,9 @@ static void cmdStatus(Hw *hw) {
     Serial.printf("config server: %s\n", Config.isConfigServerRunning() ? "running" : "stopped");
     Serial.printf("config: event=%s yellow=%ld red=%ld\n",
                   Config.eventId().c_str(), Config.yellowThreshold(), Config.redThreshold());
-    Serial.printf("event: id=%s valid=%d fake=%d name=\"%s\"\n",
-                  BCPEvent.id().c_str(), BCPEvent.valid(), BCPEvent.fake(), BCPEvent.name().c_str());
+    Serial.printf("event: id=%s valid=%d invalid=%d fake=%d bcpfail=%d lastStatus=%d name=\"%s\"\n",
+                  BCPEvent.id().c_str(), BCPEvent.valid(), BCPEvent.invalid(), BCPEvent.fake(),
+                  BCPEvent.failNetwork(), BCPEvent.lastStatus(), BCPEvent.name().c_str());
     Serial.printf("event: started=%d ended=%d round=%d/%d\n",
                   BCPEvent.started(), BCPEvent.ended(), BCPEvent.currentRound(), BCPEvent.numberOfRounds());
     Serial.printf("timer: length=%u start=%s end=%s paused=%d pausedRemaining=%u\n",
@@ -141,6 +143,10 @@ static void execute(const String& line, Hw *hw) {
     else if (cmd == "mid") { Tc001::simulateMidButton(); Serial.println("Mid button pressed"); }
     else if (cmd == "timeshift") cmdTimeshift(arg);
     else if (cmd == "fake") cmdFake(arg);
+    else if (cmd == "bcpfail") {
+        BCPEvent.setFailNetwork(arg == "on");
+        Serial.printf("BCP connection errors %s\n", BCPEvent.failNetwork() ? "on" : "off");
+    }
     else if (cmd == "reboot") { Serial.println("Rebooting..."); Serial.flush(); hw->reboot(); }
     else Serial.println("Unknown command, type help");
 }

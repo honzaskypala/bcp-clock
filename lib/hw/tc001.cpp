@@ -28,6 +28,7 @@
 #define PROGRESS_INDICATOR_SPEED 100 // milliseconds per step
 
 constexpr int DEBOUNCE_DELAY_MS = 500;
+constexpr uint32_t PORTAL_TIMEOUT_MS = 5UL * 60UL * 1000UL; // captive portal inactivity timeout, then reboot and retry
 
 CRGB Tc001::matrixleds[256];
 FastLED_NeoMatrix Tc001::matrix = FastLED_NeoMatrix(Tc001::matrixleds, 32, 8, NEO_MATRIX_TOP + NEO_MATRIX_LEFT + NEO_MATRIX_ROWS + NEO_MATRIX_ZIGZAG);
@@ -297,7 +298,8 @@ void Tc001::dumpScreen(Print& out) {
 #endif
 
 bool Tc001::ensureConnection() {
-    bool retValue = WifiMgr.connect(digitalRead(PIN_MID_BUTTON) == LOW, 0, this, debugOut_);    // if mid button pressed, enforce portal
+    bool enforcePortal = digitalRead(PIN_MID_BUTTON) == LOW;   // if mid button pressed, enforce portal with no timeout
+    bool retValue = WifiMgr.connect(enforcePortal, enforcePortal ? 0 : PORTAL_TIMEOUT_MS, this, debugOut_);
     if (retValue) {
         attachInterrupt(PIN_MID_BUTTON, []() { midButtonPressed = true; }, FALLING);
         attachInterrupt(PIN_RIGHT_BUTTON, []() { enforceUpdate = true; }, FALLING);

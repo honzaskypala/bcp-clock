@@ -13,10 +13,12 @@ public:
     void setID(String newID);
     inline String id() { return id_; }
     inline String fullId() { return fullId_; }
-    inline bool valid() { return validId_; }
+    inline bool valid() { return idState_ == ID_VALID; }
+    inline bool invalid() { return idState_ == ID_INVALID; }
 
     // ---- Refresh data from BCP API ----
     bool refreshData();
+    inline int lastStatus() const { return lastStatus_; }  // last HTTP status, <0 = connection error, 0 = no request
 
     // ---- BCP event details ----
     inline String name() const { return name_; }
@@ -41,8 +43,12 @@ public:
                      time_t roundEndEpoch, bool paused, uint32_t pausedTimeRemaining);
     void clearFakeData() { fake_ = false; }
     inline bool fake() const { return fake_; }
+    // Simulates connection errors (BCPRest returns -1)
+    void setFailNetwork(bool fail) { failNetwork_ = fail; }
+    inline bool failNetwork() const { return failNetwork_; }
 private:
     bool fake_ = false;
+    bool failNetwork_ = false;
 #endif
 
 private:
@@ -53,13 +59,15 @@ private:
     friend CBCPEvent& getBCPEventInstance();
 
     // ---- Event ID related ----
-    bool validId_ = false;
+    enum IdState { ID_UNKNOWN, ID_VALID, ID_INVALID };
+    IdState idState_ = ID_UNKNOWN;
     String id_;
     String fullId_;
     String extractEventID(const String& input);
 
     // ---- REST API ----
     int BCPRest(const String& endpoint, String& outPayload);
+    int lastStatus_ = 0;
 
     // ---- BCP event details ----
     String name_ = "";
@@ -75,6 +83,10 @@ private:
     uint32_t pausedTimeRemaining_ = 0;
     void fetchTimerData();
     void handleEventTimerPayload(const String& payload);
+
+    // ---- Snapshot of event data surviving a soft reboot ----
+    void saveSnapshot();
+    bool restoreSnapshot();
 
     // ---- Helper methods ----
     time_t timegm(struct tm* t);

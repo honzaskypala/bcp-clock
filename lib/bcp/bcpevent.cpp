@@ -12,21 +12,25 @@
 
 void CBCPEvent::setID(String newID) {
     fullId_ = newID;
-    validId_ = false;
     const String prefix = "event/";
     int idx = newID.indexOf(prefix);
     if (idx == -1) {
         id_ = newID;
-        return;
-    }
-    id_ = "";
-    for (idx += prefix.length(); idx < newID.length(); idx++) {
-        char c = newID[idx];
-        if (c == '?' || c == '#' || c == '/') {
-            break;
-        } else {
-            id_ += c;
+    } else {
+        id_ = "";
+        for (idx += prefix.length(); idx < newID.length(); idx++) {
+            char c = newID[idx];
+            if (c == '?' || c == '#' || c == '/') {
+                break;
+            } else {
+                id_ += c;
+            }
         }
+    }
+    if (id_.length() == 0) {
+        idState_ = ID_INVALID;
+    } else {
+        idState_ = restoreSnapshot() ? ID_VALID : ID_UNKNOWN;
     }
 }
 
@@ -36,19 +40,22 @@ bool CBCPEvent::refreshData() {
 #ifdef BCP_DEV
     if (fake_) return true;
 #endif
+    lastStatus_ = 0;
     if (id_.length() == 0) return false;
 
     String payload;
     int status = BCPRest("/overview", payload);
+    lastStatus_ = status;
     if (status == HTTP_CODE_OK) {
-        validId_ = true;
+        idState_ = ID_VALID;
         handleEventOverviewPayload(payload);
         if (started_ && !ended_) {
             fetchTimerData();
         }
+        saveSnapshot();
 
     } else if (status == HTTP_CODE_NOT_FOUND) {
-        validId_ = false;
+        idState_ = ID_INVALID;
 
     }
     return status == HTTP_CODE_OK || status == HTTP_CODE_NOT_FOUND;
@@ -108,6 +115,9 @@ void CBCPEvent::handleEventTimerPayload(const String& payload) {
 }
 
 int CBCPEvent::BCPRest(const String& endpoint, String& outPayload) {
+#ifdef BCP_DEV
+    if (failNetwork_) return HTTPC_ERROR_CONNECTION_REFUSED;
+#endif
     WiFiClientSecure client;
     client.setInsecure();
 
@@ -132,7 +142,7 @@ int CBCPEvent::BCPRest(const String& endpoint, String& outPayload) {
 void CBCPEvent::setFakeData(bool started, int currentRound, int numberOfRounds, uint32_t timerLength,
                             time_t roundEndEpoch, bool paused, uint32_t pausedTimeRemaining) {
     fake_ = true;
-    validId_ = true;
+    idState_ = ID_VALID;
     name_ = "Fake event";
     started_ = started;
     ended_ = false;
@@ -147,6 +157,86 @@ void CBCPEvent::setFakeData(bool started, int currentRound, int numberOfRounds, 
     pausedTimeRemaining_ = pausedTimeRemaining;
 }
 #endif
+
+// ---- Snapshot of event data surviving a soft reboot ----
+// Kept in RTC slow memory that is not initialized on boot, so it survives ESP.restart()
+// but not a power cycle. Magic, checksum and event ID hash reject random content.
+
+namespace {
+
+constexpr uint32_t SNAPSHOT_MAGIC = 0xBC9C10C1;
+
+struct EventSnapshot {
+    uint32_t magic;
+    uint32_t idHash;
+    char name[128];
+    bool started, ended;
+    int32_t numberOfRounds, currentRound;
+    uint32_t timerLength;
+    int64_t roundStartEpoch, roundEndEpoch;
+    bool timerPaused;
+    uint32_t pausedTimeRemaining;
+    uint32_t checksum;  // must be the last member
+};
+
+RTC_NOINIT_ATTR EventSnapshot snapshot;
+
+uint32_t fnv1a32(const uint8_t *data, size_t len, uint32_t h = 2166136261UL) {
+    for (size_t i = 0; i < len; ++i) {
+        h ^= data[i];
+        h *= 16777619UL;
+    }
+    return h;
+}
+
+uint32_t snapshotChecksum(const EventSnapshot& s) {
+    return fnv1a32(reinterpret_cast<const uint8_t *>(&s), offsetof(EventSnapshot, checksum));
+}
+
+uint32_t idHash(const String& id) {
+    return fnv1a32(reinterpret_cast<const uint8_t *>(id.c_str()), id.length());
+}
+
+} // namespace
+
+void CBCPEvent::saveSnapshot() {
+    EventSnapshot s = {};  // zeroed, so padding bytes are deterministic for the checksum
+    s.magic = SNAPSHOT_MAGIC;
+    s.idHash = idHash(fullId_);
+    strlcpy(s.name, name_.c_str(), sizeof(s.name));
+    s.started = started_;
+    s.ended = ended_;
+    s.numberOfRounds = numberOfRounds_;
+    s.currentRound = currentRound_;
+    s.timerLength = timerLength_;
+    s.roundStartEpoch = roundStartEpoch_;
+    s.roundEndEpoch = roundEndEpoch_;
+    s.timerPaused = timerPaused_;
+    s.pausedTimeRemaining = pausedTimeRemaining_;
+    s.checksum = snapshotChecksum(s);
+    snapshot = s;
+}
+
+bool CBCPEvent::restoreSnapshot() {
+    if (snapshot.magic != SNAPSHOT_MAGIC || snapshot.checksum != snapshotChecksum(snapshot)
+            || snapshot.idHash != idHash(fullId_)) {
+        return false;
+    }
+    snapshot.name[sizeof(snapshot.name) - 1] = '\0';
+    name_ = snapshot.name;
+    started_ = snapshot.started;
+    ended_ = snapshot.ended;
+    numberOfRounds_ = snapshot.numberOfRounds;
+    currentRound_ = snapshot.currentRound;
+    timerLength_ = snapshot.timerLength;
+    roundStartEpoch_ = snapshot.roundStartEpoch;
+    roundEndEpoch_ = snapshot.roundEndEpoch;
+    timerPaused_ = snapshot.timerPaused;
+    pausedTimeRemaining_ = snapshot.pausedTimeRemaining;
+    roundStartTime_ = "";
+    roundEndTime_ = "";
+    return true;
+}
 
 // ---- Helper methods ----
 

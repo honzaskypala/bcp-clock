@@ -98,15 +98,22 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrM
         }
     }
 
+    if (portalTimeoutMs > 0) {
+        std::vector<String> storedSsids;
+        if (!listStoredNetworks(storedSsids)) {
+            WIFIMGR_DEBUG("No stored networks to retry, portal will run with no timeout.");
+            portalTimeoutMs = 0;
+        }
+    }
+
     WIFIMGR_DEBUG("Launching captive configuration portal (blocking until connected or timeout).");
     startConfigPortal();
-    uint32_t portalStart = millis();
 
     while (!connected_) {
         dnsServer_.processNextRequest();
         server_.handleClient();
         delay(10);
-        if (portalTimeoutMs > 0 && (millis() - portalStart) > portalTimeoutMs) {
+        if (portalTimeoutMs > 0 && (millis() - lastPortalActivityMs_) > portalTimeoutMs) {
             WIFIMGR_DEBUG("Portal timeout reached, exiting without WiFi.");
             break;
         }
@@ -578,6 +585,7 @@ const char* CWifiMgr::wifiAuthModeToString(uint8_t m) {
 
 // ---------- HTTP Handlers ----------
 void CWifiMgr::handleRoot() {
+    lastPortalActivityMs_ = millis();
     bool showFail = server_.hasArg("fail");
 
     String page;
@@ -882,6 +890,7 @@ void CWifiMgr::startConfigPortal() {
 
     server_.begin();
     portalActive_ = true;
+    lastPortalActivityMs_ = millis();
     WIFIMGR_DEBUG("HTTP portal server started on port 80.");
     WIFIMGR_MSG("AP mode - Connect to Wi-Fi '" + String(AP_SSID) + "', then open http://" + WiFi.softAPIP().toString() + " to configure.");
 }
