@@ -12,6 +12,7 @@
 #include <FastLED.h>
 #include <FastLED_NeoMatrix.h>
 
+#include <countdown.h>
 #include <progress_indicator.h>
 #include <scrolling_text.h>
 
@@ -49,6 +50,8 @@ public:
     static void simulateMidButton() { midButtonPressed = true; }
     static void dumpScreen(Print& out);
     static uint32_t countdownDraws;  // number of countdown redraws since boot
+    static void playBeep(BeepSignal signal) { beepRequest = signal; }  // played by handleEvents
+    static volatile BeepSignal beepRequest;
     void rebootToPortal();           // reboot and start the captive portal as if Mid was held
 #endif
 
@@ -73,6 +76,13 @@ private:
     static const CBCPEvent *countdownEvent;  // event drawn by handleEvents in DISPLAY_EVENT_COUNTDOWN
     static void drawCountdown(const CBCPEvent& event);
     static void displayRoundWithCountdown(int currentRound, int totalRounds);
+
+    static long lastRemaining;              // remaining seconds at the last countdown redraw, LONG_MIN = none
+    static BeepSignal beepSignal;           // signal being played, BEEP_NONE = buzzer idle
+    static unsigned long beepStartMs;
+    static bool beepToneOn;
+    static void startBeep(BeepSignal signal);
+    static void stepBeep();
 
     static void startProgress();
     static void stepProgress();

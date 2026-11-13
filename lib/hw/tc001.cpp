@@ -29,6 +29,9 @@
 #define SCROLLING_TEXT_SPEED 100 // miliseconds per step
 #define PROGRESS_INDICATOR_SPEED 100 // milliseconds per step
 
+constexpr uint32_t BEEP_FREQ = 2000;   // Hz, the buzzer is passive and needs a square wave
+constexpr uint8_t BEEP_CHANNEL = 0;    // LEDC channel (FastLED uses RMT, not LEDC)
+
 constexpr int DEBOUNCE_DELAY_MS = 500;
 constexpr uint32_t PORTAL_TIMEOUT_MS = 5UL * 60UL * 1000UL; // captive portal inactivity timeout, then reboot and retry
 
@@ -42,6 +45,10 @@ const GFXfont* Tc001::mmssFont = &F4x6;
 unsigned long Tc001::stMillis = 0;
 unsigned long Tc001::piMillis = 0;
 time_t Tc001::countdownDrawnAt = 0;
+long Tc001::lastRemaining = LONG_MIN;
+BeepSignal Tc001::beepSignal = BEEP_NONE;
+unsigned long Tc001::beepStartMs = 0;
+bool Tc001::beepToneOn = false;
 
 // ---- Display lock ----
 // The matrix and the animations are used by both loop() and handleEvents (same core and priority,
@@ -180,6 +187,7 @@ void Tc001::displayCountdown(const CBCPEvent& event) {
     DisplayLock lock;
     stopAnimations();  // also resets countdownDrawnAt, so handleEvents draws the countdown right away
     countdownEvent = &event;
+    lastRemaining = LONG_MIN;  // the first redraw does not beep (boot or return in the middle of a round)
     displayState = DISPLAY_EVENT_COUNTDOWN;
 }
 
@@ -188,9 +196,19 @@ void Tc001::drawCountdown(const CBCPEvent& event) {
     countdownDraws++;
 #endif
     time_t now = time(nullptr);
-    CountdownView view = formatCountdown(event.roundEndEpoch() - now, event.timerLength(), event.isTimerPaused(),
+    long remaining = event.roundEndEpoch() - now;
+    CountdownView view = formatCountdown(remaining, event.timerLength(), event.isTimerPaused(),
                                          event.pausedTimeRemaining(), Config.yellowThreshold(),
                                          Config.redThreshold(), now % 2);
+
+    // the same value formatCountdown compares with the thresholds
+    if (event.isTimerPaused()) remaining = event.pausedTimeRemaining();
+    BeepSignal signal = detectThresholdCrossing(lastRemaining, remaining, Config.yellowThreshold(),
+                                                Config.redThreshold());
+    lastRemaining = remaining;
+    if (signal != BEEP_NONE && Config.isAcousticSignalsEnabled()) {
+        startBeep(signal);
+    }
     uint16_t color;
     switch (view.color) {
         case COUNTDOWN_YELLOW:  color = COLOR_YELLOW; break;
@@ -209,6 +227,42 @@ void Tc001::drawCountdown(const CBCPEvent& event) {
     displayRoundWithCountdown(event.currentRound(), event.numberOfRounds());
     matrix.show();
     matrix.setFont((GFXfont *) defaultFont);
+}
+
+// ---- Buzzer ----
+// Called from handleEvents only (the dev console requests a signal through playBeep()).
+
+void Tc001::startBeep(BeepSignal signal) {
+    if (beepSignal == BEEP_NONE) {
+        ledcSetup(BEEP_CHANNEL, BEEP_FREQ, 8);
+        ledcAttachPin(PIN_BUZZER, BEEP_CHANNEL);
+    }
+    beepToneOn = false;
+    beepStartMs = millis();
+    beepSignal = signal;
+}
+
+// Switches the tone on/off by the signal pattern; the pin is pulled down again when the pattern ends
+void Tc001::stepBeep() {
+#ifdef BCP_DEV
+    if (beepRequest != BEEP_NONE) {
+        startBeep(beepRequest);
+        beepRequest = BEEP_NONE;
+    }
+#endif
+    BeepSignal signal = beepSignal;
+    if (signal == BEEP_NONE) return;
+    unsigned long elapsed = millis() - beepStartMs;
+    bool on = isBeepOn(signal, elapsed);
+    if (on != beepToneOn) {
+        ledcWriteTone(BEEP_CHANNEL, on ? BEEP_FREQ : 0);
+        beepToneOn = on;
+    }
+    if (elapsed >= beepPatternLength(signal)) {
+        ledcDetachPin(PIN_BUZZER);
+        pinMode(PIN_BUZZER, INPUT_PULLDOWN);  // stop whistle noise
+        beepSignal = BEEP_NONE;
+    }
 }
 
 void Tc001::startProgress() {
@@ -237,6 +291,7 @@ void Tc001::reboot() {
 
 #ifdef BCP_DEV
 uint32_t Tc001::countdownDraws = 0;
+volatile BeepSignal Tc001::beepRequest = BEEP_NONE;
 
 static constexpr uint32_t FORCE_PORTAL_MAGIC = 0xB0C1F0CE;
 RTC_NOINIT_ATTR static uint32_t forcePortalFlag;  // survives ESP.restart()
@@ -352,6 +407,8 @@ void Tc001::handleEvents(void * parameter) {
                 matrix.show();
             }
         }
+
+        stepBeep();
 
         vTaskDelay(pdMS_TO_TICKS(10));
     }

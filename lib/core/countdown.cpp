@@ -65,6 +65,35 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
     return view;
 }
 
+// ---- Acoustic signals at thresholds ----
+
+static constexpr unsigned long BEEP_ON_MS = 2000;
+static constexpr unsigned long BEEP_OFF_MS = 1000;
+
+BeepSignal detectThresholdCrossing(long prevRemaining, long remaining, long yellowThreshold, long redThreshold) {
+    if (prevRemaining > redThreshold && remaining <= redThreshold) return BEEP_RED;
+    if (prevRemaining > yellowThreshold && remaining <= yellowThreshold) return BEEP_YELLOW;
+    return BEEP_NONE;
+}
+
+static int beepCount(BeepSignal signal) {
+    switch (signal) {
+        case BEEP_YELLOW: return 1;
+        case BEEP_RED:    return 3;
+        default:          return 0;
+    }
+}
+
+unsigned long beepPatternLength(BeepSignal signal) {
+    int count = beepCount(signal);
+    return count == 0 ? 0 : count * BEEP_ON_MS + (count - 1) * BEEP_OFF_MS;
+}
+
+bool isBeepOn(BeepSignal signal, unsigned long elapsedMs) {
+    if (elapsedMs >= beepPatternLength(signal)) return false;
+    return elapsedMs % (BEEP_ON_MS + BEEP_OFF_MS) < BEEP_ON_MS;
+}
+
 // ---- Round indicator (bottom row) ----
 
 // Left offset of the round lines, chosen per number of rounds so the lines look centred

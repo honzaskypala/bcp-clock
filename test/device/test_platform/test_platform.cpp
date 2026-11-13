@@ -121,7 +121,17 @@ static void test_config_defaults() {
     TEST_ASSERT_EQUAL_STRING("", v.event.c_str());
     TEST_ASSERT_EQUAL(600, v.yellow);
     TEST_ASSERT_EQUAL(0, v.red);
+    TEST_ASSERT_TRUE(v.beep);
     TEST_ASSERT_EQUAL_STRING("BCP-clock", v.hostname.c_str());
+}
+
+static void test_config_beepDisabled() {
+    clearTestNs();
+    Preferences prefs;
+    prefs.begin(TEST_NS, false);
+    prefs.putBool("beep", false);
+    prefs.end();
+    TEST_ASSERT_FALSE(readTestNs().beep);
 }
 
 static void test_config_longValues() {
@@ -175,6 +185,7 @@ void setup() {
     RUN_TEST(test_timerStream_empty);
     RUN_TEST(test_config_defaults);
     RUN_TEST(test_config_longValues);
+    RUN_TEST(test_config_beepDisabled);
     RUN_TEST(test_config_legacyStringThresholds);
     RUN_TEST(test_config_hostnameSanitizedOnLoad);
     UNITY_END();

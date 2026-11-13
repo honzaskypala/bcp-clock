@@ -28,6 +28,24 @@ struct CountdownView {
 CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused, uint32_t pausedRemaining,
                               long yellowThreshold, long redThreshold, bool blinkOn);
 
+// ---- Acoustic signals at thresholds ----
+
+enum BeepSignal {
+    BEEP_NONE,
+    BEEP_YELLOW,    // yellow threshold reached: one long beep
+    BEEP_RED        // red threshold reached: three long beeps
+};
+
+// prevRemaining / remaining = seconds left at the previous / current redraw (paused: paused time remaining);
+// red wins when both thresholds are crossed at once
+BeepSignal detectThresholdCrossing(long prevRemaining, long remaining, long yellowThreshold, long redThreshold);
+
+// true while the buzzer is on at elapsedMs since the start of the signal, false after the pattern ends
+bool isBeepOn(BeepSignal signal, unsigned long elapsedMs);
+
+// length of the signal pattern in milliseconds
+unsigned long beepPatternLength(BeepSignal signal);
+
 // ---- Round indicator (bottom row) ----
 
 enum RoundPixel : uint8_t {

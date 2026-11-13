@@ -5,6 +5,7 @@
 #include <unity.h>
 #include <Arduino.h>
 #include <countdown.h>
+#include <limits.h>
 
 void setUp() {}
 void tearDown() {}
@@ -138,6 +139,70 @@ static void test_knownLimitation_pausedOverOneHourInShortRound() {
     TEST_ASSERT_EQUAL_STRING("06:40", v.text);
 }
 
+// ---- Acoustic signals ----
+
+static void test_crossing_yellowAtThreshold() {
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(602, 601, 600, 0));
+    TEST_ASSERT_EQUAL(BEEP_YELLOW, detectThresholdCrossing(601, 600, 600, 0));
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(600, 599, 600, 0));
+}
+
+static void test_crossing_redAtThreshold() {
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(2, 1, 600, 0));
+    TEST_ASSERT_EQUAL(BEEP_RED, detectThresholdCrossing(1, 0, 600, 0));
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(0, -1, 600, 0));
+}
+
+static void test_crossing_skippedSecond() {
+    // a redraw may skip a second
+    TEST_ASSERT_EQUAL(BEEP_YELLOW, detectThresholdCrossing(601, 599, 600, 0));
+}
+
+static void test_crossing_bothAtOnce_redWins() {
+    TEST_ASSERT_EQUAL(BEEP_RED, detectThresholdCrossing(700, -5, 600, 0));
+    TEST_ASSERT_EQUAL(BEEP_RED, detectThresholdCrossing(301, 300, 300, 300));
+}
+
+static void test_crossing_negativeRedThreshold() {
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(0, -1, 600, -60));
+    TEST_ASSERT_EQUAL(BEEP_RED, detectThresholdCrossing(-59, -60, 600, -60));
+}
+
+static void test_crossing_noPreviousValue() {
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(LONG_MIN, 600, 600, 0));
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(LONG_MIN, 0, 600, 0));
+}
+
+static void test_crossing_constantWhilePaused() {
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(600, 600, 600, 0));
+}
+
+static void test_crossing_upwards_noBeep() {
+    // new round or extended timer
+    TEST_ASSERT_EQUAL(BEEP_NONE, detectThresholdCrossing(-30, 3600, 600, 0));
+}
+
+static void test_beepPattern_yellow() {
+    TEST_ASSERT_EQUAL_UINT32(2000, beepPatternLength(BEEP_YELLOW));
+    TEST_ASSERT_TRUE(isBeepOn(BEEP_YELLOW, 0));
+    TEST_ASSERT_TRUE(isBeepOn(BEEP_YELLOW, 1999));
+    TEST_ASSERT_FALSE(isBeepOn(BEEP_YELLOW, 2000));
+    TEST_ASSERT_FALSE(isBeepOn(BEEP_YELLOW, 3000));
+}
+
+static void test_beepPattern_red() {
+    TEST_ASSERT_EQUAL_UINT32(8000, beepPatternLength(BEEP_RED));
+    const unsigned long on[] = { 0, 1999, 3000, 4999, 6000, 7999 };
+    const unsigned long off[] = { 2000, 2999, 5000, 5999, 8000, 9000 };
+    for (unsigned long ms : on) TEST_ASSERT_TRUE(isBeepOn(BEEP_RED, ms));
+    for (unsigned long ms : off) TEST_ASSERT_FALSE(isBeepOn(BEEP_RED, ms));
+}
+
+static void test_beepPattern_none() {
+    TEST_ASSERT_EQUAL_UINT32(0, beepPatternLength(BEEP_NONE));
+    TEST_ASSERT_FALSE(isBeepOn(BEEP_NONE, 0));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_running_shortRound_mmss);
@@ -154,5 +219,16 @@ int main() {
     RUN_TEST(test_paused_longRound_hmmss);
     RUN_TEST(test_invariants_fontCharsAndHours);
     RUN_TEST(test_knownLimitation_pausedOverOneHourInShortRound);
+    RUN_TEST(test_crossing_yellowAtThreshold);
+    RUN_TEST(test_crossing_redAtThreshold);
+    RUN_TEST(test_crossing_skippedSecond);
+    RUN_TEST(test_crossing_bothAtOnce_redWins);
+    RUN_TEST(test_crossing_negativeRedThreshold);
+    RUN_TEST(test_crossing_noPreviousValue);
+    RUN_TEST(test_crossing_constantWhilePaused);
+    RUN_TEST(test_crossing_upwards_noBeep);
+    RUN_TEST(test_beepPattern_yellow);
+    RUN_TEST(test_beepPattern_red);
+    RUN_TEST(test_beepPattern_none);
     return UNITY_END();
 }

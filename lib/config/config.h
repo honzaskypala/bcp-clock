@@ -12,6 +12,7 @@
 struct ConfigValues {
     String event;
     long yellow, red;   // seconds
+    bool beep;          // acoustic signals at thresholds
     String hostname;
 };
 
@@ -24,6 +25,7 @@ public:
     const String& eventId() const { return event_; }
     long yellowThreshold() const { return yellow_; }
     long redThreshold() const { return red_; }
+    bool isAcousticSignalsEnabled() const { return beep_; }
     const String& hostname() const { return hostname_; }
 
     // ---- Erase configuration from persistent storage ----
@@ -46,6 +48,7 @@ private:
     // ---- Configuration parameters ----
     String event_;
     long yellow_, red_;
+    bool beep_;
     String hostname_;
     void savePreferences();
     

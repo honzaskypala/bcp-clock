@@ -15,6 +15,7 @@
 static const String DEF_EVENT = "";
 static const long DEF_YELLOW = 600; // seconds
 static const long DEF_RED    = 0;   // seconds
+static const bool DEF_BEEP   = true;
 static const String DEF_HOSTNAME = "BCP-clock";
 static constexpr const char* CONFIG_NS = "config";
 // ---- Read configuration values from an opened Preferences namespace ----
@@ -34,6 +35,7 @@ ConfigValues readConfig(Preferences& prefs) {
     if (rStr.length() > 0) {
         v.red = timeToSeconds(rStr);
     }
+    v.beep = prefs.getBool("beep", DEF_BEEP);
     v.hostname = sanitizeHostname(prefs.getString("hostname", DEF_HOSTNAME));
     return v;
 }
@@ -45,6 +47,7 @@ CConfig::CConfig() {
     event_ = DEF_EVENT;
     yellow_ = DEF_YELLOW;
     red_ = DEF_RED;
+    beep_ = DEF_BEEP;
     hostname_ = DEF_HOSTNAME;
 
     // Load configuration from persistent storage if available
@@ -61,6 +64,7 @@ CConfig::CConfig() {
     event_    = v.event;
     yellow_   = v.yellow;
     red_      = v.red;
+    beep_     = v.beep;
     hostname_ = v.hostname;
     prefs.end();
     CONFIG_DEBUG("Preferences loaded");
@@ -82,6 +86,7 @@ void CConfig::savePreferences() {
     prefs.putString("event", event_);
     prefs.putLong("yellow", yellow_);
     prefs.putLong("red", red_);
+    prefs.putBool("beep", beep_);
     prefs.putString("hostname", hostname_);
     prefs.end();
     CONFIG_DEBUG("Preferences saved");
@@ -107,6 +112,7 @@ void CConfig::erase() {
     event_ = DEF_EVENT;
     yellow_ = DEF_YELLOW;
     red_ = DEF_RED;
+    beep_ = DEF_BEEP;
     hostname_ = DEF_HOSTNAME;
 }
 
@@ -174,6 +180,8 @@ static const char CONFIG_PAGE_CSS[] =
     "label[for=yellow]{color:#ff0}"
     "label[for=red]{color:red}"
     ".row.threshold{margin:4px 0}"
+    ".row.check{gap:8px}"
+    ".row.check label{flex:0 1 auto}"
     ".input-wrapper{position:relative;flex:1 1 auto}"
     ".clear-text{display:none}"
     "@media (pointer:coarse){"
@@ -232,6 +240,10 @@ void CConfig::appendConfigFormHtml(String& html) {
             "<div class='row threshold'>"
                 "<label for='red'>Red:</label>"
                 "<input type='text' id='red' name='red' value='" + secondsToTime(red_) + "'>"
+            "</div>"
+            "<div class='row check'>"
+                "<input type='checkbox' id='beep' name='beep' value='1'" + (beep_ ? " checked" : "") + ">"
+                "<label for='beep'>Acoustic signals</label>"
             "</div>";
     html += WebUI::buildSectionHeader("Network");
     html += "<div class='row'>"
@@ -248,6 +260,8 @@ void CConfig::handleConfigPost() {
     }
     if (configServer->hasArg("yellow")) {
         yellow_ = timeToSeconds(configServer->arg("yellow"));
+        // an unchecked checkbox is not sent, the yellow field tells the form was posted
+        beep_ = configServer->hasArg("beep");
     }
     if (configServer->hasArg("red")) {
         red_ = timeToSeconds(configServer->arg("red"));

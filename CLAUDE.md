@@ -28,7 +28,7 @@ PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
 
 - Board profile is `nodemcu-32s` (the TC001 is ESP32-WROOM based). `upload_speed = 115200`: the CH340
   USB-serial bridge is unreliable at higher rates.
-- Flash usage is ~85 % of the 1.25 MB app partition (dev build ~89 %). Watch the size when adding
+- Flash usage is ~85 % of the 1.25 MB app partition (dev build ~90 %). Watch the size when adding
   features/fonts/HTML.
 - Opening or closing the serial port resets the ESP32 (auto-reset circuit), even with DTR/RTS low.
 
@@ -38,7 +38,7 @@ PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
   build; in production the macro emits no code or strings.
 - Serial command console (`src/devconsole.cpp`, called from `loop()`), 9600 baud, one command per line,
   each response ends with `[Console] done`. `help` lists commands: `status`, `screen` (ASCII dump of the
-  matrix: `.` off, `:` dim, letters = colour), `refresh`, `mid`, `timeshift <sec>`,
+  matrix: `.` off, `:` dim, letters = colour), `refresh`, `mid`, `timeshift <sec>`, `beep yellow|red` (play a threshold signal),
   `fake <mode> [sec] [length] [round/rounds]` (fake event data: `name`, `round`, `start`, `run`, `pause`,
   `over`, `off`; BCP is not contacted while active), `bcpfail on|off` (simulated BCP connection errors),
   `portal` (reboot into the captive portal), `reboot`.
@@ -114,7 +114,8 @@ redrawing what is already shown.
 - `EVENT_ROUND` — event running, no timer for the current round: "Round N".
 - `EVENT_COUNTDOWN` — timer active; `handleEvents` redraws every second. Colours: green = time to round
   start, white = running, yellow/red = below configured thresholds, blinking magenta = paused.
-  Bottom row shows round progress (`displayRoundWithCountdown`).
+  Bottom row shows round progress (`displayRoundWithCountdown`). When the remaining time crosses
+  the yellow / red threshold between two redraws, `drawCountdown` starts a beep (see Buzzer below).
 - `CONFIG_REQUIRED` — invalid event ID: red message once, then the config page address loops; config
   server runs with no timeout.
 - `CONFIG_MESSAGE` — config server started by the Mid button: the address scrolls once, data refreshes
@@ -124,7 +125,15 @@ redrawing what is already shown.
 ### Buttons (TC001 pins)
 - Mid (GPIO 27): held at boot → force WiFi captive portal; pressed at runtime → start config server (5 min timeout).
 - Right (GPIO 14): immediate data refresh (`Hw::enforceUpdate`).
-- Left button is not used. Buzzer GPIO 15 is held as `INPUT_PULLDOWN` to silence it. LED matrix data on GPIO 32.
+- Left button is not used. LED matrix data on GPIO 32.
+
+### Buzzer (GPIO 15, passive)
+- Idles as `INPUT_PULLDOWN`; a floating pin whistles. A beep attaches LEDC channel 0 (`ledcWriteTone`, 2 kHz) and
+  pulls the pin down again when the pattern ends.
+- `Tc001::stepBeep()` runs in `handleEvents` every 10 ms, so the beep never blocks the countdown. Patterns and
+  threshold crossing are in `lib/core/countdown` (`detectThresholdCrossing`, `isBeepOn`): yellow = one 2 s beep,
+  red = three 2 s beeps with 1 s gaps. `lastRemaining` is reset in `displayCountdown()`, so the first redraw
+  (boot or return from the config message in the middle of a round) never beeps. Disabled by config `beep`.
 
 ### Startup flow
 `Tc001` ctor (matrix, task) → splash → `WifiMgr.connect()` (blocking; portal if no known/open network
@@ -143,7 +152,7 @@ server with no timeout and scrolls "Config page http://<IP>".
 - 404 on the event (v2) = invalid event ID (counts as a "successful" fetch, not a failure).
 
 ### Persistent storage (NVS / Preferences)
-- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `hostname`.
+- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`.
 - Namespace `wificreds`: `__ssids` (newline-separated list), `pwd_<fnv1a32(ssid) hex>` per network.
 - Config web form (`/`, `POST /config`, `/wifi/delete`, `/wifi/deleteAll`) also lists/deletes stored WiFi networks.
 

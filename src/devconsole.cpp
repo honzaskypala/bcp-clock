@@ -31,6 +31,7 @@ static void handleHelp() {
     Serial.println("                    run (sec remaining), pause (sec remaining), over (sec over time), off");
     Serial.println("                    defaults: sec=300, length=9000, round 3/5");
     Serial.println("  bcpfail on|off    simulate BCP connection errors (counts toward reboot, reset by reboot)");
+    Serial.println("  beep yellow|red   play the threshold signal (also when acoustic signals are off)");
     Serial.println("  portal            reboot into the captive portal (= Mid held at boot)");
     Serial.println("  reboot            restart the device");
 }
@@ -46,8 +47,9 @@ static void handleStatus(Hw *hw) {
                   WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
     Serial.printf("display state: %s, countdown draws: %u\n", displayStateName(hw->displayState), Tc001::countdownDraws);
     Serial.printf("config server: %s\n", Config.isConfigServerRunning() ? "running" : "stopped");
-    Serial.printf("config: event=%s yellow=%ld red=%ld\n",
-                  Config.eventId().c_str(), Config.yellowThreshold(), Config.redThreshold());
+    Serial.printf("config: event=%s yellow=%ld red=%ld beep=%s\n",
+                  Config.eventId().c_str(), Config.yellowThreshold(), Config.redThreshold(),
+                  Config.isAcousticSignalsEnabled() ? "on" : "off");
     Serial.printf("event: id=%s valid=%d invalid=%d fake=%d bcpfail=%d lastStatus=%d name=\"%s\"\n",
                   BCPEvent.id().c_str(), BCPEvent.isValid(), BCPEvent.isInvalid(), BCPEvent.isFake(),
                   BCPEvent.isNetworkFailing(), BCPEvent.lastStatus(), BCPEvent.name().c_str());
@@ -133,6 +135,10 @@ static void executeCommand(const String& line, Hw *hw) {
     else if (cmd == "bcpfail") {
         BCPEvent.setNetworkFailing(arg == "on");
         Serial.printf("BCP connection errors %s\n", BCPEvent.isNetworkFailing() ? "on" : "off");
+    }
+    else if (cmd == "beep" && (arg == "yellow" || arg == "red")) {
+        Tc001::playBeep(arg == "red" ? BEEP_RED : BEEP_YELLOW);
+        Serial.printf("Playing %s signal\n", arg.c_str());
     }
     else if (cmd == "portal") { Serial.println("Rebooting into portal..."); Serial.flush(); static_cast<Tc001 *>(hw)->rebootToPortal(); }
     else if (cmd == "reboot") { Serial.println("Rebooting..."); Serial.flush(); hw->reboot(); }

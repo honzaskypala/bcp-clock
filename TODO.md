@@ -11,7 +11,6 @@
 - [ ] blink red (over time) always
 - [ ] blink green (time to start) last 2 minutes
 - [ ] display brightness configurable
-- [ ] [beep](https://github.com/rroels/ulanzi_tc001_hardware?tab=readme-ov-file#example-code-buzzer) at passing thresholds
 - [ ] support for rounds >= 10 hours (double digit hours)
 - [ ] show finished tables + config top / bottom / none
 
@@ -44,6 +43,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [TC001] [Feature] Acoustic signals at thresholds: one 2 s beep when the countdown reaches the yellow threshold, three 2 s beeps (1 s gaps) at red. Non-blocking (`Tc001::stepBeep` in `handleEvents`, LEDC square wave on GPIO 15, pin pulled down again afterwards), no beep on the first redraw or while paused. Crossing detection and patterns in `lib/core/countdown` (native tests). Config checkbox "Acoustic signals" (NVS `beep`, default on), dev console `beep yellow|red`. Production firmware 7 628 B larger (84.3 % → 84.9 %)
 - [x] [General] [Refactor] Debug output merged with the dev build: `DEV_LOG` macro (`lib/devlog/devlog.h`) prints to `Serial` only with `BCP_DEV`, in production it emits nothing; `Print *debugOut` parameters/members removed from `Tc001`, `WifiMgr.connect`, `Config` and `main.cpp`, unused `Tc001::debugPrintln` removed. Production firmware 10 348 B smaller (85.1 % → 84.3 %)
 - [x] [General] [Refactor] Long functions split (target ≤ 30 lines): WiFiMgr `startConfigPortal` (`startAccessPoint`, `registerPortalRoutes`), `connect` (`runPortal`), `handleRoot` (`appendScannedNetworksHtml`, page CSS/script as constants); Config `handleConfigRoot` (`statusMessage`, `appendConfigFormHtml`, CSS/script constants); `updateDisplay` (`collectDisplayInputs`, `applyDisplayAction`); `formatCountdown` (`formatTime`); `decideDisplay` (`decideValidEvent`); Tc001 `showMessage` (`showErrorMessage`, `showInfoMessage`); `ScrollingText::append` reuses `createCanvas`. No behaviour change, firmware 196 B larger
 - [x] [WiFi Manager] [Bugfix] Memory leak: `scanAndSort()` now calls `freeScanData()` before scanning, so a Rescan in the captive portal no longer leaks the previous scan arrays (a failed Rescan leaves the list empty)
