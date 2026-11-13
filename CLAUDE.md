@@ -21,11 +21,14 @@ PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
 ~/.platformio/penv/bin/pio run -t upload          # flash production over USB
 ~/.platformio/penv/bin/pio run -e dev -t upload   # flash dev build (debug output + console)
 ~/.platformio/penv/bin/pio device monitor -b 9600 # serial console
+~/.platformio/penv/bin/pio test -e native         # unit tests on the Mac (lib/core, lib/webui)
+~/.platformio/penv/bin/pio test -e nodemcu-32s    # unit tests on the TC001 (gfx, NVS, newlib time)
+~/.platformio/penv/bin/python tools/bcp_contract.py <eventId>  # contract test of the live BCP API
 ```
 
 - Board profile is `nodemcu-32s` (the TC001 is ESP32-WROOM based). `upload_speed = 115200`: the CH340
   USB-serial bridge is unreliable at higher rates.
-- Flash usage is ~83 % of the 1.25 MB app partition (dev build ~87 %). Watch the size when adding
+- Flash usage is ~85 % of the 1.25 MB app partition (dev build ~89 %). Watch the size when adding
   features/fonts/HTML.
 - Opening or closing the serial port resets the ESP32 (auto-reset circuit), even with DTR/RTS low.
 
@@ -45,7 +48,13 @@ PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
   (see `status`), so config changes can be made via HTTP.
 - `reset.py` (gitignored) defines a custom `reset` target via esptool; it is not wired into
   `platformio.ini` (`extra_scripts`).
-- There are no unit tests (`test/` is the PlatformIO placeholder). Verification = build + run on device.
+- Tests (PlatformIO Unity): `test/native/` runs on the Mac (env `native`, Arduino `String` from
+  ArduinoFake, only `lib/core` and `lib/webui` are compiled), `test/device/` runs on the TC001. Device
+  tests replace the firmware: stop devmon before, flash production (or dev) again after. Running both
+  device suites in one `pio test` call sometimes fails to upload the second one; run it again with
+  `-f device/<suite>`. Unity on the ESP32 has no 64-bit asserts. Logic that needs tests belongs to
+  `lib/core` (no ESP-only includes). Display, WiFi, portal, config server and buttons are verified on the
+  device with the dev console.
 - Claude may flash the device and read its serial output. USB is reliable when the TC001 is plugged
   directly into the MacBook, unreliable through a USB hub. If upload/monitor fails, suspect the hub first.
 - In 2025 the device occasionally froze after flashing. Recovery: hold Left + Right to power off, power on
@@ -59,9 +68,11 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 |---|---|
 | `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display state decisions (`displayUpdate()`), reboot after 5 consecutive fetch failures, mDNS `<hostname>.local` |
 | `src/devconsole.*` | Serial command console, dev build only |
-| `tools/` | Mac-side dev helpers: `devmon.py` (persistent serial monitor), `devcmd.sh` (send console command) |
-| `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: parses event ID from ID or URL, calls BCP REST API |
-| `lib/hw/hw.h` | Abstract `Hw` interface + `DisplayState` enum (static volatile `displayState`, `enforceUpdate`, `redrawRequested`) |
+| `tools/` | Mac-side dev helpers: `devmon.py` (persistent serial monitor), `devcmd.sh` (send console command), `bcp_contract.py` (live BCP API contract test, `--dump` saves responses) |
+| `test/native/`, `test/device/` | Unit tests on the Mac / on the TC001 |
+| `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: calls BCP REST API, keeps event data, RTC snapshot |
+| `lib/core/` | Hardware independent logic, unit tested on the Mac: event ID / JSON / time parsing (`bcpparse`), countdown text + colour and round indicator layout (`countdown`), display / refresh decisions and message prefixes (`policy`), `DisplayState` (`displaystate.h`), snapshot validation, string helpers (`textutil`) |
+| `lib/hw/hw.h` | Abstract `Hw` interface (static volatile `displayState`, `enforceUpdate`, `redrawRequested`) |
 | `lib/hw/tc001.*` | `Tc001` singleton: the TC001 implementation (matrix, buttons, display task, fonts) |
 | `lib/config/` | `CConfig` singleton `Config`: settings in NVS + on-demand HTTP config server |
 | `lib/wifimgr/` | `CWifiMgr` global `WifiMgr`: multi-network WiFi manager with captive portal, NTP + RTC time sync |
@@ -84,7 +95,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
   request in `loop()` does not stop the countdown redraw (measured 1 redraw/s during fetches). Core 0
   is left to the WiFi stack on purpose: the display task next to it risks FastLED flicker.
 
-### Display state machine (`DisplayState` in `hw.h`)
+### Display state machine (`DisplayState` in `lib/core/displaystate.h`)
 `displayState` says what is shown. Only the `Hw` implementation sets it (each `display*()` /
 `splashScreen()` / `configServerMsg()` method sets its state); `main.cpp` only reads it to skip
 redrawing what is already shown.
@@ -130,7 +141,7 @@ plausible RTC time is used instead, otherwise the connection attempt counts as f
 ## Non-obvious contracts
 
 - **`Tc001` is a `Print`** passed to `WifiMgr.connect()` as the user-message sink. `Tc001::write()` buffers
-  lines and dispatches on the line prefix: `"Error:"` → red scrolling text, `"Connecting "` → "Connect" +
+  lines and dispatches on the line prefix (`classifyMessage()` in `lib/core/policy`): `"Error:"` → red scrolling text, `"Connecting "` → "Connect" +
   progress indicator, `"Connected "` → ignored, anything else → white scrolling text. Changing message
   texts in `wifimgr.cpp` changes what the display does.
 - **Fonts** (`lib/gfx`):

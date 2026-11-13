@@ -10,6 +10,7 @@
 #include <bcpevent.h>
 #include <hw.h>
 #include <tc001.h>
+#include <policy.h>
 #ifdef BCP_DEV
 #include "devconsole.h"
 #endif
@@ -37,69 +38,57 @@ void startMdns() {
 // The display state is set by the Hw implementation; here it is only read to avoid redrawing
 // what is already shown.
 void displayUpdate() {
-    bool redraw = hw->redrawRequested;
+    static DisplayMemory memory;
+    DisplayInputs in;
+    in.state = hw->displayState;
+    in.redrawRequested = hw->redrawRequested;
+    in.valid = BCPEvent.valid();
+    in.invalid = BCPEvent.invalid();
+    in.started = BCPEvent.started();
+    in.ended = BCPEvent.ended();
+    in.timerLength = BCPEvent.timerLength();
+    in.name = BCPEvent.name();
+    in.currentRound = BCPEvent.currentRound();
     hw->redrawRequested = false;
-    MAIN_DEBUG("Updating display, current state: " + String(displayStateName(hw->displayState)));
+    MAIN_DEBUG("Updating display, current state: " + String(displayStateName(in.state)));
 
-    if (hw->displayState == DISPLAY_CONFIG_MESSAGE && !redraw) {
-        return;  // config page address is scrolling, eventHandler requests a redraw when it finishes
+    DisplayDecision d = decideDisplay(in, memory);
+
+    if (d.restartConfigServer && Config.isConfigServerRunning()) {
+        // event ID became valid: restart config server with timeout
+        Config.stopConfigServer();
+        Config.startConfigServer();
     }
 
-    static bool wasInvalidEvent = false;
-
-    if (BCPEvent.valid()) {
-        MAIN_DEBUG("BCP event is valid.");
-
-        if (wasInvalidEvent) {
-            if (Config.isConfigServerRunning()) {
-                // restart config server with timeout
-                Config.stopConfigServer();
-                Config.startConfigServer();
-            }
-            wasInvalidEvent = false;
-        }
-
-        bool isEventRunning = BCPEvent.started() && !BCPEvent.ended();
-        if (!isEventRunning) {
-            // event not running, show event name
-            static String eventName = "";
-            if (hw->displayState != DISPLAY_EVENT_NAME || eventName != BCPEvent.name()) {
-                MAIN_DEBUG("Displaying event name.");
-                hw->displayEventName(BCPEvent);
-                eventName = BCPEvent.name();
-            }
-
-        } else if (BCPEvent.timerLength() <= 0) {
-            // event running but no timer active, show round only
-            static int lastRound = -1;
-            if (hw->displayState != DISPLAY_EVENT_ROUND || lastRound != BCPEvent.currentRound()) {
-                MAIN_DEBUG("Displaying event round.");
-                hw->displayEventRound(BCPEvent);
-                lastRound = BCPEvent.currentRound();
-            }
-
-        } else if (hw->displayState != DISPLAY_EVENT_COUNTDOWN) {
-            // timer active, the countdown is redrawn by the Hw implementation
+    switch (d.action) {
+        case SHOW_EVENT_NAME:
+            MAIN_DEBUG("Displaying event name.");
+            hw->displayEventName(BCPEvent);
+            break;
+        case SHOW_EVENT_ROUND:
+            MAIN_DEBUG("Displaying event round.");
+            hw->displayEventRound(BCPEvent);
+            break;
+        case SHOW_COUNTDOWN:
+            // the countdown is redrawn by the Hw implementation
             MAIN_DEBUG("Displaying countdown.");
             hw->displayCountdown(BCPEvent);
-        }
-
-    } else if (!BCPEvent.invalid()) {
-        // event ID not verified yet (no response from BCP), keep the splash screen
-        if (hw->displayState != DISPLAY_BOOT) {
+            break;
+        case SHOW_SPLASH:
             MAIN_DEBUG("Event ID not verified yet, displaying splash screen.");
             hw->splashScreen();
-        }
-
-    } else if (hw->displayState != DISPLAY_CONFIG_REQUIRED) {
-        // invalid event ID, run the config server with no timeout and ask for configuration
-        MAIN_DEBUG("Invalid event ID, starting config server.");
-        if (Config.isConfigServerRunning()) {
-            Config.stopConfigServer();
-        }
-        Config.startConfigServer(0);
-        hw->configServerMsg("Invalid event ID");
-        wasInvalidEvent = true;
+            break;
+        case SHOW_CONFIG_REQUIRED:
+            // run the config server with no timeout and ask for configuration
+            MAIN_DEBUG("Invalid event ID, starting config server.");
+            if (Config.isConfigServerRunning()) {
+                Config.stopConfigServer();
+            }
+            Config.startConfigServer(0);
+            hw->configServerMsg("Invalid event ID");
+            break;
+        case SHOW_NOTHING_NEW:
+            break;
     }
 }
 
@@ -152,26 +141,32 @@ void loop() {
         MAIN_DEBUG("Refreshing BCP event data...");
         hw->enforceUpdate = false;
         lastDataRefresh = millis();
-        if (BCPEvent.refreshData()) {
-            MAIN_DEBUG("BCP event data refreshed successfully");
-            failCount = 0;
-        } else if (WiFi.status() != WL_CONNECTED) {
-            // WiFi outage: keep displaying the last data, rebooting would not help
-            MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting");
-            WiFi.reconnect();
-        } else if (BCPEvent.lastStatus() < 0) {
-            // connection error while WiFi is up, may be stuck TLS/HTTP
-            failCount++;
-            MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()) +
-                       " (failure count " + String(failCount) + ")");
-            if (failCount >= MAX_CONNECTION_FAILURES) {
-                MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
-                hw->reboot();
-            }
-        } else if (BCPEvent.lastStatus() > 0) {
-            // server responded (e.g. 5xx), the connection works
-            failCount = 0;
-            MAIN_DEBUG("Failed to refresh BCP event data, HTTP status " + String(BCPEvent.lastStatus()));
+        bool ok = BCPEvent.refreshData();
+        RefreshDecision r = onRefreshResult(ok, WiFi.status() == WL_CONNECTED, BCPEvent.lastStatus(),
+                                            failCount, MAX_CONNECTION_FAILURES);
+        failCount = r.failCount;
+        switch (r.outcome) {
+            case REFRESH_SUCCESS:
+                MAIN_DEBUG("BCP event data refreshed successfully");
+                break;
+            case REFRESH_WIFI_DOWN:
+                MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting");
+                WiFi.reconnect();
+                break;
+            case REFRESH_CONNECTION_ERROR:
+            case REFRESH_REBOOT:
+                MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()) +
+                           " (failure count " + String(failCount) + ")");
+                if (r.outcome == REFRESH_REBOOT) {
+                    MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
+                    hw->reboot();
+                }
+                break;
+            case REFRESH_HTTP_ERROR:
+                MAIN_DEBUG("Failed to refresh BCP event data, HTTP status " + String(BCPEvent.lastStatus()));
+                break;
+            case REFRESH_NO_REQUEST:
+                break;
         }
         displayUpdate();
 

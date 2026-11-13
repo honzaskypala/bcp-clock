@@ -10,6 +10,7 @@
 #include <vector>
 #include <RTClib.h>
 #include <webui.h>
+#include <textutil.h>
 
 // ---------- Config ----------
 static const uint32_t CONNECT_TIMEOUT_MS = 15000;
@@ -297,44 +298,6 @@ bool CWifiMgr::attemptConnect(const char* ssid, const char* pass, uint32_t timeo
 bool CWifiMgr::beginPrefs(bool readOnly) {
     // Return true on success, false on failure
     return prefs_.begin(PREFS_NS, readOnly);
-}
-
-// FNV-1a 32-bit hash for key shortening (SSID can be arbitrary)
-static uint32_t fnv1a32(const String& s) {
-    uint32_t h = 2166136261UL;
-    for (size_t i = 0; i < s.length(); ++i) {
-        h ^= (uint8_t)s[i];
-        h *= 16777619UL;
-    }
-    return h;
-}
-
-String CWifiMgr::makePassKey(const String& ssid) {
-    uint32_t h = fnv1a32(ssid);
-    char buf[13]; // "pwd_" + 8 hex + null
-    snprintf(buf, sizeof(buf), "pwd_%08x", (unsigned)h);
-    return String(buf);
-}
-
-void CWifiMgr::splitList(const String& src, std::vector<String>& out) {
-    out.clear();
-    int start = 0;
-    while (start <= (int)src.length()) {
-        int nl = src.indexOf('\n', start);
-        if (nl < 0) nl = src.length();
-        String item = src.substring(start, nl);
-        if (item.length() > 0) out.push_back(item);
-        start = nl + 1;
-    }
-}
-
-String CWifiMgr::joinList(const std::vector<String>& list) {
-    String s;
-    for (size_t i = 0; i < list.size(); ++i) {
-        s += list[i];
-        if (i + 1 < list.size()) s += '\n';
-    }
-    return s;
 }
 
 bool CWifiMgr::listStoredNetworks(std::vector<String>& out) {

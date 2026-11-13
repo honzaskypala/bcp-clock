@@ -7,6 +7,16 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include <Preferences.h>
+
+struct ConfigValues {
+    String event;
+    long yellow, red;   // seconds
+    String hostname;
+};
+
+// Reads the configuration from an opened Preferences namespace, defaults for missing keys
+ConfigValues readConfig(Preferences& prefs);
 
 class CConfig {
 public:
@@ -53,8 +63,6 @@ private:
     unsigned long _serverTimeoutMs; // 0 = no timeout
 
     // ---- Helpers ----
-    String secondsToTime(long seconds) const;
-    long timeToSeconds(const String& time) const;
     bool ensureNvsReady();
 };
 

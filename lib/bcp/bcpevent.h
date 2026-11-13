@@ -63,7 +63,6 @@ private:
     IdState idState_ = ID_UNKNOWN;
     String id_;
     String fullId_;
-    String extractEventID(const String& input);
 
     // ---- REST API ----
     int BCPRest(const String& endpoint, String& outPayload);
@@ -88,9 +87,6 @@ private:
     // ---- Snapshot of event data surviving a soft reboot ----
     void saveSnapshot();
     bool restoreSnapshot();
-
-    // ---- Helper methods ----
-    time_t timegm(struct tm* t);
 };
 
 // ---- Singleton instance ----

@@ -7,6 +7,7 @@
 #include <nvs_flash.h>
 #include <wifimgr.h>
 #include <webui.h>
+#include <textutil.h>
 
 #define CONFIG_DEBUG(msg) if (debugOut) { debugOut->print("[Config] "); debugOut->println(msg); }
 
@@ -15,21 +16,25 @@ static const long DEF_YELLOW = 600; // seconds
 static const long DEF_RED    = 0;   // seconds
 static const String DEF_HOSTNAME = "BCP-clock";
 static constexpr const char* CONFIG_NS = "config";
-static constexpr unsigned int MAX_HOSTNAME_LEN = 32;   // ESP-IDF netif limit
+// ---- Read configuration values from an opened Preferences namespace ----
 
-// Keep only characters valid in a hostname (letters, digits, inner hyphens), fall back to the default
-static String sanitizeHostname(const String& name) {
-    String out;
-    for (unsigned int i = 0; i < name.length() && out.length() < MAX_HOSTNAME_LEN; i++) {
-        char c = name[i];
-        if (isalnum(static_cast<unsigned char>(c)) || (c == '-' && out.length() > 0)) {
-            out += c;
-        }
+ConfigValues readConfig(Preferences& prefs) {
+    ConfigValues v;
+    v.event = prefs.getString("event", DEF_EVENT);
+    // Prefer integer keys; if missing or type-mismatch, try string fallback
+    v.yellow = prefs.getLong("yellow", DEF_YELLOW);
+    v.red = prefs.getLong("red", DEF_RED);
+    String yStr = prefs.getString("yellow", "");
+    String rStr = prefs.getString("red", "");
+    if (yStr.length() > 0) {
+        // parse m[:ss] as minutes/seconds (same as config webpage form)
+        v.yellow = timeToSeconds(yStr);
     }
-    while (out.endsWith("-")) {
-        out.remove(out.length() - 1);
+    if (rStr.length() > 0) {
+        v.red = timeToSeconds(rStr);
     }
-    return out.length() > 0 ? out : DEF_HOSTNAME;
+    v.hostname = sanitizeHostname(prefs.getString("hostname", DEF_HOSTNAME));
+    return v;
 }
 
 // ---- Constructor: load configuration from persistent storage ----
@@ -48,22 +53,11 @@ CConfig::CConfig() {
     }
     Preferences prefs;
     if (prefs.begin(CONFIG_NS, true)) { // read-only
-        event_ = prefs.getString("event", event_);
-        // Prefer integer keys; if missing or type-mismatch, try string fallback
-        long y = prefs.getLong("yellow", yellow_);
-        long r = prefs.getLong("red", red_);
-        String yStr = prefs.getString("yellow", "");
-        String rStr = prefs.getString("red", "");
-        if (yStr.length() > 0) {
-            // parse m[:ss] as minutes/seconds (same as config webpage form)
-            y = timeToSeconds(yStr);
-        }
-        if (rStr.length() > 0) {
-            r = timeToSeconds(rStr);
-        }
-        yellow_   = y;
-        red_      = r;
-        hostname_ = sanitizeHostname(prefs.getString("hostname", hostname_));
+        ConfigValues v = readConfig(prefs);
+        event_    = v.event;
+        yellow_   = v.yellow;
+        red_      = v.red;
+        hostname_ = v.hostname;
         prefs.end();
         CONFIG_DEBUG("Preferences loaded");
     } else {
@@ -291,31 +285,6 @@ void CConfig::handleWifiDeleteAll() {
 }
 
 // ---- Helpers ----
-
-String CConfig::secondsToTime(long seconds) const {
-    long m = seconds / 60;
-    long s = seconds % 60;
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%ld:%02ld", m, s);
-    return String(buf);
-}
-
-long CConfig::timeToSeconds(const String& time) const {
-    String t = time;
-    t.replace(".", ":");  // if time entered as 05.00, replace dots by colons
-    t.trim();
-
-    int colonPos = t.indexOf(':');
-    if (colonPos == -1) {
-        // Interpret single number as minutes
-        long m = t.toInt();
-        return m * 60;
-    }
-
-    long m = t.substring(0, colonPos).toInt();
-    long s = t.substring(colonPos + 1).toInt();
-    return m * 60 + s;
-}
 
 // Ensure NVS is initialized before using Preferences
 bool CConfig::ensureNvsReady() {

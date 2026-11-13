@@ -38,9 +38,6 @@ private:
     bool saveCredential(const char* ssid, const char* pass);
     bool getCredential(const char* ssid, String& outPass);
     bool beginPrefs(bool readOnly);
-    static String makePassKey(const String& ssid);
-    static void splitList(const String& src, std::vector<String>& out);
-    static String joinList(const std::vector<String>& list);
 
     void ensureStaModeForScan();
 

@@ -9,6 +9,8 @@
 #include <wifimgr.h>
 #include <config.h>
 #include <bcpevent.h>
+#include <countdown.h>
+#include <policy.h>
 
 #define PIN_BUZZER          15
 #define PIN_MID_BUTTON      27
@@ -139,48 +141,14 @@ void Tc001::configServerMsg(const char *msg) {
 }
 
 void Tc001::displayRoundWithCountdown(int currentRound, int totalRounds) {
-    uint16_t activeColor = COLOR_DEEPSKYBLUE,
-             inactiveColor = COLOR_DARKGRAY;
     const int line = 7;
-    int displayWidth = matrix.width();
-    matrix.drawFastHLine(0, line, displayWidth, COLOR_BLACK);
-    if (totalRounds <= 0) {
-        return;  // number of rounds unknown, show the countdown only
-    }
-    if (totalRounds < displayWidth / 2) {
-        int lineWidth = displayWidth / totalRounds, offset;
-        switch (totalRounds) {
-            case 3:
-            case 5:
-            case 14:
-                offset = 2;
-                break;
-            case 7:
-            case 9:
-            case 13:
-                offset = 3;
-                break;
-            case 12:
-                offset = 4;
-                break;
-            case 11:
-                offset = 5;
-                break;
-            default:
-                offset = 1;
-        }
-        for (int i = 0; i < totalRounds; i++) {
-            matrix.drawFastHLine(i * lineWidth + offset, line, lineWidth - 1, (i == currentRound - 1) ? activeColor : inactiveColor);
-        }
-    } else {
-        int t = totalRounds <= displayWidth ? totalRounds : displayWidth;
-        int start = (displayWidth - (t + (t <= displayWidth - 2 ? 2 : 0))) / 2;
-        for (int i = 0; i < t; i++) {
-            if (totalRounds <= displayWidth - 2 && (i == currentRound - 1 || i == currentRound)) {
-                start++;
-            }
-            matrix.drawPixel(start + i, line, (i == currentRound - 1) ? activeColor : inactiveColor);
-        }
+    const int displayWidth = 32;
+    RoundPixel pixels[displayWidth];
+    roundIndicator(currentRound, totalRounds, displayWidth, pixels);
+    for (int x = 0; x < displayWidth; x++) {
+        uint16_t color = pixels[x] == ROUND_PIXEL_ACTIVE ? COLOR_DEEPSKYBLUE
+                       : pixels[x] == ROUND_PIXEL_INACTIVE ? COLOR_DARKGRAY : COLOR_BLACK;
+        matrix.drawPixel(x, line, color);
     }
 }
 
@@ -219,64 +187,25 @@ void Tc001::drawCountdown(const CBCPEvent& event) {
 #ifdef BCP_DEV
     countdownDraws++;
 #endif
-    long remaining = event.roundEndEpoch() - time(nullptr);
-    bool dontDisplayHours = event.timerLength() <= 3600;
-
-    if (event.timerPaused()) {
-        // timer is paused
-        remaining = event.pausedTimeRemaining();
-        matrix.setTextColor(time(nullptr) % 2 ? COLOR_MAGENTA : COLOR_BLACK);
-    } else if (remaining <= Config.redThreshold()) {
-        // we are below red threshold of the timer
-        matrix.setTextColor(COLOR_RED);
-    } else if (remaining <= Config.yellowThreshold()) {
-        // we are below yellow threshold of the timer
-        matrix.setTextColor(COLOR_YELLOW);
-    } else if (remaining > event.timerLength() || (remaining == event.timerLength() && event.timerLength() <= 3600)) {
-        // event round not yet started, show time to start
-        matrix.setTextColor(COLOR_GREEN);
-        remaining -= event.timerLength();
-        dontDisplayHours = remaining < 3600 && event.timerLength() <= 3600;
-    } else {
-        matrix.setTextColor(COLOR_WHITE);
+    time_t now = time(nullptr);
+    CountdownView view = formatCountdown(event.roundEndEpoch() - now, event.timerLength(), event.timerPaused(),
+                                         event.pausedTimeRemaining(), Config.yellowThreshold(),
+                                         Config.redThreshold(), now % 2);
+    uint16_t color;
+    switch (view.color) {
+        case COUNTDOWN_YELLOW:  color = COLOR_YELLOW; break;
+        case COUNTDOWN_RED:     color = COLOR_RED; break;
+        case COUNTDOWN_GREEN:   color = COLOR_GREEN; break;
+        case COUNTDOWN_MAGENTA: color = COLOR_MAGENTA; break;
+        case COUNTDOWN_BLACK:   color = COLOR_BLACK; break;
+        default:                color = COLOR_WHITE; break;
     }
-
-    String out  = remaining < 0 ? "-" : "";
-    int absoluteTime = remaining < 0 ? -remaining : remaining;
-    int hours = absoluteTime / 3600;
-    int minutes = (absoluteTime % 3600) / 60;
-    int seconds = absoluteTime % 60;
-
-    int x, y;
-
-    if (dontDisplayHours) {
-        // mm:ss
-        matrix.setFont(mmssFont);
-        x = remaining < 0 ? 1 : 5;
-        y = 6;
-        if (remaining < -3599) {
-            out = "-//://";    // To save space in the font, X bitmap mapped to / character
-        } else {
-            out += String(minutes / 10) + String(minutes % 10) + ":" +
-                   String(seconds / 10) + String(seconds % 10);
-        }
-    } else {
-        // h:mm:ss
-        matrix.setFont(hmmssFont);
-        x = remaining < 0 ? -1 : 3;
-        y = 1;
-        if (remaining < -35999) {
-            out = "-/://://";  // To save space in the font, X bitmap mapped to / character
-        } else {
-            out += String(hours) + ":" +
-                String(minutes / 10) + String(minutes % 10) + ":" +
-                String(seconds / 10) + String(seconds % 10);
-        }
-    }
+    matrix.setTextColor(color);
+    matrix.setFont(view.hmmss ? hmmssFont : mmssFont);
 
     matrix.clear();
-    matrix.setCursor(x, 6);
-    matrix.print(out);
+    matrix.setCursor(view.x, 6);
+    matrix.print(view.text);
     displayRoundWithCountdown(event.currentRound(), event.numberOfRounds());
     matrix.show();
     matrix.setFont((GFXfont *) defaultFont);
@@ -426,7 +355,8 @@ size_t Tc001::write(uint8_t c) {
         buffer[bufferIndex] = '\0';
         DisplayLock lock;
 
-        if (strncmp(buffer, "Error:", 6) == 0) {
+        MessageKind kind = classifyMessage(buffer);
+        if (kind == MESSAGE_ERROR) {
             // Error message, display in red
             stopAnimations();
             matrix.clear();
@@ -437,7 +367,7 @@ size_t Tc001::write(uint8_t c) {
                 errorShown_ = true;
             }
 
-        } else if (strncmp(buffer, "Connecting ", 11) == 0) {
+        } else if (kind == MESSAGE_CONNECTING) {
             // Connecting message, show progress indicator
             stopAnimations();
             matrix.clear();
@@ -446,7 +376,7 @@ size_t Tc001::write(uint8_t c) {
             matrix.print("Connect");
             progressStart();
 
-        } else if (strncmp(buffer, "Connected ", 10) == 0) {
+        } else if (kind == MESSAGE_CONNECTED) {
             // do nothing, let the current status message continue
 
         } else {

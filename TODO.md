@@ -38,6 +38,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [General] [Tests] Unit tests: `pio test -e native` on the Mac (event ID, BCP JSON and time parsing, thresholds, hostname, WiFi list, countdown text/colour, round indicator, display/refresh decisions, message prefixes, RTC snapshot, web UI), `pio test -e nodemcu-32s` on the TC001 (fonts, UTF-8 canvas, scrolling text, progress indicator, newlib time, config in NVS), `tools/bcp_contract.py` for the live BCP API; testable logic moved to lib/core without behaviour change
 - [x] [General] [Docs] Documented that loop() and the display task both run on Core 1 (time-sliced); Core 0 is left to the WiFi stack
 - [x] [WiFiMgr] [Minor] Time zone set to plain UTC (no daylight offset), so logged times match the console and BCP times
 - [x] [General] [Refactor] Code review cleanup: unused urlEncode and _serverTimedOut removed, lastDataRefresh typed as millis(), named RTC plausibility constant, GFXanimation virtual destructor and isActive default
