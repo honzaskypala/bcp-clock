@@ -50,7 +50,16 @@ void ScrollingText::append(const char *text, int16_t color, bool newStart, uint1
     newCanvas->fillScreen(0x0000);
     newCanvas->drawRGBBitmap(0, y1_ - new_y1, scrollCanvas_->getBuffer(), scrollCanvas_->width(), scrollCanvas_->height());
     y1_ = new_y1;
+#ifdef _UTF8_32BIT_FONT_H_
+    if (isUTF8Font_) {
+        // same font setup as the initial text, otherwise non-ASCII characters are not drawn
+        newCanvas->setFont((const UTF8_32BitFont *) gfxFont_, isSegFont_);
+    } else {
+        newCanvas->setFont(gfxFont_);
+    }
+#else
     newCanvas->setFont(gfxFont_);
+#endif // _UTF8_32BIT_FONT_H_
     newCanvas->setTextColor(color);
     newCanvas->setCursor(scrollCanvas_->width() + rpad_ + lpad, y_ - y1_); // baseline
     newCanvas->print(text);
@@ -179,6 +188,10 @@ void ScrollingText::charBounds(const unsigned char c, int16_t *x, int16_t *y, in
             } else {
                 return; // still not complete
             }
+        } else if (c >= 0x80) { // invalid byte, skipped like in UTF8canvas16::write()
+            utf8Char_ = 0;
+            utf8BytesExpected_ = 0;
+            return;
         }
     }
 #endif // _UTF8_32BIT_FONT_H_

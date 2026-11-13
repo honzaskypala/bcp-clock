@@ -69,8 +69,7 @@ static void test_invariants() {
             } else {
                 TEST_ASSERT_EQUAL_MESSAGE(total, (int) (WIDTH - std::count(s.begin(), s.end(), '.')), msg);
             }
-            // centred within one pixel (an invalid current round does not get the gaps around it)
-            if (!valid) continue;
+            // centred within one pixel
             int left = s.find_first_not_of('.'), right = WIDTH - 1 - s.find_last_not_of('.');
             TEST_ASSERT_INT_WITHIN_MESSAGE(1, left, right, msg);
         }

@@ -104,7 +104,12 @@ void roundIndicator(int currentRound, int totalRounds, int width, RoundPixel out
         }
     } else {
         int t = totalRounds <= width ? totalRounds : width;
-        int start = (width - (t + (t <= width - 2 ? 2 : 0))) / 2;
+        // gaps before and after the current round, only those that are drawn (none after the last round)
+        int gaps = 0;
+        if (totalRounds <= width - 2) {
+            gaps = (currentRound - 1 >= 0 && currentRound - 1 < t) + (currentRound >= 0 && currentRound < t);
+        }
+        int start = (width - (t + gaps)) / 2;
         for (int i = 0; i < t; i++) {
             if (totalRounds <= width - 2 && (i == currentRound - 1 || i == currentRound)) {
                 start++;
