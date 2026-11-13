@@ -290,23 +290,57 @@ bool Tc001::ensureConnection() {
     return retValue;
 }
 
+// Mid button pressed (debounced): start the config server and show its address
+void Tc001::handleMidButton() {
+    if (!midButtonPressed) return;
+    static unsigned long lastPress = millis();
+    unsigned long now = millis();
+    if (now - lastPress < DEBOUNCE_DELAY_MS) return;
+    lastPress = now;
+    midButtonPressed = false;
+    DisplayLock lock;
+    stopAnimations();
+    Config.startConfigServer();
+    showConfigServerMsg("", false);
+}
+
+// Advances the animations and the countdown that are due, returns true if the matrix needs to be shown.
+// Called with the display lock held.
+bool Tc001::stepAnimations() {
+    bool showMatrix = false;
+
+    if (displayState == DISPLAY_CONFIG_MESSAGE && scrollingText && !scrollingText->isActive) {
+        // config page address scrolled once, let main redraw the event data
+        delete scrollingText;
+        scrollingText = nullptr;
+        redrawRequested = true;
+    }
+
+    if (scrollingText && scrollingText->isActive && (stMillis == 0 || millis() - stMillis > SCROLLING_TEXT_SPEED)) {
+        stMillis = (stMillis == 0) ? millis() : stMillis + SCROLLING_TEXT_SPEED;
+        scrollingText->step(true);
+        showMatrix = true;
+    }
+
+    if (progressIndicator && progressIndicator->isActive && (piMillis == 0 || millis() - piMillis > PROGRESS_INDICATOR_SPEED)) {
+        piMillis = (piMillis == 0) ? millis() : piMillis + PROGRESS_INDICATOR_SPEED;
+        stepProgress();
+        showMatrix = true;
+    }
+
+    // redraw the countdown once per second, right after the second changes
+    if (displayState == DISPLAY_EVENT_COUNTDOWN && countdownEvent && time(nullptr) != countdownDrawnAt) {
+        countdownDrawnAt = time(nullptr);
+        drawCountdown(*countdownEvent);
+        showMatrix = true;
+    }
+
+    return showMatrix;
+}
+
 void Tc001::handleEvents(void * parameter) {
     while (true) {
-        bool showMatrix;
-        showMatrix = false;
-
-        if (midButtonPressed) {
-            static unsigned long lastPress = millis();
-            unsigned long now = millis();
-            if (now - lastPress >= DEBOUNCE_DELAY_MS) {
-                lastPress = now;
-                midButtonPressed = false;
-                DisplayLock lock;
-                stopAnimations();
-                Config.startConfigServer();
-                showConfigServerMsg("", false);
-            }
-        }
+        handleMidButton();
 
         if (Config.isConfigServerRunning()) {
             Config.handleClient();
@@ -314,34 +348,7 @@ void Tc001::handleEvents(void * parameter) {
 
         {
             DisplayLock lock;  // released before vTaskDelay()
-
-            if (displayState == DISPLAY_CONFIG_MESSAGE && scrollingText && !scrollingText->isActive) {
-                // config page address scrolled once, let main redraw the event data
-                delete scrollingText;
-                scrollingText = nullptr;
-                redrawRequested = true;
-            }
-
-            if (scrollingText && scrollingText->isActive && (stMillis == 0 || millis() - stMillis > SCROLLING_TEXT_SPEED)) {
-                stMillis = (stMillis == 0) ? millis() : stMillis + SCROLLING_TEXT_SPEED;
-                scrollingText->step(true);
-                showMatrix = true;
-            }
-
-            if (progressIndicator && progressIndicator->isActive && (piMillis == 0 || millis() - piMillis > PROGRESS_INDICATOR_SPEED)) {
-                piMillis = (piMillis == 0) ? millis() : piMillis + PROGRESS_INDICATOR_SPEED;
-                stepProgress();
-                showMatrix = true;
-            }
-
-            // redraw the countdown once per second, right after the second changes
-            if (displayState == DISPLAY_EVENT_COUNTDOWN && countdownEvent && time(nullptr) != countdownDrawnAt) {
-                countdownDrawnAt = time(nullptr);
-                drawCountdown(*countdownEvent);
-                showMatrix = true;
-            }
-
-            if (showMatrix) {
+            if (stepAnimations()) {
                 matrix.show();
             }
         }
@@ -353,21 +360,33 @@ void Tc001::handleEvents(void * parameter) {
 size_t Tc001::write(uint8_t c) {
     if (c == '\n' || bufferIndex >= sizeof(buffer) - 1) {
         buffer[bufferIndex] = '\0';
-        DisplayLock lock;
+        showMessage(buffer);
+        bufferIndex = 0;
+        return 1;
+    }
+    if (c != '\r' && bufferIndex < sizeof(buffer) - 2) {
+        buffer[bufferIndex++] = c;
+    }
+    return 1;
+}
 
-        MessageKind kind = classifyMessage(buffer);
-        if (kind == MESSAGE_ERROR) {
+// Shows one complete user message line, the line prefix decides how (see classifyMessage())
+void Tc001::showMessage(const char *msg) {
+    DisplayLock lock;
+    switch (classifyMessage(msg)) {
+        case MESSAGE_ERROR:
             // Error message, display in red
             stopAnimations();
             matrix.clear();
-            scrollingText = new ScrollingText(&matrix, buffer, 0, 7, (const GFXfont *) defaultFont, false, COLOR_RED);
+            scrollingText = new ScrollingText(&matrix, msg, 0, 7, (const GFXfont *) defaultFont, false, COLOR_RED);
             if (initMsg_.length() > 0) {
                 scrollingText->append(initMsg_, COLOR_WHITE, true);
             } else {
                 errorShown_ = true;
             }
+            break;
 
-        } else if (kind == MESSAGE_CONNECTING) {
+        case MESSAGE_CONNECTING:
             // Connecting message, show progress indicator
             stopAnimations();
             matrix.clear();
@@ -375,28 +394,23 @@ size_t Tc001::write(uint8_t c) {
             matrix.setTextColor(COLOR_WHITE);
             matrix.print("Connect");
             startProgress();
+            break;
 
-        } else if (kind == MESSAGE_CONNECTED) {
+        case MESSAGE_CONNECTED:
             // do nothing, let the current status message continue
+            break;
 
-        } else {
+        default:
             if (errorShown_) {
-                scrollingText->append(buffer, COLOR_WHITE, true);
+                scrollingText->append(msg, COLOR_WHITE, true);
                 errorShown_ = false;
             } else {
                 stopAnimations();
                 matrix.clear();
-                scrollingText = new ScrollingText(&matrix, buffer, 0, 7, (const GFXfont *) defaultFont);
+                scrollingText = new ScrollingText(&matrix, msg, 0, 7, (const GFXfont *) defaultFont);
             }
-            if (initMsg_.length() == 0) initMsg_ = String(buffer);
-        }
-
-        matrix.show();
-        bufferIndex = 0;
-
-    } else if (c != '\r' && bufferIndex < sizeof(buffer) - 2) {
-        buffer[bufferIndex++] = c;
-
+            if (initMsg_.length() == 0) initMsg_ = String(msg);
+            break;
     }
-    return 1;
+    matrix.show();
 }

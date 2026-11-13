@@ -74,6 +74,8 @@ private:
     static void stopAnimations();
 
     static bool midButtonPressed;
+    static void handleMidButton();
+    static bool stepAnimations();
 
     static const CBCPEvent *countdownEvent;  // event drawn by handleEvents in DISPLAY_EVENT_COUNTDOWN
     static void drawCountdown(const CBCPEvent& event);
@@ -96,4 +98,5 @@ private:
     size_t bufferIndex;
     String initMsg_ = String();
     bool errorShown_ = false;
+    void showMessage(const char *msg);
 };
