@@ -46,56 +46,11 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrM
         WIFIMGR_DEBUG("Scan failed or found no networks.");
 
     } else if (!enforcePortal) {
-        // Pass 1: known networks (DO NOT save credential here)
-        std::vector<String> storedSsids;
-        bool haveCreds = listStoredNetworks(storedSsids);
-
-        if (haveCreds) {
-            WIFIMGR_DEBUG("Pass 1 - Trying known networks...");
-            for (int order = 0; order < scanCount_; ++order) {
-                int i = scanIdx_[order];
-                const String& ssid = scanSsid_[i];
-                WIFIMGR_DEBUG("Considering SSID: " + ssid);
-                if (ssid.length() == 0) continue;
-
-                String pass;
-                if (getCredential(ssid.c_str(), pass)) {
-                    WIFIMGR_DEBUG("Known SSID candidate: " + ssid + " (RSSI " + String(scanRssi_[order]) + " dBm)");
-
-                    if (attemptConnect(ssid.c_str(), pass.c_str(), CONNECT_TIMEOUT_MS)) {
-                        connected_ = true;
-                        freeScanData();
-                        WIFIMGR_DEBUG("Connected via known network (no credential save).");
-                        return true;
-                    }
-                }
-                delay(0);
-            }
-            WIFIMGR_DEBUG("Pass 1 finished: No known networks connected.");
-        } else {
-            WIFIMGR_DEBUG("No known networks (missing or invalid /wifi.json).");
+        if (tryKnownNetworks() || tryOpenNetworks()) {
+            connected_ = true;
+            freeScanData();
+            return true;
         }
-
-        // Pass 2: open networks (DO NOT save credential here)
-        WIFIMGR_DEBUG("Pass 2 - Trying open networks...");
-        for (int order = 0; order < scanCount_; ++order) {
-            int i = scanIdx_[order];
-            uint8_t enc = scanEnc_[i];
-            if (!isOpenEncryption(enc)) continue;
-            const String& ssid = scanSsid_[i];
-            if (ssid.length() == 0) continue;
-
-            WIFIMGR_DEBUG("Open SSID candidate: " + ssid + " (RSSI " + String(scanRssi_[order]) + " dBm)");
-            if (attemptConnect(ssid.c_str(), nullptr, CONNECT_TIMEOUT_MS)) {
-                connected_ = true;
-                freeScanData();
-                WIFIMGR_DEBUG("Connected via open network (no credential save).");
-                return true;
-            }
-            delay(0);
-        }
-        WIFIMGR_DEBUG("Pass 2 finished: No open networks connected.");
-
         if (timeSyncFailed_) {
             WIFIMGR_MSG(NTP_TIME_SYNC_FAIL_MSG);
         }
@@ -126,6 +81,55 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrM
     return connected_;
 }
 
+// Pass 1: known networks (DO NOT save credential here)
+bool CWifiMgr::tryKnownNetworks() {
+    std::vector<String> storedSsids;
+    if (!listStoredNetworks(storedSsids)) {
+        WIFIMGR_DEBUG("No known networks (missing or invalid /wifi.json).");
+        return false;
+    }
+
+    WIFIMGR_DEBUG("Pass 1 - Trying known networks...");
+    for (int order = 0; order < scanCount_; ++order) {
+        int i = scanIdx_[order];
+        const String& ssid = scanSsid_[i];
+        WIFIMGR_DEBUG("Considering SSID: " + ssid);
+        if (ssid.length() == 0) continue;
+
+        String pass;
+        if (getCredential(ssid.c_str(), pass)) {
+            WIFIMGR_DEBUG("Known SSID candidate: " + ssid + " (RSSI " + String(scanRssi_[order]) + " dBm)");
+            if (attemptConnect(ssid.c_str(), pass.c_str(), CONNECT_TIMEOUT_MS)) {
+                WIFIMGR_DEBUG("Connected via known network (no credential save).");
+                return true;
+            }
+        }
+        delay(0);
+    }
+    WIFIMGR_DEBUG("Pass 1 finished: No known networks connected.");
+    return false;
+}
+
+// Pass 2: open networks (DO NOT save credential here)
+bool CWifiMgr::tryOpenNetworks() {
+    WIFIMGR_DEBUG("Pass 2 - Trying open networks...");
+    for (int order = 0; order < scanCount_; ++order) {
+        int i = scanIdx_[order];
+        if (!isOpenEncryption(scanEnc_[i])) continue;
+        const String& ssid = scanSsid_[i];
+        if (ssid.length() == 0) continue;
+
+        WIFIMGR_DEBUG("Open SSID candidate: " + ssid + " (RSSI " + String(scanRssi_[order]) + " dBm)");
+        if (attemptConnect(ssid.c_str(), nullptr, CONNECT_TIMEOUT_MS)) {
+            WIFIMGR_DEBUG("Connected via open network (no credential save).");
+            return true;
+        }
+        delay(0);
+    }
+    WIFIMGR_DEBUG("Pass 2 finished: No open networks connected.");
+    return false;
+}
+
 bool CWifiMgr::eraseStoredNetworks() {
     WIFIMGR_DEBUG("Removing all stored SSIDs and credentials.");
     if (!beginPrefs(false)) {
@@ -133,12 +137,7 @@ bool CWifiMgr::eraseStoredNetworks() {
         return false;
     }
 
-    String listStr;
-    if (prefs_.isKey(PREFS_LIST_KEY)) {
-        listStr = prefs_.getString(PREFS_LIST_KEY, "");
-    } else {
-        listStr = "";
-    }
+    String listStr = readStoredList();
 
     std::vector<String> list;
     splitList(listStr, list);
@@ -181,57 +180,66 @@ bool CWifiMgr::scanAndSort() {
         return false;
     }
 
+    if (!loadDriverScanResults(n)) {
+        loadFallbackScanResults(n);
+    }
+    WiFi.scanDelete();
+    sortScanByRssi();
+
+    WIFIMGR_DEBUG("" + String(scanCount_) + " networks found (sorted strongest to weakest)");
+    return true;
+}
+
+void CWifiMgr::allocScanArrays(int count) {
+    scanCount_ = count;
+    scanIdx_   = new int[scanCount_];
+    scanRssi_  = new int[scanCount_];
+    scanSsid_  = new String[scanCount_];
+    scanEnc_   = new uint8_t[scanCount_];
+    scanChan_  = new int[scanCount_];
+}
+
+// Reads the scan results with the driver API (includes BSSID), returns false if they are not available
+bool CWifiMgr::loadDriverScanResults(int n) {
     uint16_t count = static_cast<uint16_t>(n);
     wifi_ap_record_t* recs = static_cast<wifi_ap_record_t*>(malloc(count * sizeof(wifi_ap_record_t)));
-    bool usedDriverRecords = false;
-
-    if (recs) {
-        if (esp_wifi_scan_get_ap_records(&count, recs) == ESP_OK && count > 0) {
-            scanCount_ = static_cast<int>(count);
-            scanIdx_   = new int[scanCount_];
-            scanRssi_  = new int[scanCount_];
-            scanSsid_  = new String[scanCount_];
-            scanEnc_   = new uint8_t[scanCount_];
-            scanChan_  = new int[scanCount_];
-
-            WIFIMGR_DEBUG("Scan results (driver):");
-            for (int i = 0; i < scanCount_; ++i) {
-                scanIdx_[i]  = i;
-                scanSsid_[i] = String(reinterpret_cast<const char*>(recs[i].ssid));
-                scanRssi_[i] = static_cast<int>(recs[i].rssi);
-                scanEnc_[i]  = static_cast<uint8_t>(recs[i].authmode);
-                scanChan_[i] = static_cast<int>(recs[i].primary);
-
-                const uint8_t* b = recs[i].bssid;
-                WIFIMGR_DEBUG("  [" + String(i) + "] SSID='" + scanSsid_[i] + "' RSSI=" + String(scanRssi_[i]) + " dBm ENC=" + String((unsigned)scanEnc_[i]) + " CH=" + String(scanChan_[i]) + " BSSID=" + String(b[0], HEX) + ":" + String(b[1], HEX) + ":" + String(b[2], HEX) + ":" + String(b[3], HEX) + ":" + String(b[4], HEX) + ":" + String(b[5], HEX));
-            }
-            usedDriverRecords = true;
-        }
+    if (!recs) return false;
+    if (esp_wifi_scan_get_ap_records(&count, recs) != ESP_OK || count == 0) {
         free(recs);
+        return false;
     }
 
-    if (!usedDriverRecords) {
-        scanCount_ = n;
-        scanIdx_   = new int[scanCount_];
-        scanRssi_  = new int[scanCount_];
-        scanSsid_  = new String[scanCount_];
-        scanEnc_   = new uint8_t[scanCount_];
-        scanChan_  = new int[scanCount_];
+    allocScanArrays(static_cast<int>(count));
+    WIFIMGR_DEBUG("Scan results (driver):");
+    for (int i = 0; i < scanCount_; ++i) {
+        scanIdx_[i]  = i;
+        scanSsid_[i] = String(reinterpret_cast<const char*>(recs[i].ssid));
+        scanRssi_[i] = static_cast<int>(recs[i].rssi);
+        scanEnc_[i]  = static_cast<uint8_t>(recs[i].authmode);
+        scanChan_[i] = static_cast<int>(recs[i].primary);
 
-        WIFIMGR_DEBUG("Scan results (fallback API):");
-        for (int i = 0; i < scanCount_; ++i) {
-            scanIdx_[i]  = i;
-            scanSsid_[i] = WiFi.SSID(i);
-            scanRssi_[i] = WiFi.RSSI(i);
-            scanEnc_[i]  = (uint8_t)WiFi.encryptionType(i);
-            scanChan_[i] = WiFi.channel(i);
-            WIFIMGR_DEBUG("  [" + String(i) + "] SSID='" + scanSsid_[i] + "' RSSI=" + String(scanRssi_[i]) + " dBm ENC=" + String((unsigned)scanEnc_[i]) + " CH=" + String(scanChan_[i]));
-        }
+        const uint8_t* b = recs[i].bssid;
+        WIFIMGR_DEBUG("  [" + String(i) + "] SSID='" + scanSsid_[i] + "' RSSI=" + String(scanRssi_[i]) + " dBm ENC=" + String((unsigned)scanEnc_[i]) + " CH=" + String(scanChan_[i]) + " BSSID=" + String(b[0], HEX) + ":" + String(b[1], HEX) + ":" + String(b[2], HEX) + ":" + String(b[3], HEX) + ":" + String(b[4], HEX) + ":" + String(b[5], HEX));
     }
+    free(recs);
+    return true;
+}
 
-    WiFi.scanDelete();
+void CWifiMgr::loadFallbackScanResults(int n) {
+    allocScanArrays(n);
+    WIFIMGR_DEBUG("Scan results (fallback API):");
+    for (int i = 0; i < scanCount_; ++i) {
+        scanIdx_[i]  = i;
+        scanSsid_[i] = WiFi.SSID(i);
+        scanRssi_[i] = WiFi.RSSI(i);
+        scanEnc_[i]  = (uint8_t)WiFi.encryptionType(i);
+        scanChan_[i] = WiFi.channel(i);
+        WIFIMGR_DEBUG("  [" + String(i) + "] SSID='" + scanSsid_[i] + "' RSSI=" + String(scanRssi_[i]) + " dBm ENC=" + String((unsigned)scanEnc_[i]) + " CH=" + String(scanChan_[i]));
+    }
+}
 
-    // Sort by RSSI descending (keep idx indirection)
+// Sort by RSSI descending (keep idx indirection)
+void CWifiMgr::sortScanByRssi() {
     for (int i = 1; i < scanCount_; ++i) {
         int keyIdx  = scanIdx_[i];
         int keyRssi = scanRssi_[i];
@@ -244,9 +252,6 @@ bool CWifiMgr::scanAndSort() {
         scanIdx_[j + 1]  = keyIdx;
         scanRssi_[j + 1] = keyRssi;
     }
-
-    WIFIMGR_DEBUG("" + String(scanCount_) + " networks found (sorted strongest to weakest)");
-    return true;
 }
 
 void CWifiMgr::freeScanData() {
@@ -300,6 +305,11 @@ bool CWifiMgr::beginPrefs(bool readOnly) {
     return prefs_.begin(PREFS_NS, readOnly);
 }
 
+// Newline-separated list of stored SSIDs; read only if the key exists, to avoid the NOT_FOUND log
+String CWifiMgr::readStoredList() {
+    return prefs_.isKey(PREFS_LIST_KEY) ? prefs_.getString(PREFS_LIST_KEY, "") : String();
+}
+
 bool CWifiMgr::listStoredNetworks(std::vector<String>& out) {
     out.clear();
     if (!beginPrefs(true)) {
@@ -307,12 +317,7 @@ bool CWifiMgr::listStoredNetworks(std::vector<String>& out) {
         return false;
     }
 
-    String list;
-    if (prefs_.isKey(PREFS_LIST_KEY)) {
-        list = prefs_.getString(PREFS_LIST_KEY, "");
-    } else {
-        list = "";
-    }
+    String list = readStoredList();
     prefs_.end();
 
     splitList(list, out);
@@ -348,13 +353,7 @@ bool CWifiMgr::saveCredential(const char* ssid, const char* pass) {
         return false;
     }
 
-    // Read current list only if it exists to avoid NOT_FOUND log
-    String listStr;
-    if (prefs_.isKey(PREFS_LIST_KEY)) {
-        listStr = prefs_.getString(PREFS_LIST_KEY, "");
-    } else {
-        listStr = "";
-    }
+    String listStr = readStoredList();
 
     std::vector<String> list;
     splitList(listStr, list);
@@ -381,13 +380,7 @@ bool CWifiMgr::removeStoredNetwork(const char* ssid) {
         return false;
     }
 
-    // Read list only if present (avoid NOT_FOUND log)
-    String listStr;
-    if (prefs_.isKey(PREFS_LIST_KEY)) {
-        listStr = prefs_.getString(PREFS_LIST_KEY, "");
-    } else {
-        listStr = "";
-    }
+    String listStr = readStoredList();
 
     std::vector<String> list;
     splitList(listStr, list);
@@ -455,18 +448,18 @@ bool CWifiMgr::syncTime(uint32_t timeoutMs) {
             rtc.adjust(DateTime((uint32_t) time(nullptr)));  // Update RTC time
         }
         return true;
-    } else if (rtc.begin() && rtc.now().unixtime() > MIN_PLAUSIBLE_EPOCH) {
-        WIFIMGR_DEBUG("NTP sync failed, but RTC has valid time. Using RTC time.");
-        struct timeval tv;
-        tv.tv_sec = rtc.now().unixtime();
-        tv.tv_usec = 0;
-        settimeofday(&tv, nullptr);
-        printLocalTime();
-        return true;
-    } else {
+    }
+    if (!rtc.begin() || rtc.now().unixtime() <= MIN_PLAUSIBLE_EPOCH) {
         WIFIMGR_DEBUG("Failed to obtain time.");
         return false;
     }
+    WIFIMGR_DEBUG("NTP sync failed, but RTC has valid time. Using RTC time.");
+    struct timeval tv;
+    tv.tv_sec = rtc.now().unixtime();
+    tv.tv_usec = 0;
+    settimeofday(&tv, nullptr);
+    printLocalTime();
+    return true;
 }
 
 void CWifiMgr::printLocalTime() {

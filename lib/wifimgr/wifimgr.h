@@ -31,13 +31,20 @@ private:
 
     // ---- Core steps ----
     bool scanAndSort();
+    void allocScanArrays(int count);
+    bool loadDriverScanResults(int n);
+    void loadFallbackScanResults(int n);
+    void sortScanByRssi();
     void freeScanData();
+    bool tryKnownNetworks();
+    bool tryOpenNetworks();
     bool attemptConnect(const char* ssid, const char* pass, uint32_t timeoutMs);
 
     // ---- Credentials storage ----
     bool saveCredential(const char* ssid, const char* pass);
     bool getCredential(const char* ssid, String& outPass);
     bool beginPrefs(bool readOnly);
+    String readStoredList();
 
     void ensureStaModeForScan();
 
