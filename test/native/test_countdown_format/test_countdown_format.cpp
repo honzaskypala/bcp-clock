@@ -16,7 +16,7 @@ static CountdownView run(long remaining, uint32_t timerLength) {
 }
 
 static void assertView(const char *text, CountdownColor color, bool hmmss, int x, const CountdownView& v) {
-    TEST_ASSERT_EQUAL_STRING(text, v.text.c_str());
+    TEST_ASSERT_EQUAL_STRING(text, v.text);
     TEST_ASSERT_EQUAL(color, v.color);
     TEST_ASSERT_EQUAL(hmmss, v.hmmss);
     TEST_ASSERT_EQUAL(x, v.x);
@@ -111,7 +111,7 @@ static void test_invariants_fontCharsAndHours() {
     for (uint32_t len : lengths) {
         for (long rem = -40000; rem <= 75000; rem += 7) {
             CountdownView v = run(rem, len);
-            const char *t = v.text.c_str();
+            const char *t = v.text;
             // only characters of the time fonts F4x6 / F3x5_Fixed ('-' to ':')
             for (const char *p = t; *p; p++) {
                 TEST_ASSERT_TRUE_MESSAGE(*p >= '-' && *p <= ':', t);
@@ -135,7 +135,7 @@ static void test_invariants_fontCharsAndHours() {
 static void test_knownLimitation_pausedOverOneHourInShortRound() {
     CountdownView v = formatCountdown(0, 600, true, 4000, YELLOW, RED, true);
     TEST_ASSERT_FALSE(v.hmmss);
-    TEST_ASSERT_EQUAL_STRING("06:40", v.text.c_str());
+    TEST_ASSERT_EQUAL_STRING("06:40", v.text);
 }
 
 int main() {

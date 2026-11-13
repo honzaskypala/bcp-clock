@@ -10,7 +10,7 @@
 
 // ---- Event ID related ----
 
-void CBCPEvent::setID(String newID) {
+void CBCPEvent::setID(const String& newID) {
     fullId_ = newID;
     id_ = parseEventId(newID);
     if (id_.length() == 0) {

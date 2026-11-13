@@ -10,9 +10,9 @@
 class CBCPEvent {
 public:
     // ---- Event ID related ----
-    void setID(String newID);
-    inline String id() { return id_; }
-    inline String fullId() { return fullId_; }
+    void setID(const String& newID);
+    inline const String& id() { return id_; }
+    inline const String& fullId() { return fullId_; }
     inline bool valid() { return idState_ == ID_VALID; }
     inline bool invalid() { return idState_ == ID_INVALID; }
 
@@ -21,7 +21,7 @@ public:
     inline int lastStatus() const { return lastStatus_; }  // last HTTP status, <0 = connection error, 0 = no request
 
     // ---- BCP event details ----
-    inline String name() const { return name_; }
+    inline const String& name() const { return name_; }
     inline bool started() const { return started_; }
     inline bool ended() const { return ended_; }
     inline int numberOfRounds() const { return numberOfRounds_; }
@@ -29,8 +29,8 @@ public:
 
     // ---- BCP round timer details ----
     inline uint32_t timerLength() const { return timerLength_; }
-    inline String roundStartTime() const { return roundStartTime_; }
-    inline String roundEndTime() const { return roundEndTime_; }
+    inline const String& roundStartTime() const { return roundStartTime_; }
+    inline const String& roundEndTime() const { return roundEndTime_; }
     inline time_t roundStartEpoch() const { return roundStartEpoch_; }
     inline time_t roundEndEpoch() const { return roundEndEpoch_; }
     inline bool timerPaused() const { return timerPaused_; }

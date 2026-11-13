@@ -21,10 +21,10 @@ ConfigValues readConfig(Preferences& prefs);
 class CConfig {
 public:
     // ---- Configuration parameter getters ----
-    String eventId() const { return event_; }
+    const String& eventId() const { return event_; }
     long yellowThreshold() const { return yellow_; }
     long redThreshold() const { return red_; }
-    String hostname() const { return hostname_; }
+    const String& hostname() const { return hostname_; }
 
     // ---- Erase configuration from persistent storage ----
     void erase();

@@ -110,8 +110,7 @@ void Tc001::splashScreen(bool showProgress) {
     matrix.print("BCP");
     int16_t x1, y1;
     uint16_t w, h;
-    const String msg = "clock";
-    matrix.getTextBounds(msg, 0, y, &x1, &y1, &w, &h);
+    matrix.getTextBounds("clock", 0, y, &x1, &y1, &w, &h);
     matrix.setCursor((matrix.width() - w), y);  
     matrix.print("clock");
     if (showProgress) {
@@ -169,7 +168,8 @@ void Tc001::displayEventRound(const CBCPEvent& event) {
     matrix.setTextColor(COLOR_WHITE);
     int16_t  x1, y1;
     uint16_t w, h;
-    String msg = "Round " + String(event.currentRound());
+    char msg[20];
+    snprintf(msg, sizeof(msg), "Round %d", event.currentRound());
     matrix.getTextBounds(msg, 0, 7, &x1, &y1, &w, &h);
     matrix.setCursor((matrix.width() - w) / 2, 7);
     matrix.print(msg);

@@ -3,6 +3,8 @@
 // WTFPL license applies
 
 #include "countdown.h"
+#include <stdio.h>
+#include <string.h>
 
 // ---- Countdown ----
 
@@ -30,7 +32,7 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
         view.color = COUNTDOWN_WHITE;
     }
 
-    String out = remaining < 0 ? "-" : "";
+    const char *sign = remaining < 0 ? "-" : "";
     int absoluteTime = remaining < 0 ? -remaining : remaining;
     int hours = absoluteTime / 3600;
     int minutes = (absoluteTime % 3600) / 60;
@@ -41,24 +43,20 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
         view.hmmss = false;
         view.x = remaining < 0 ? 1 : 5;
         if (remaining < -3599) {
-            out = "-//://";    // To save space in the font, X bitmap mapped to / character
+            strcpy(view.text, "-//://");    // To save space in the font, X bitmap mapped to / character
         } else {
-            out += String(minutes / 10) + String(minutes % 10) + ":" +
-                   String(seconds / 10) + String(seconds % 10);
+            snprintf(view.text, sizeof(view.text), "%s%02d:%02d", sign, minutes, seconds);
         }
     } else {
         // h:mm:ss
         view.hmmss = true;
         view.x = remaining < 0 ? -1 : 3;
         if (remaining < -35999) {
-            out = "-/://://";  // To save space in the font, X bitmap mapped to / character
+            strcpy(view.text, "-/://://");  // To save space in the font, X bitmap mapped to / character
         } else {
-            out += String(hours) + ":" +
-                String(minutes / 10) + String(minutes % 10) + ":" +
-                String(seconds / 10) + String(seconds % 10);
+            snprintf(view.text, sizeof(view.text), "%s%d:%02d:%02d", sign, hours, minutes, seconds);
         }
     }
-    view.text = out;
     return view;
 }
 
