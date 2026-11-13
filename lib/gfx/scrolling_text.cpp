@@ -3,28 +3,14 @@
 // WTFPL license applies
 
 #include "scrolling_text.h"
+#include "fontsegment.h"
 
 void ScrollingText::init(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont, int16_t color, uint16_t lpad, uint16_t rpad, bool loop, bool draw) {
     isSegFont_ = segmentedFont;
     int16_t x1;
     uint16_t w, h;
     measureText(text, &x1, &y1_, &w, &h);
-#ifdef _UTF8_32BIT_FONT_H_
-    if (isUTF8Font_) {
-        UTF8canvas16 *utf8Canvas = new UTF8canvas16(w, h);
-        if (isSegFont_) {
-            utf8Canvas->setFont((UTF8_32BitFont *) gfxFont, isSegFont_);
-        } else {
-            utf8Canvas->setFont((UTF8_32BitFont *) gfxFont);
-        }
-        scrollCanvas_ = utf8Canvas;
-    } else {
-#endif // _UTF8_32BIT_FONT_H_
-        scrollCanvas_ = new GFXcanvas16(w, h);
-        scrollCanvas_->setFont(gfxFont);
-#ifdef _UTF8_32BIT_FONT_H_
-    }
-#endif // _UTF8_32BIT_FONT_H_
+    scrollCanvas_ = createCanvas(w, h, gfxFont);
     scrollCanvas_->fillScreen(0x0000);
     scrollCanvas_->setTextColor(color);
     scrollCanvas_->setCursor(0, y_ - y1_); // align baseline between gfx and canvas
@@ -34,6 +20,23 @@ void ScrollingText::init(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t
     if (draw) {
         this->draw();
     }
+}
+
+GFXcanvas16 *ScrollingText::createCanvas(uint16_t w, uint16_t h, const GFXfont *gfxFont) {
+#ifdef _UTF8_32BIT_FONT_H_
+    if (isUTF8Font_) {
+        UTF8canvas16 *utf8Canvas = new UTF8canvas16(w, h);
+        if (isSegFont_) {
+            utf8Canvas->setFont((UTF8_32BitFont *) gfxFont, isSegFont_);
+        } else {
+            utf8Canvas->setFont((UTF8_32BitFont *) gfxFont);
+        }
+        return utf8Canvas;
+    }
+#endif // _UTF8_32BIT_FONT_H_
+    GFXcanvas16 *canvas = new GFXcanvas16(w, h);
+    canvas->setFont(gfxFont);
+    return canvas;
 }
 
 void ScrollingText::append(const char *text, int16_t color, bool newStart, uint16_t lpad, uint16_t rpad) {
@@ -76,19 +79,24 @@ void ScrollingText::append(const char *text, int16_t color, bool newStart, uint1
 void ScrollingText::step(bool draw) {
     pos_++;
     if (pos_ > totalWidth_) {
-        if (loop_) {
-            if (newLpad_ != -256) {
-                lpad_ = newLpad_;
-                newLpad_ = -256;
-            }
-            pos_ = startPos_;
-        } else {
-            isActive = false;
-        }
+        restartOrStop();
     }
     if (draw) {
         this->draw();
     }
+}
+
+// End of the text reached: start the looped part again, or stop
+void ScrollingText::restartOrStop() {
+    if (!loop_) {
+        isActive = false;
+        return;
+    }
+    if (newLpad_ != -256) {
+        lpad_ = newLpad_;
+        newLpad_ = -256;
+    }
+    pos_ = startPos_;
 }
 
 void ScrollingText::draw() {
@@ -162,71 +170,18 @@ void ScrollingText::measureText(const char *str, int16_t *x1, int16_t *y1, uint1
 
 void ScrollingText::measureChar(const unsigned char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) {
     uint32_t cp = c;
-
 #ifdef _UTF8_32BIT_FONT_H_
-    if (isUTF8Font_) {
-        // handle UTF-8 decoding
-        if ((c & 0xE0) == 0xC0) { // 2-byte sequence
-            utf8Char_ = c & 0x1F;
-            utf8BytesExpected_ = 1;
-            return;
-        } else if ((c & 0xF0) == 0xE0) { // 3-byte sequence
-            utf8Char_ = c & 0x0F;
-            utf8BytesExpected_ = 2;
-            return;
-        } else if ((c & 0xF8) == 0xF0) { // 4-byte sequence
-            utf8Char_ = c & 0x07;
-            utf8BytesExpected_ = 3;
-            return;
-        } else if ((c & 0xC0) == 0x80 && utf8BytesExpected_ > 0) { // continuation byte
-            utf8Char_ = (utf8Char_ << 6) | (c & 0x3F);
-            utf8BytesExpected_--;
-            if (utf8BytesExpected_ == 0) {
-                // complete character
-                cp = utf8Char_;
-                utf8Char_ = 0;
-            } else {
-                return; // still not complete
-            }
-        } else if (c >= 0x80) { // invalid byte, skipped like in UTF8canvas16::write()
-            utf8Char_ = 0;
-            utf8BytesExpected_ = 0;
-            return;
-        }
-    }
+    const bool isUTF8 = isUTF8Font_;
+    // invalid bytes are skipped like in UTF8canvas16::write()
+    if (isUTF8 && !decodeUtf8Byte(c, utf8Char_, utf8BytesExpected_, cp)) return;
+#else
+    const bool isUTF8 = false;
 #endif // _UTF8_32BIT_FONT_H_
 
     const GFXfont *font = gfxFont_;
-
-    // handle segmented fonts
     if (font != nullptr && isSegFont_) {
-        while (font->glyph != nullptr) {
-            uint32_t first = font->first;
-            uint32_t last = font->last;
-#ifdef _UTF8_32BIT_FONT_H_
-            if (isUTF8Font_) {
-                const UTF8_32BitFont *utf8Font = (const UTF8_32BitFont *) font;
-                first = (utf8Font->dFirst != 0) ? utf8Font->dFirst : first;
-                last = (utf8Font->dLast != 0) ? utf8Font->dLast : last;
-            }
-#endif // _UTF8_32BIT_FONT_H_
-            if (cp >= first && cp <= last) {
-                break;
-            } else {
-                // try next segment
-#ifdef _UTF8_32BIT_FONT_H_
-                if (isUTF8Font_) {
-                    font = (const GFXfont *) (((const UTF8_32BitFont *) font) + 1);
-                } else {
-#endif // _UTF8_32BIT_FONT_H_
-                    font = font + 1;
-#ifdef _UTF8_32BIT_FONT_H_
-                }
-#endif // _UTF8_32BIT_FONT_H_
-            }
-        }
+        font = findFontSegment(font, isUTF8, cp);
     }
-
     if (font == nullptr || font->glyph == nullptr) {
         return; // Char not found
     }
@@ -234,38 +189,24 @@ void ScrollingText::measureChar(const unsigned char c, int16_t *x, int16_t *y, i
     if (cp == '\n') { // Newline?
         *x = 0;        // Reset x to zero, advance y by one line
         *y += (uint8_t) pgm_read_byte(&font->yAdvance);
-    } else if (cp != '\r') { // Not a carriage return; is normal char
-        uint32_t first = pgm_read_word(&font->first),
-                 last = pgm_read_word(&font->last);
-#ifdef _UTF8_32BIT_FONT_H_
-        if (isUTF8Font_) {
-            first = (((const UTF8_32BitFont *) font)->dFirst != 0) ? ((const UTF8_32BitFont *) font)->dFirst : first;
-            last = (((const UTF8_32BitFont *) font)->dLast != 0) ? ((const UTF8_32BitFont *) font)->dLast : last;
-        }
-#endif // _UTF8_32BIT_FONT_H_
-        if ((cp >= first) && (cp <= last)) { // Char present in this font?
-            GFXglyph *glyph = pgm_read_glyph_ptr(font, cp - first);
-            uint8_t gw = pgm_read_byte(&glyph->width),
-                    gh = pgm_read_byte(&glyph->height),
-                    xa = pgm_read_byte(&glyph->xAdvance);
-            int8_t xo = pgm_read_byte(&glyph->xOffset),
-                    yo = pgm_read_byte(&glyph->yOffset);
-            // if (wrap && ((*x + (((int16_t)xo + gw) * textsize_x)) > _width)) {
-            //     *x = 0; // Reset x to zero, advance y by one line
-            //     *y += textsize_y * (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-            // }
-            int16_t tsx = 1, tsy = 1,
-                    x1 = *x + xo * tsx, y1 = *y + yo * tsy, x2 = x1 + gw * tsx - 1,
-                    y2 = y1 + gh * tsy - 1;
-            if (x1 < *minx)
-                *minx = x1;
-            if (y1 < *miny)
-                *miny = y1;
-            if (x2 > *maxx)
-                *maxx = x2;
-            if (y2 > *maxy)
-                *maxy = y2;
-            *x += xa * tsx;
-        }
+        return;
     }
+    if (cp == '\r') return;
+
+    uint32_t first, last;
+    fontRange(font, isUTF8, first, last);
+    if (cp < first || cp > last) return; // Char not present in this font
+
+    GFXglyph *glyph = pgm_read_glyph_ptr(font, cp - first);
+    uint8_t gw = pgm_read_byte(&glyph->width),
+            gh = pgm_read_byte(&glyph->height),
+            xa = pgm_read_byte(&glyph->xAdvance);
+    int8_t xo = pgm_read_byte(&glyph->xOffset),
+           yo = pgm_read_byte(&glyph->yOffset);
+    int16_t x1 = *x + xo, y1 = *y + yo, x2 = x1 + gw - 1, y2 = y1 + gh - 1;
+    if (x1 < *minx) *minx = x1;
+    if (y1 < *miny) *miny = y1;
+    if (x2 > *maxx) *maxx = x2;
+    if (y2 > *maxy) *maxy = y2;
+    *x += xa;
 }

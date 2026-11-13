@@ -61,6 +61,8 @@ private:
     uint8_t utf8BytesExpected_ = 0;
 
     void init(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont, int16_t color, uint16_t lpad, uint16_t rpad, bool loop, bool draw);
+    GFXcanvas16 *createCanvas(uint16_t w, uint16_t h, const GFXfont *gfxFont);
+    void restartOrStop();
 
     // We need to implement our own measureText() and measureChar() functions, as the
     // Adafruit GFX versions clips the text to the display size, which we do not want here.

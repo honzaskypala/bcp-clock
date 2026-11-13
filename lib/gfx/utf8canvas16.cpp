@@ -3,6 +3,7 @@
 // WTFPL license applies
 
 #include "utf8canvas16.h"
+#include "fontsegment.h"
 
 void UTF8canvas16::setFont(const GFXfont *f, bool segmented) {
     isFontSegmented_ = segmented;
@@ -16,88 +17,37 @@ void UTF8canvas16::setFont(const UTF8_32BitFont *utf8Font, bool segmented) {
 }
 
 size_t UTF8canvas16::write(uint8_t c) {
-    const GFXfont *font = gfxFont;
     uint32_t cp = c;
-
     if (isUTF8Font_) {
-        if (c < 0x80) {
-            // single byte ASCII
-            return GFXcanvas16::write(c);
-        } else if ((c & 0xE0) == 0xC0) {
-            // start of 2-byte sequence
-            utf8Char_ = c & 0x1F;
-            utf8BytesExpected_ = 1;
-            return 0;
-        } else if ((c & 0xF0) == 0xE0) {
-            // start of 3-byte sequence
-            utf8Char_ = c & 0x0F;
-            utf8BytesExpected_ = 2;
-            return 0;
-        } else if ((c & 0xF8) == 0xF0) {
-            // start of 4-byte sequence
-            utf8Char_ = c & 0x07;
-            utf8BytesExpected_ = 3;
-            return 0;
-        } else if ((c & 0xC0) == 0x80 && utf8BytesExpected_ > 0) {
-            // continuation byte
-            utf8Char_ = (utf8Char_ << 6) | (c & 0x3F);
-            utf8BytesExpected_--;
-            if (utf8BytesExpected_ == 0) {
-                cp = utf8Char_;
-                utf8Char_ = 0;
-            } else {
-                return 0; // still not complete
-            }
-        } else {
-            // invalid byte, reset state
-            utf8Char_ = 0;
-            utf8BytesExpected_ = 0;
-            return 0;
-        }
+        if (c < 0x80) return GFXcanvas16::write(c);  // single byte ASCII
+        if (!decodeUtf8Byte(c, utf8Char_, utf8BytesExpected_, cp)) return 0;
     }
     // now we have a complete UTF-8 character
 
+    const GFXfont *font = gfxFont;
     if (font == nullptr) {
         return GFXcanvas16::write((char) cp);
     }
-
-    size_t res = 0;
-    while (true) {
-        uint32_t first = font->first;
-        uint32_t last = font->last;
-        if (isUTF8Font_) {
-            first = (((const UTF8_32BitFont *) font)->dFirst != 0) ? ((const UTF8_32BitFont *) font)->dFirst : first;
-            last = (((const UTF8_32BitFont *) font)->dLast != 0) ? ((const UTF8_32BitFont *) font)->dLast : last;
-        }
-        if (cp >= first && cp <= last) {
-            const GFXfont tmpFont = {
-                (uint8_t  *) font->bitmap,
-                (GFXglyph *) font->glyph + (cp - first),
-                0,
-                0,
-                font->yAdvance
-            };
-            const GFXfont *font1 = gfxFont;
-            GFXcanvas16::setFont(&tmpFont);
-            c = 0;
-            res = GFXcanvas16::write(c);
-            GFXcanvas16::setFont(font1);
-            break;
-        } else if (isFontSegmented_) {
-            // try next segment
-            if (isUTF8Font_) {
-                font = (const GFXfont *) (((const UTF8_32BitFont *) font) + 1);
-            } else {
-                font = font + 1;
-            }
-            if (font->glyph == nullptr) {
-                // no more segments
-                break;
-            }
-        } else {
-            break;
-        }
-    }
     utf8Char_ = 0;
+    if (isFontSegmented_) {
+        font = findFontSegment(font, isUTF8Font_, cp);
+        if (font == nullptr) return 0;
+    }
+    uint32_t first, last;
+    fontRange(font, isUTF8Font_, first, last);
+    if (cp < first || cp > last) return 0;
+
+    // draw the glyph through a one-glyph font, as GFXcanvas16 handles only 8-bit characters
+    const GFXfont tmpFont = {
+        (uint8_t  *) font->bitmap,
+        (GFXglyph *) font->glyph + (cp - first),
+        0,
+        0,
+        font->yAdvance
+    };
+    const GFXfont *font1 = gfxFont;
+    GFXcanvas16::setFont(&tmpFont);
+    size_t res = GFXcanvas16::write((uint8_t) 0);
+    GFXcanvas16::setFont(font1);
     return res;
 }
