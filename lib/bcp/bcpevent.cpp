@@ -30,7 +30,7 @@ bool CBCPEvent::refreshData() {
     if (id_.length() == 0) return false;
 
     String payload;
-    int status = BCPRest("/overview", payload);
+    int status = BCPRest("/v2/events/" + id_, payload);
     lastStatus_ = status;
     if (status == HTTP_CODE_OK) {
         idState_ = ID_VALID;
@@ -65,7 +65,7 @@ void CBCPEvent::handleEventOverviewPayload(const String& payload) {
 
 void CBCPEvent::fetchTimerData() {
     String payload;
-    int status = BCPRest("/timer?round=" + String(currentRound_), payload);
+    int status = BCPRest("/v1/events/" + id_ + "/timer?round=" + String(currentRound_), payload);
     if (status == HTTP_CODE_OK) {
         handleEventTimerPayload(payload);
     } else if (status == HTTP_CODE_NOT_FOUND) {
@@ -97,7 +97,7 @@ void CBCPEvent::handleEventTimerPayload(const String& payload) {
     }
 }
 
-int CBCPEvent::BCPRest(const String& endpoint, String& outPayload) {
+int CBCPEvent::BCPRest(const String& path, String& outPayload) {
 #ifdef BCP_DEV
     if (failNetwork_) return HTTPC_ERROR_CONNECTION_REFUSED;
 #endif
@@ -105,7 +105,7 @@ int CBCPEvent::BCPRest(const String& endpoint, String& outPayload) {
     client.setInsecure();
 
     HTTPClient http;
-    if (!http.begin(client, "https://newprod-api.bestcoastpairings.com/v1/events/" + id_ + endpoint)) {
+    if (!http.begin(client, "https://newprod-api.bestcoastpairings.com" + path)) {
         return -1;
     }
     http.addHeader("client-id", "web-app");

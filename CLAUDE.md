@@ -128,11 +128,13 @@ connects or NTP fails) → `BCPEvent.setID(Config.eventId())`. An invalid/empty 
 server with no timeout and scrolls "Config page http://<IP>".
 
 ### BCP API
-- `GET https://newprod-api.bestcoastpairings.com/v1/events/<id>/overview` → `name`, `status.started/ended/numberOfRounds/currentRound`.
-- `GET .../timer?round=<n>` → `timerLength`, `startTime`, `endTime` (UTC ISO), `timerPaused`, `pausedTimeRemaining`.
+- `GET https://newprod-api.bestcoastpairings.com/v2/events/<id>` → `name`, `status.started/ended/numberOfRounds/currentRound`.
+  The response is ~6 KB; `parseOverview` uses an ArduinoJson filter to keep only `name` and `status`.
+  Spec: https://github.com/honzaskypala/bcp-api/blob/main/bcp-api.yaml
+- `GET .../v1/events/<id>/timer?round=<n>` (no v2 exists) → `timerLength`, `startTime`, `endTime` (UTC ISO), `timerPaused`, `pausedTimeRemaining`.
   A round without a timer (also a non-existent round) returns `200 {}`, not 404. BCP has no way to cancel a started timer.
 - Header `client-id: web-app`; TLS without cert validation (`setInsecure()`). Unofficial API.
-- 404 on overview = invalid event ID (counts as a "successful" fetch, not a failure).
+- 404 on the event (v2) = invalid event ID (counts as a "successful" fetch, not a failure).
 
 ### Persistent storage (NVS / Preferences)
 - Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `hostname`.

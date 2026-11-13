@@ -35,7 +35,7 @@ static void test_eventId_whitespaceKept() {
     TEST_ASSERT_EQUAL_STRING(" AbC123 ", parseEventId(" AbC123 ").c_str());
 }
 
-// ---- /overview ----
+// ---- event overview (/v2/events/<id>) ----
 
 static const char *OVERVIEW_RUNNING =
     "{\"id\":\"AbC123\",\"name\":\"Prague Open – 2025\",\"status\":{\"started\":true,\"ended\":false,"
@@ -48,6 +48,25 @@ static void test_overview_running() {
     TEST_ASSERT_TRUE(o.started);
     TEST_ASSERT_FALSE(o.ended);
     TEST_ASSERT_EQUAL(5, o.numberOfRounds);
+    TEST_ASSERT_EQUAL(3, o.currentRound);
+}
+
+// v2 shape: "name" also nested in other objects, large sections around "status"
+static const char *OVERVIEW_V2 =
+    "{\"id\":\"AbC123\",\"owner\":{\"id\":\"o1\",\"name\":\"Owner\"},"
+    "\"metrics\":{\"placings\":[{\"isOn\":true,\"name\":\"Tournament Points\",\"key\":\"tp\"}]},"
+    "\"name\":\"Cobras con la fresca\","
+    "\"gameSystem\":{\"id\":\"g1\",\"name\":\"Warhammer Underworlds\"},"
+    "\"status\":{\"started\":true,\"ended\":true,\"currentRound\":3,\"numberOfRounds\":3},"
+    "\"listsDetails\":{\"listsLocked\":false,\"options\":{\"allowsText\":true}},\"teamEventOptions\":{}}";
+
+static void test_overview_v2() {
+    EventOverview o;
+    TEST_ASSERT_TRUE(parseOverview(OVERVIEW_V2, o));
+    TEST_ASSERT_EQUAL_STRING("Cobras con la fresca", o.name.c_str());
+    TEST_ASSERT_TRUE(o.started);
+    TEST_ASSERT_TRUE(o.ended);
+    TEST_ASSERT_EQUAL(3, o.numberOfRounds);
     TEST_ASSERT_EQUAL(3, o.currentRound);
 }
 
@@ -148,6 +167,7 @@ int main() {
     RUN_TEST(test_eventId_empty);
     RUN_TEST(test_eventId_whitespaceKept);
     RUN_TEST(test_overview_running);
+    RUN_TEST(test_overview_v2);
     RUN_TEST(test_overview_missingStatus);
     RUN_TEST(test_overview_invalidJson_unchanged);
     RUN_TEST(test_timer_running);

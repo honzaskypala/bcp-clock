@@ -65,7 +65,7 @@ private:
     String fullId_;
 
     // ---- REST API ----
-    int BCPRest(const String& endpoint, String& outPayload);
+    int BCPRest(const String& path, String& outPayload);  // path after the host, e.g. /v2/events/<id>
     int lastStatus_ = 0;
 
     // ---- BCP event details ----

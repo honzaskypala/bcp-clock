@@ -25,8 +25,11 @@ String parseEventId(const String& input) {
 }
 
 bool parseOverview(const String& payload, EventOverview& out) {
+    JsonDocument filter;  // the v2 event response is ~6 KB, keep only the fields used
+    filter["name"] = true;
+    filter["status"] = true;
     JsonDocument doc;
-    if (deserializeJson(doc, payload)) {
+    if (deserializeJson(doc, payload, DeserializationOption::Filter(filter))) {
         return false;
     }
     out.name = doc["name"].as<String>();

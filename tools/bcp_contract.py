@@ -15,7 +15,7 @@ import sys
 import urllib.error
 import urllib.request
 
-API = "https://newprod-api.bestcoastpairings.com/v1/events/"
+API = "https://newprod-api.bestcoastpairings.com"
 ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")   # format parsed by parseIsoUtc()
 
 failures = 0
@@ -27,8 +27,8 @@ except ImportError:
     SSL_CONTEXT = ssl.create_default_context()
 
 
-def get(event_id, endpoint):
-    req = urllib.request.Request(API + event_id + endpoint, headers={"client-id": "web-app", "User-Agent": "ESP32HTTPClient"})  # same as the firmware
+def get(path):
+    req = urllib.request.Request(API + path, headers={"client-id": "web-app", "User-Agent": "ESP32HTTPClient"})  # same as the firmware
     try:
         with urllib.request.urlopen(req, timeout=20, context=SSL_CONTEXT) as resp:
             return resp.status, resp.read().decode("utf-8")
@@ -48,7 +48,7 @@ def is_int(value):
 
 
 def check_timer(round_no, body):
-    print(f"/timer?round={round_no}")
+    print(f"/v1/events/<id>/timer?round={round_no}")
     if body == {}:
         check(True, "{} (round without timer)")
         return
@@ -68,8 +68,8 @@ def main():
     parser.add_argument("--dump", metavar="DIR", help="save the responses to DIR")
     args = parser.parse_args()
 
-    print("/overview")
-    status, text = get(args.event_id, "/overview")
+    print("/v2/events/<id>")
+    status, text = get(f"/v2/events/{args.event_id}")
     check(status == 200, f"HTTP 200 (got {status})")
     if status != 200:
         return
@@ -84,7 +84,7 @@ def main():
 
     rounds = sorted({max(1, st.get("currentRound") or 1), 999})
     for r in rounds:
-        status, text = get(args.event_id, f"/timer?round={r}")
+        status, text = get(f"/v1/events/{args.event_id}/timer?round={r}")
         check(status == 200, f"/timer?round={r}: HTTP 200 (got {status})")
         if status == 200:
             body = json.loads(text)
@@ -93,7 +93,7 @@ def main():
     check(json.loads(responses.get("timer_round999.json", "null")) == {}, "non-existent round returns {}")
 
     print("invalid event ID")
-    status, _ = get("doesNotExist000", "/overview")
+    status, _ = get("/v2/events/doesNotExist000")
     check(status == 404, f"HTTP 404 (got {status})")
 
     if args.dump:
