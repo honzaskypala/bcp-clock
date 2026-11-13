@@ -11,6 +11,7 @@
 #include <RTClib.h>
 #include <webui.h>
 #include <textutil.h>
+#include <devlog.h>
 
 // ---------- Config ----------
 static const uint32_t CONNECT_TIMEOUT_MS = 15000;
@@ -27,16 +28,15 @@ static constexpr const char* PREFS_LIST_KEY = "__ssids";
 constexpr const char* CONNECTION_FAIL_MSG = "Error: Connection failed";
 constexpr const char* NTP_TIME_SYNC_FAIL_MSG = "Error: NTP time sync failed";
 
-#define WIFIMGR_DEBUG(msg) if (debugOut_) { debugOut_->print("[WiFiMgr] "); debugOut_->println(msg); }
+#define WIFIMGR_DEBUG(msg) DEV_LOG("WiFiMgr", msg)
 #define WIFIMGR_MSG(msg) if (usrMsg_) { usrMsg_->println(msg); }
 
 // -----------Singleton----------
 CWifiMgr WifiMgr;
 
 // ---------- Public API ----------
-bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrMsg, Print *debugOut) {
+bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrMsg) {
     usrMsg_ = usrMsg;
-    debugOut_ = debugOut;
 
     WIFIMGR_DEBUG("Attempting automatic WiFi connection.");
     connected_ = false;

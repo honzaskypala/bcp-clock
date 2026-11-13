@@ -61,7 +61,7 @@ ProgressIndicator* Tc001::progressIndicator = nullptr;
 ScrollingText* Tc001::scrollingText = nullptr;
 bool Tc001::midButtonPressed = false;
 
-Tc001::Tc001(Print *debugOut) : debugOut_(debugOut) {
+Tc001::Tc001() {
     pinMode(PIN_BUZZER, INPUT_PULLDOWN);      // stop whistle noise
     pinMode(PIN_MID_BUTTON, INPUT_PULLUP);    // mid button
     pinMode(PIN_RIGHT_BUTTON, INPUT_PULLUP);  // right button
@@ -282,7 +282,7 @@ bool Tc001::ensureConnection() {
     if (forcePortalFlag == FORCE_PORTAL_MAGIC) enforcePortal = true;
     forcePortalFlag = 0;
 #endif
-    bool retValue = WifiMgr.connect(enforcePortal, enforcePortal ? 0 : PORTAL_TIMEOUT_MS, this, debugOut_);
+    bool retValue = WifiMgr.connect(enforcePortal, enforcePortal ? 0 : PORTAL_TIMEOUT_MS, this);
     if (retValue) {
         attachInterrupt(PIN_MID_BUTTON, []() { midButtonPressed = true; }, FALLING);
         attachInterrupt(PIN_RIGHT_BUTTON, []() { enforceUpdate = true; }, FALLING);

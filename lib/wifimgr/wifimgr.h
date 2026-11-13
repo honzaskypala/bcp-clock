@@ -13,7 +13,7 @@
 class CWifiMgr {
 public:
     // ---- Public API ----
-    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0, Print *usrMsg = &Serial, Print *debugOut = nullptr);
+    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0, Print *usrMsg = &Serial);
     bool isConnected() const { return connected_; }
     bool eraseStoredNetworks();
     bool listStoredNetworks(std::vector<String>& out);
@@ -23,7 +23,6 @@ public:
     String buildStoredWifisHtml();
 
 private:
-    Print *debugOut_ = nullptr;  // Optional debug output
     Print *usrMsg_   = &Serial;  // Optional user messages output
 
     // ---- Core state ----

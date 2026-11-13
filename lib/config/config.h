@@ -36,8 +36,6 @@ public:
     bool isConfigServerRunning() const { return configServer != nullptr; }
     volatile bool configUpdated = false;
 
-    Print *debugOut = nullptr;  // Optional debug output
-
 private:
     // ---- Singleton related ----
     CConfig();

@@ -19,12 +19,12 @@ class Tc001 : public Hw, public Print {
 
 // ---- Singleton pattern ----
 public:
-    static Tc001& getInstance(Print *debugOut = nullptr) {
-        static Tc001 instance(debugOut);
+    static Tc001& getInstance() {
+        static Tc001 instance;
         return instance;
     }
 private:
-    Tc001(Print *debugOut = nullptr);
+    Tc001();
     Tc001(const Tc001&) = delete;
     Tc001& operator=(const Tc001&) = delete;
 
@@ -53,13 +53,6 @@ public:
 #endif
 
 private:
-    Print *debugOut_ = nullptr;
-    void debugPrintln(const String& msg) {
-        if (debugOut_ != nullptr) {
-            debugOut_->println("[Tc001] " + msg);
-        }
-    }
-
     static CRGB matrixleds[256];
     static FastLED_NeoMatrix matrix;
 

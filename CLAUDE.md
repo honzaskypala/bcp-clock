@@ -34,7 +34,8 @@ PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
 
 ### Dev build (`-e dev`, `BCP_DEV` define)
 - All development code is inside `#ifdef BCP_DEV`; the production build must stay byte-identical without it.
-- Debug output (`debugOut_ = &Serial`, passed to all modules) is enabled only in the dev build.
+- Debug output (`DEV_LOG("Module", msg)` from `lib/devlog/devlog.h`, printed to `Serial`) exists only in the dev
+  build; in production the macro emits no code or strings.
 - Serial command console (`src/devconsole.cpp`, called from `loop()`), 9600 baud, one command per line,
   each response ends with `[Console] done`. `help` lists commands: `status`, `screen` (ASCII dump of the
   matrix: `.` off, `:` dim, letters = colour), `refresh`, `mid`, `timeshift <sec>`,
@@ -84,6 +85,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 | `lib/hw/tc001.*` | `Tc001` singleton: the TC001 implementation (matrix, buttons, display task, fonts) |
 | `lib/config/` | `CConfig` singleton `Config`: settings in NVS + on-demand HTTP config server |
 | `lib/wifimgr/` | `CWifiMgr` global `WifiMgr`: multi-network WiFi manager with captive portal, NTP + RTC time sync |
+| `lib/devlog/devlog.h` | `DEV_LOG` debug macro, dev build only |
 | `lib/webui/` | Shared look of the web pages (captive portal, config page): page template, common CSS, `escapeHtml` |
 | `lib/gfx/` | Adafruit_GFX helpers: `ScrollingText`, `ProgressIndicator`, `UTF8canvas16`, fonts |
 | `lib/*/*.html`, `wifimgr.css` | Gitignored, formatted copies of the generated pages used for styling, older than `lib/webui`; the real HTML/CSS is inlined as strings in the `.cpp` files |
@@ -175,7 +177,8 @@ plausible RTC time is used instead, otherwise the connection attempt counts as f
   Getters follow the Qt style: value getters are nouns (`name()`, `eventId()`), bool getters use
   `is`/`has` (`isStarted()`, `hasTimeSyncFailed()`). `xToY()` conversions are fine (`secondsToTime()`).
   Overrides of Arduino/Adafruit methods keep their names (`write`, `setFont`, `draw`).
-- Per-module debug macros printing `[Module] msg` to an optional `Print *debugOut`.
+- Per-module debug macros (`MAIN_DEBUG`, `CONFIG_DEBUG`, `WIFIMGR_DEBUG`) are aliases of `DEV_LOG("Module", msg)`,
+  which prints `[Module] msg` to `Serial` in the dev build only.
 - Arduino `String` is used widely; the TODO lists moving to `const String&` / `char*` where it makes sense.
 - Section comments in the form `// ---- Section ----`.
 

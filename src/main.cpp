@@ -11,6 +11,7 @@
 #include <hw.h>
 #include <tc001.h>
 #include <policy.h>
+#include <devlog.h>
 #ifdef BCP_DEV
 #include "devconsole.h"
 #endif
@@ -18,8 +19,7 @@
 #define DATA_REFRESH_INTERVAL_MS 60000 // 60 seconds
 #define MAX_CONNECTION_FAILURES 5      // reboot after this many consecutive connection errors (stuck TLS/HTTP)
 
-Print *debugOut_ = nullptr;  // Optional debug output
-#define MAIN_DEBUG(msg) if (debugOut_) { debugOut_->print("[Main] "); debugOut_->println(msg); }
+#define MAIN_DEBUG(msg) DEV_LOG("Main", msg)
 
 Hw *hw;
 String mdnsHostname;  // hostname announced over mDNS
@@ -167,10 +167,7 @@ void refreshEventData() {
 // ---- core Arduino functions ----
 
 void setup() {
-#ifdef BCP_DEV
-    debugOut_ = &Serial;
-#endif
-    hw = &Tc001::getInstance(debugOut_);
+    hw = &Tc001::getInstance();
     hw->showSplashScreen();
     WiFi.setHostname(Config.hostname().c_str());   // must be set before WiFi starts
     if (!hw->ensureConnection()) {
@@ -178,7 +175,6 @@ void setup() {
         delay(5000);
         hw->reboot();
     }
-    Config.debugOut = debugOut_;
     startMdns();
     // Config.erase(); // for testing only - remove in production
     BCPEvent.setID(Config.eventId());

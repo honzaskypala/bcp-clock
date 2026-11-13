@@ -8,8 +8,9 @@
 #include <wifimgr.h>
 #include <webui.h>
 #include <textutil.h>
+#include <devlog.h>
 
-#define CONFIG_DEBUG(msg) if (debugOut) { debugOut->print("[Config] "); debugOut->println(msg); }
+#define CONFIG_DEBUG(msg) DEV_LOG("Config", msg)
 
 static const String DEF_EVENT = "";
 static const long DEF_YELLOW = 600; // seconds
