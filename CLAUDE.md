@@ -50,7 +50,9 @@ PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
   `platformio.ini` (`extra_scripts`).
 - Tests (PlatformIO Unity): `test/native/` runs on the Mac (env `native`, Arduino `String` from
   ArduinoFake, only `lib/core` and `lib/webui` are compiled), `test/device/` runs on the TC001. Device
-  tests replace the firmware: stop devmon before, flash production (or dev) again after. Running both
+  tests replace the firmware: stop devmon before, flash production (or dev) again right after every run
+  (the test firmware leaves the display frozen). The TC001 whistles from power-on until firmware drives
+  the buzzer pin, so every device test `setup()` must start with `pinMode(15, INPUT_PULLDOWN)`. Running both
   device suites in one `pio test` call sometimes fails to upload the second one; run it again with
   `-f device/<suite>`. Unity on the ESP32 has no 64-bit asserts. Logic that needs tests belongs to
   `lib/core` (no ESP-only includes). Display, WiFi, portal, config server and buttons are verified on the

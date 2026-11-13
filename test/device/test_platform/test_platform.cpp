@@ -163,6 +163,7 @@ static void test_config_hostnameSanitizedOnLoad() {
 }
 
 void setup() {
+    pinMode(15, INPUT_PULLDOWN);   // silence the TC001 buzzer (GPIO 15) before anything else
     delay(2000);   // the serial port reset the board, give the test runner time to attach
     UNITY_BEGIN();
     RUN_TEST(test_isoUtc_newlib);
