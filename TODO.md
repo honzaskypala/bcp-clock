@@ -1,6 +1,7 @@
 # TODO for BCP-clock project
 
 ## main related
+- [ ] WiFi disconnected warning
 - [ ] offline mode, just run countdown from configurable time
 - [ ] chess clock functionality
 - [ ] [Low battery warning](https://github.com/rroels/ulanzi_tc001_hardware?tab=readme-ov-file#battery-voltage-example-2-mapped-value)
