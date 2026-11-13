@@ -43,10 +43,10 @@
 ## General
 - [ ] Refactor all code, method names to verbNouns()
 - [ ] Refactor code, unnest
-- [ ] [BCP] Parse the JSON response from the HTTP stream instead of `getString()` (~6 KB heap peak every refresh; mind chunked responses)
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [BCP] JSON responses parsed directly from the HTTP stream instead of `getString()` (no ~6 KB body String on every refresh); requests use HTTP/1.0 so the body is never chunked
 - [x] [General] [Refactor] String replaced where it pays off: countdown text built with snprintf into a char buffer (no heap allocations in the per-second redraw), BCPEvent/Config getters return `const String&`, "Round N" and splash text without String. String cannot be removed completely (ESP32 core WebServer/HTTPClient/Preferences APIs use it)
 - [x] [BCP] Event overview fetched from BCP API v2 (`/v2/events/<id>`) with a JSON filter keeping only name and status; the timer stays on v1 (no v2 exists)
 - [x] [General] [Tests] Git pre-commit hook (tools/git-hooks): native tests on every commit, TC001 tests only when related files are staged, then production firmware is flashed back

@@ -24,7 +24,8 @@ String parseEventId(const String& input) {
     return id;
 }
 
-bool parseOverview(const String& payload, EventOverview& out) {
+template <typename TInput>
+static bool parseOverviewFrom(TInput& payload, EventOverview& out) {
     JsonDocument filter;  // the v2 event response is ~6 KB, keep only the fields used
     filter["name"] = true;
     filter["status"] = true;
@@ -40,7 +41,8 @@ bool parseOverview(const String& payload, EventOverview& out) {
     return true;
 }
 
-bool parseTimer(const String& payload, TimerData& out) {
+template <typename TInput>
+static bool parseTimerFrom(TInput& payload, TimerData& out) {
     JsonDocument doc;
     if (deserializeJson(doc, payload)) {
         return false;
@@ -62,6 +64,24 @@ bool parseTimer(const String& payload, TimerData& out) {
     }
     return true;
 }
+
+bool parseOverview(const String& payload, EventOverview& out) {
+    return parseOverviewFrom(payload, out);
+}
+
+bool parseTimer(const String& payload, TimerData& out) {
+    return parseTimerFrom(payload, out);
+}
+
+#if ARDUINOJSON_ENABLE_ARDUINO_STREAM
+bool parseOverview(Stream& payload, EventOverview& out) {
+    return parseOverviewFrom(payload, out);
+}
+
+bool parseTimer(Stream& payload, TimerData& out) {
+    return parseTimerFrom(payload, out);
+}
+#endif
 
 time_t parseIsoUtc(const char *iso) {
     struct tm t = {};

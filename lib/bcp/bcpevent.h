@@ -65,14 +65,15 @@ private:
     String fullId_;
 
     // ---- REST API ----
-    int BCPRest(const String& path, String& outPayload);  // path after the host, e.g. /v2/events/<id>
+    // path after the host, e.g. /v2/events/<id>; onBody parses the response body of a 200 from the stream
+    int BCPRest(const String& path, void (CBCPEvent::*onBody)(Stream&));
     int lastStatus_ = 0;
 
     // ---- BCP event details ----
     String name_ = "";
     bool started_ = false, ended_ = false;
     int numberOfRounds_ = 0, currentRound_ = 0;
-    void handleEventOverviewPayload(const String& payload);
+    void handleEventOverviewPayload(Stream& payload);
 
     // ---- BCP round timer details ----
     uint32_t timerLength_ = 0;
@@ -82,7 +83,7 @@ private:
     uint32_t pausedTimeRemaining_ = 0;
     void fetchTimerData();
     void clearTimerData();
-    void handleEventTimerPayload(const String& payload);
+    void handleEventTimerPayload(Stream& payload);
 
     // ---- Snapshot of event data surviving a soft reboot ----
     void saveSnapshot();

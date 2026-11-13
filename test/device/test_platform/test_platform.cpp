@@ -1,4 +1,4 @@
-// On-device tests of the platform dependent parts: newlib time conversion, JSON parsing, config in NVS
+// On-device tests of the platform dependent parts: newlib time conversion, JSON parsing (also from a Stream), config in NVS
 // (c) 2025 Honza Skýpala
 // WTFPL license applies
 
@@ -41,6 +41,61 @@ static void test_timerPayload_onDevice() {
     TEST_ASSERT_EQUAL_INT32(1763456400 + 9000, (int32_t) t.endEpoch);
     TEST_ASSERT_TRUE(t.paused);
     TEST_ASSERT_EQUAL_UINT32(1234, t.pausedTimeRemaining);
+}
+
+// ---- JSON parsed from a Stream (the HTTP response path) ----
+
+// Read-only in-memory Stream; ends like a closed connection (read() returns -1)
+class MemStream : public Stream {
+public:
+    explicit MemStream(const char *data) : data_(data), pos_(0), len_(strlen(data)) { setTimeout(0); }
+    int available() override { return len_ - pos_; }
+    int read() override { return pos_ < len_ ? (uint8_t) data_[pos_++] : -1; }
+    int peek() override { return pos_ < len_ ? (uint8_t) data_[pos_] : -1; }
+    size_t write(uint8_t) override { return 0; }
+private:
+    const char *data_;
+    size_t pos_, len_;
+};
+
+static void test_overviewStream_v2() {
+    MemStream in("{\"id\":\"AbC123\",\"owner\":{\"id\":\"o1\",\"name\":\"Owner\"},"
+                 "\"name\":\"Prague Open – 2025\",\"gameSystem\":{\"name\":\"X\"},"
+                 "\"status\":{\"started\":true,\"ended\":false,\"currentRound\":3,\"numberOfRounds\":5},"
+                 "\"teamEventOptions\":{}}");
+    EventOverview o;
+    TEST_ASSERT_TRUE(parseOverview(in, o));
+    TEST_ASSERT_EQUAL_STRING("Prague Open – 2025", o.name.c_str());
+    TEST_ASSERT_TRUE(o.started);
+    TEST_ASSERT_FALSE(o.ended);
+    TEST_ASSERT_EQUAL(5, o.numberOfRounds);
+    TEST_ASSERT_EQUAL(3, o.currentRound);
+}
+
+static void test_overviewStream_truncated_unchanged() {
+    MemStream in("{\"name\":\"X\",\"status\":{\"started\":tr");
+    EventOverview o;
+    o.name = "keep";
+    TEST_ASSERT_FALSE(parseOverview(in, o));
+    TEST_ASSERT_EQUAL_STRING("keep", o.name.c_str());
+}
+
+static void test_timerStream() {
+    MemStream in("{\"timerLength\":3600,\"startTime\":\"2025-11-18T09:00:00Z\","
+                 "\"endTime\":\"2025-11-18T10:00:00Z\",\"timerPaused\":false}");
+    TimerData t;
+    TEST_ASSERT_TRUE(parseTimer(in, t));
+    TEST_ASSERT_EQUAL_UINT32(3600, t.timerLength);
+    TEST_ASSERT_EQUAL_INT32(1763456400 + 3600, (int32_t) t.endEpoch);
+    TEST_ASSERT_FALSE(t.paused);
+}
+
+static void test_timerStream_empty() {
+    MemStream in("{}");
+    TimerData t;
+    t.timerLength = 99;
+    TEST_ASSERT_TRUE(parseTimer(in, t));
+    TEST_ASSERT_EQUAL_UINT32(0, t.timerLength);
 }
 
 // ---- Config in NVS ----
@@ -113,6 +168,10 @@ void setup() {
     RUN_TEST(test_isoUtc_newlib);
     RUN_TEST(test_isoUtc_newlib_withTz);
     RUN_TEST(test_timerPayload_onDevice);
+    RUN_TEST(test_overviewStream_v2);
+    RUN_TEST(test_overviewStream_truncated_unchanged);
+    RUN_TEST(test_timerStream);
+    RUN_TEST(test_timerStream_empty);
     RUN_TEST(test_config_defaults);
     RUN_TEST(test_config_longValues);
     RUN_TEST(test_config_legacyStringThresholds);

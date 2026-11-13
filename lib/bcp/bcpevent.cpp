@@ -29,12 +29,10 @@ bool CBCPEvent::refreshData() {
     lastStatus_ = 0;
     if (id_.length() == 0) return false;
 
-    String payload;
-    int status = BCPRest("/v2/events/" + id_, payload);
+    int status = BCPRest("/v2/events/" + id_, &CBCPEvent::handleEventOverviewPayload);
     lastStatus_ = status;
     if (status == HTTP_CODE_OK) {
         idState_ = ID_VALID;
-        handleEventOverviewPayload(payload);
         if (started_ && !ended_) {
             fetchTimerData();
         }
@@ -47,7 +45,7 @@ bool CBCPEvent::refreshData() {
     return status == HTTP_CODE_OK || status == HTTP_CODE_NOT_FOUND;
 }
 
-void CBCPEvent::handleEventOverviewPayload(const String& payload) {
+void CBCPEvent::handleEventOverviewPayload(Stream& payload) {
     EventOverview overview;
     if (parseOverview(payload, overview)) {
         int pastRound = currentRound_;
@@ -64,11 +62,9 @@ void CBCPEvent::handleEventOverviewPayload(const String& payload) {
 }
 
 void CBCPEvent::fetchTimerData() {
-    String payload;
-    int status = BCPRest("/v1/events/" + id_ + "/timer?round=" + String(currentRound_), payload);
-    if (status == HTTP_CODE_OK) {
-        handleEventTimerPayload(payload);
-    } else if (status == HTTP_CODE_NOT_FOUND) {
+    int status = BCPRest("/v1/events/" + id_ + "/timer?round=" + String(currentRound_),
+                         &CBCPEvent::handleEventTimerPayload);
+    if (status == HTTP_CODE_NOT_FOUND) {
         clearTimerData();  // BCP returns 200 {} for no timer now; 404 handled in case that changes
     }
     // other errors (connection, 5xx): keep the last timer data
@@ -84,7 +80,7 @@ void CBCPEvent::clearTimerData() {
     pausedTimeRemaining_ = 0;
 }
 
-void CBCPEvent::handleEventTimerPayload(const String& payload) {
+void CBCPEvent::handleEventTimerPayload(Stream& payload) {
     TimerData timer;
     if (parseTimer(payload, timer)) {   // {} = round without timer, clears the data
         timerLength_ = timer.timerLength;
@@ -97,7 +93,7 @@ void CBCPEvent::handleEventTimerPayload(const String& payload) {
     }
 }
 
-int CBCPEvent::BCPRest(const String& path, String& outPayload) {
+int CBCPEvent::BCPRest(const String& path, void (CBCPEvent::*onBody)(Stream&)) {
 #ifdef BCP_DEV
     if (failNetwork_) return HTTPC_ERROR_CONNECTION_REFUSED;
 #endif
@@ -109,10 +105,11 @@ int CBCPEvent::BCPRest(const String& path, String& outPayload) {
         return -1;
     }
     http.addHeader("client-id", "web-app");
+    http.useHTTP10(true);  // no chunked transfer encoding, so the body can be parsed from the raw stream
 
     int status = http.GET();
     if (status == HTTP_CODE_OK) {
-        outPayload = http.getString();
+        (this->*onBody)(http.getStream());
     }
     http.end();
 
