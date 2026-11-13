@@ -11,7 +11,7 @@ DisplayDecision decideDisplay(const DisplayInputs& in, DisplayMemory& memory) {
     DisplayDecision d = { SHOW_NOTHING_NEW, false };
 
     if (in.state == DISPLAY_CONFIG_MESSAGE && !in.redrawRequested) {
-        return d;  // config page address is scrolling, eventHandler requests a redraw when it finishes
+        return d;  // config page address is scrolling, handleEvents requests a redraw when it finishes
     }
 
     if (in.valid) {
@@ -56,7 +56,7 @@ DisplayDecision decideDisplay(const DisplayInputs& in, DisplayMemory& memory) {
 
 // ---- Reaction to a data refresh result ----
 
-RefreshDecision onRefreshResult(bool ok, bool wifiConnected, int lastStatus, int failCount, int maxFailures) {
+RefreshDecision decideRefresh(bool ok, bool wifiConnected, int lastStatus, int failCount, int maxFailures) {
     if (ok) {
         return { REFRESH_SUCCESS, 0 };
     } else if (!wifiConnected) {

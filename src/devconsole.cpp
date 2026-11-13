@@ -17,7 +17,7 @@ static long timeShift_ = 0;  // total seconds the system clock was shifted by "t
 
 // ---- Commands ----
 
-static void cmdHelp() {
+static void handleHelp() {
     Serial.println("Commands:");
     Serial.println("  help              this list");
     Serial.println("  status            device, network, event and timer state");
@@ -35,7 +35,7 @@ static void cmdHelp() {
     Serial.println("  reboot            restart the device");
 }
 
-static void cmdStatus(Hw *hw) {
+static void handleStatus(Hw *hw) {
     time_t now = time(nullptr);
     Serial.printf("uptime: %lu s, free heap: %u B, min free heap: %u B\n",
                   millis() / 1000, ESP.getFreeHeap(), ESP.getMinFreeHeap());
@@ -49,19 +49,19 @@ static void cmdStatus(Hw *hw) {
     Serial.printf("config: event=%s yellow=%ld red=%ld\n",
                   Config.eventId().c_str(), Config.yellowThreshold(), Config.redThreshold());
     Serial.printf("event: id=%s valid=%d invalid=%d fake=%d bcpfail=%d lastStatus=%d name=\"%s\"\n",
-                  BCPEvent.id().c_str(), BCPEvent.valid(), BCPEvent.invalid(), BCPEvent.fake(),
-                  BCPEvent.failNetwork(), BCPEvent.lastStatus(), BCPEvent.name().c_str());
+                  BCPEvent.id().c_str(), BCPEvent.isValid(), BCPEvent.isInvalid(), BCPEvent.isFake(),
+                  BCPEvent.isNetworkFailing(), BCPEvent.lastStatus(), BCPEvent.name().c_str());
     Serial.printf("event: started=%d ended=%d round=%d/%d\n",
-                  BCPEvent.started(), BCPEvent.ended(), BCPEvent.currentRound(), BCPEvent.numberOfRounds());
+                  BCPEvent.isStarted(), BCPEvent.isEnded(), BCPEvent.currentRound(), BCPEvent.numberOfRounds());
     Serial.printf("timer: length=%u start=%s end=%s paused=%d pausedRemaining=%u\n",
                   BCPEvent.timerLength(), BCPEvent.roundStartTime().c_str(), BCPEvent.roundEndTime().c_str(),
-                  BCPEvent.timerPaused(), BCPEvent.pausedTimeRemaining());
+                  BCPEvent.isTimerPaused(), BCPEvent.pausedTimeRemaining());
     if (BCPEvent.timerLength() > 0) {
         Serial.printf("timer: remaining=%ld s\n", (long) (BCPEvent.roundEndEpoch() - now));
     }
 }
 
-static void cmdTimeshift(const String& arg) {
+static void handleTimeshift(const String& arg) {
     long shift = arg.toInt();
     struct timeval tv;
     gettimeofday(&tv, nullptr);
@@ -72,7 +72,7 @@ static void cmdTimeshift(const String& arg) {
 }
 
 // Returns the n-th space separated word of str, or empty string
-static String word(const String& str, int n) {
+static String extractWord(const String& str, int n) {
     int start = 0;
     for (int i = 0; i < n; i++) {
         start = str.indexOf(' ', start);
@@ -83,8 +83,8 @@ static String word(const String& str, int n) {
     return end < 0 ? str.substring(start) : str.substring(start, end);
 }
 
-static void cmdFake(const String& arg) {
-    String mode = word(arg, 0);
+static void handleFake(const String& arg) {
+    String mode = extractWord(arg, 0);
     if (mode == "off") {
         BCPEvent.clearFakeData();
         Hw::enforceUpdate = true;
@@ -92,7 +92,7 @@ static void cmdFake(const String& arg) {
         return;
     }
 
-    String secArg = word(arg, 1), lengthArg = word(arg, 2), roundArg = word(arg, 3);
+    String secArg = extractWord(arg, 1), lengthArg = extractWord(arg, 2), roundArg = extractWord(arg, 3);
     long sec = secArg.length() > 0 ? secArg.toInt() : 300;
     long length = lengthArg.length() > 0 ? lengthArg.toInt() : 9000;
     int round = 3, rounds = 5;
@@ -117,22 +117,22 @@ static void cmdFake(const String& arg) {
     Serial.printf("Fake data set: %s sec=%ld length=%ld round=%d/%d\n", mode.c_str(), sec, length, round, rounds);
 }
 
-static void execute(const String& line, Hw *hw) {
+static void executeCommand(const String& line, Hw *hw) {
     int space = line.indexOf(' ');
     String cmd = space < 0 ? line : line.substring(0, space);
     String arg = space < 0 ? String() : line.substring(space + 1);
     arg.trim();
 
-    if (cmd == "help") cmdHelp();
-    else if (cmd == "status") cmdStatus(hw);
+    if (cmd == "help") handleHelp();
+    else if (cmd == "status") handleStatus(hw);
     else if (cmd == "screen") Tc001::dumpScreen(Serial);
     else if (cmd == "refresh") { Hw::enforceUpdate = true; Serial.println("Refresh requested"); }
     else if (cmd == "mid") { Tc001::simulateMidButton(); Serial.println("Mid button pressed"); }
-    else if (cmd == "timeshift") cmdTimeshift(arg);
-    else if (cmd == "fake") cmdFake(arg);
+    else if (cmd == "timeshift") handleTimeshift(arg);
+    else if (cmd == "fake") handleFake(arg);
     else if (cmd == "bcpfail") {
-        BCPEvent.setFailNetwork(arg == "on");
-        Serial.printf("BCP connection errors %s\n", BCPEvent.failNetwork() ? "on" : "off");
+        BCPEvent.setNetworkFailing(arg == "on");
+        Serial.printf("BCP connection errors %s\n", BCPEvent.isNetworkFailing() ? "on" : "off");
     }
     else if (cmd == "portal") { Serial.println("Rebooting into portal..."); Serial.flush(); static_cast<Tc001 *>(hw)->rebootToPortal(); }
     else if (cmd == "reboot") { Serial.println("Rebooting..."); Serial.flush(); hw->reboot(); }
@@ -141,7 +141,7 @@ static void execute(const String& line, Hw *hw) {
 
 // ---- Public entry point ----
 
-void devConsoleTick(Hw *hw) {
+void tickDevConsole(Hw *hw) {
     static String line;
     while (Serial.available()) {
         char c = Serial.read();
@@ -150,7 +150,7 @@ void devConsoleTick(Hw *hw) {
             line.trim();
             if (line.length() > 0) {
                 Serial.println("> " + line);
-                execute(line, hw);
+                executeCommand(line, hw);
                 Serial.println("[Console] done");
             }
             line = "";

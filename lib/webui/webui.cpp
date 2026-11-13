@@ -37,31 +37,31 @@ static const char COMMON_CSS[] =
         ".btnMain{width:100%;min-width:0}"
     "}";
 
-String pageStart(const String& title, const char *pageCss) {
+String buildPageStart(const String& title, const char *pageCss) {
     String page;
     page.reserve(4096);
     page += "<!DOCTYPE html><html><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'><title>";
-    page += htmlEscape(title);
+    page += escapeHtml(title);
     page += "</title><style>";
     page += COMMON_CSS;
     page += pageCss;
     page += "</style></head><body><div class='wrap'><h1>";
-    page += htmlEscape(title);
+    page += escapeHtml(title);
     page += "</h1>";
     return page;
 }
 
-String pageEnd() {
+String buildPageEnd() {
     return "</div></body></html>";
 }
 
-String sectionHeader(const String& title, const String& buttonHtml, bool first) {
-    return String("<div class='secHeader") + (first ? " first" : "") + "'><h2>" + htmlEscape(title) + "</h2>" +
+String buildSectionHeader(const String& title, const String& buttonHtml, bool first) {
+    return String("<div class='secHeader") + (first ? " first" : "") + "'><h2>" + escapeHtml(title) + "</h2>" +
            buttonHtml + "</div>";
 }
 
-String htmlEscape(const String& in) {
+String escapeHtml(const String& in) {
     String out;
     out.reserve(in.length() + 10);
     for (size_t i = 0; i < in.length(); ++i) {

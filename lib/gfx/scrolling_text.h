@@ -19,14 +19,14 @@
 class ScrollingText : public GFXanimation {
 public:
     ScrollingText(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont = false, int16_t color = DEFAULT_COLOR, uint16_t lpad = DEFAULT_LPAD, uint16_t rpad = DEFAULT_RPAD, bool loop = DEFAULT_LOOP, bool draw = DEFAULT_DRAW) : GFXanimation(gfx), x_(x), y_(y), gfxFont_(gfxFont), lpad_(lpad), rpad_(rpad), loop_(loop), startPos_(0), pos_(0), newLpad_(-256) {
-        _ScrollingText(gfx, text, x, y, gfxFont, segmentedFont, color, lpad, rpad, loop, draw);
+        init(gfx, text, x, y, gfxFont, segmentedFont, color, lpad, rpad, loop, draw);
     };
     ScrollingText(Adafruit_GFX *gfx, const String &text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont = false, int16_t color = DEFAULT_COLOR, uint16_t lpad = DEFAULT_LPAD, uint16_t rpad = DEFAULT_RPAD, bool loop = DEFAULT_LOOP, bool draw = DEFAULT_DRAW) : ScrollingText(gfx, text.c_str(), x, y, gfxFont, segmentedFont, color, lpad, rpad, loop, draw) {};
 
 #ifdef _UTF8_32BIT_FONT_H_
     ScrollingText(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const UTF8_32BitFont *gfxFont, bool segmentedFont = false, int16_t color = DEFAULT_COLOR, uint16_t lpad = DEFAULT_LPAD, uint16_t rpad = DEFAULT_RPAD, bool loop = DEFAULT_LOOP, bool draw = DEFAULT_DRAW) : GFXanimation(gfx), x_(x), y_(y), gfxFont_((const GFXfont *) gfxFont), lpad_(lpad), rpad_(rpad), loop_(loop), startPos_(0), pos_(0), newLpad_(-256), isSegFont_(true) {
         isUTF8Font_ = true;
-        _ScrollingText(gfx, text, x, y, (const GFXfont *) gfxFont, segmentedFont, color, lpad, rpad, loop, draw);
+        init(gfx, text, x, y, (const GFXfont *) gfxFont, segmentedFont, color, lpad, rpad, loop, draw);
     };
     ScrollingText(Adafruit_GFX *gfx, const String &text, int16_t x, int16_t y, const UTF8_32BitFont *gfxFont, bool segmentedFont = false, int16_t color = DEFAULT_COLOR, uint16_t lpad = DEFAULT_LPAD, uint16_t rpad = DEFAULT_RPAD, bool loop = DEFAULT_LOOP, bool draw = DEFAULT_DRAW) : ScrollingText(gfx, text.c_str(), x, y, gfxFont, segmentedFont, color, lpad, rpad, loop, draw) {};
 #endif // _UTF8_32BIT_FONT_H_
@@ -57,16 +57,16 @@ private:
     uint16_t totalWidth_;
     uint16_t startPos_, pos_;
     bool loop_;
-    uint32_t utf8Char_ = 0;           // UTF-8 decoder state for charBounds()
+    uint32_t utf8Char_ = 0;           // UTF-8 decoder state for measureChar()
     uint8_t utf8BytesExpected_ = 0;
 
-    void _ScrollingText(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont, int16_t color, uint16_t lpad, uint16_t rpad, bool loop, bool draw);
+    void init(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont, int16_t color, uint16_t lpad, uint16_t rpad, bool loop, bool draw);
 
-    // We need to implement our own textDimensions() and charBounds() functions, as the
+    // We need to implement our own measureText() and measureChar() functions, as the
     // Adafruit GFX versions clips the text to the display size, which we do not want here.
     // We need full dimensions of the text even if it is larger than the display.
-    void textDimensions(const char *str, int16_t *x1, int16_t *y1, uint16_t *width, uint16_t *height);
-    void charBounds(const unsigned char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy);
+    void measureText(const char *str, int16_t *x1, int16_t *y1, uint16_t *width, uint16_t *height);
+    void measureChar(const unsigned char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy);
 
     // we need our own drawBitmap(), as the methods in Adafruit GFX work only
     // with 1-bit bitmaps, not with 16-bit color bitmaps as used in our canvas

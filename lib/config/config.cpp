@@ -122,7 +122,7 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
     
     configServer->on("/", HTTP_GET, [this]() { handleConfigRoot(); });
     configServer->on("/config", HTTP_POST, [this]() { handleConfigPost(); });
-    // same paths as the captive portal, the stored networks HTML is shared (WifiMgr.storedWifisHTML())
+    // same paths as the captive portal, the stored networks HTML is shared (WifiMgr.buildStoredWifisHtml())
     configServer->on("/delete", HTTP_DELETE, [this]() { handleWifiDelete(); });
     configServer->on("/deleteAll", HTTP_DELETE, [this]() { handleWifiDeleteAll(); });
 
@@ -181,7 +181,7 @@ void CConfig::handleConfigRoot() {
         status = "All WiFi networks deleted";
     }
     
-    String page = WebUI::pageStart("BCP-clock config",
+    String page = WebUI::buildPageStart("BCP-clock config",
             "label[for=yellow],label[for=red]{display:flex;align-items:center;background:#000;padding:0 8px;box-sizing:border-box}"
             ".row.threshold{align-items:stretch}"
             "label[for=yellow]{color:#ff0}"
@@ -203,11 +203,11 @@ void CConfig::handleConfigRoot() {
                 "<div class='row'>"
                     "<label for='event'>Event:</label>"
                     "<div class='input-wrapper'>"
-                        "<input type='text' id='event' name='event' placeholder='Enter event ID or event URL' value='" + WebUI::htmlEscape(event_) + "'>"
+                        "<input type='text' id='event' name='event' placeholder='Enter event ID or event URL' value='" + WebUI::escapeHtml(event_) + "'>"
                         "<a class='clear-text' onclick='clearInput(this);return false;'>⨂</a>"
                     "</div>"
                 "</div>";
-    page += WebUI::sectionHeader("Colour thresholds");
+    page += WebUI::buildSectionHeader("Colour thresholds");
     page += "<div class='row threshold'>"
                 "<label for='yellow'>Yellow:</label>"
                 "<input type='text' id='yellow' name='yellow' value='" + secondsToTime(yellow_) + "'>"
@@ -216,10 +216,10 @@ void CConfig::handleConfigRoot() {
                 "<label for='red'>Red:</label>"
                 "<input type='text' id='red' name='red' value='" + secondsToTime(red_) + "'>"
             "</div>";
-    page += WebUI::sectionHeader("Network");
+    page += WebUI::buildSectionHeader("Network");
     page += "<div class='row'>"
                 "<label for='hostname'>Hostname:</label>"
-                "<input type='text' id='hostname' name='hostname' maxlength='32' value='" + WebUI::htmlEscape(hostname_) + "'>"
+                "<input type='text' id='hostname' name='hostname' maxlength='32' value='" + WebUI::escapeHtml(hostname_) + "'>"
             "</div>"
             "<div class='actions'><button class='btn btnMain' type='submit'>Save</button></div>"
             "</form>"
@@ -232,8 +232,8 @@ void CConfig::handleConfigRoot() {
                 "}"
             "</script>";
 
-    page += WifiMgr.storedWifisHTML();
-    page += WebUI::pageEnd();
+    page += WifiMgr.buildStoredWifisHtml();
+    page += WebUI::buildPageEnd();
 
     configServer->send(200, "text/html", page);
 }

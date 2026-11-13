@@ -37,15 +37,15 @@ void startMdns() {
 // ---- update display after data refresh ----
 // The display state is set by the Hw implementation; here it is only read to avoid redrawing
 // what is already shown.
-void displayUpdate() {
+void updateDisplay() {
     static DisplayMemory memory;
     DisplayInputs in;
     in.state = hw->displayState;
     in.redrawRequested = hw->redrawRequested;
-    in.valid = BCPEvent.valid();
-    in.invalid = BCPEvent.invalid();
-    in.started = BCPEvent.started();
-    in.ended = BCPEvent.ended();
+    in.valid = BCPEvent.isValid();
+    in.invalid = BCPEvent.isInvalid();
+    in.started = BCPEvent.isStarted();
+    in.ended = BCPEvent.isEnded();
     in.timerLength = BCPEvent.timerLength();
     in.name = BCPEvent.name();
     in.currentRound = BCPEvent.currentRound();
@@ -76,7 +76,7 @@ void displayUpdate() {
             break;
         case SHOW_SPLASH:
             MAIN_DEBUG("Event ID not verified yet, displaying splash screen.");
-            hw->splashScreen();
+            hw->showSplashScreen();
             break;
         case SHOW_CONFIG_REQUIRED:
             // run the config server with no timeout and ask for configuration
@@ -85,7 +85,7 @@ void displayUpdate() {
                 Config.stopConfigServer();
             }
             Config.startConfigServer(0);
-            hw->configServerMsg("Invalid event ID");
+            hw->showConfigServerMsg("Invalid event ID");
             break;
         case SHOW_NOTHING_NEW:
             break;
@@ -99,7 +99,7 @@ void setup() {
     debugOut_ = &Serial;
 #endif
     hw = &Tc001::getInstance(debugOut_);
-    hw->splashScreen();
+    hw->showSplashScreen();
     WiFi.setHostname(Config.hostname().c_str());   // must be set before WiFi starts
     if (!hw->ensureConnection()) {
         MAIN_DEBUG("Connection not established, rebooting in 5 seconds...");
@@ -110,7 +110,7 @@ void setup() {
     startMdns();
     // Config.erase(); // for testing only - remove in production
     BCPEvent.setID(Config.eventId());
-    if (BCPEvent.valid()) {
+    if (BCPEvent.isValid()) {
         MAIN_DEBUG("Event data restored from snapshot.");
     }
 }
@@ -130,7 +130,7 @@ void loop() {
         }
         if (Config.eventId() != BCPEvent.fullId()) {
             MAIN_DEBUG("Event ID changed, updating BCP event.");
-            hw->splashScreen();
+            hw->showSplashScreen();
             BCPEvent.setID(Config.eventId());
             lastDataRefresh = 0; // force data refresh
             failCount = 0;
@@ -142,7 +142,7 @@ void loop() {
         hw->enforceUpdate = false;
         lastDataRefresh = millis();
         bool ok = BCPEvent.refreshData();
-        RefreshDecision r = onRefreshResult(ok, WiFi.status() == WL_CONNECTED, BCPEvent.lastStatus(),
+        RefreshDecision r = decideRefresh(ok, WiFi.status() == WL_CONNECTED, BCPEvent.lastStatus(),
                                             failCount, MAX_CONNECTION_FAILURES);
         failCount = r.failCount;
         switch (r.outcome) {
@@ -168,14 +168,14 @@ void loop() {
             case REFRESH_NO_REQUEST:
                 break;
         }
-        displayUpdate();
+        updateDisplay();
 
     } else if (hw->redrawRequested) {
-        displayUpdate();
+        updateDisplay();
     }
 
 #ifdef BCP_DEV
-    devConsoleTick(hw);
+    tickDevConsole(hw);
 #endif
     hw->tick();
     delay(10);

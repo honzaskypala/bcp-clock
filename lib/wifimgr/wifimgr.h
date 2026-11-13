@@ -18,9 +18,9 @@ public:
     bool eraseStoredNetworks();
     bool listStoredNetworks(std::vector<String>& out);
     bool removeStoredNetwork(const char* ssid);
-    inline bool timeSyncFailed() const { return timeSyncFailed_; }
+    inline bool hasTimeSyncFailed() const { return timeSyncFailed_; }
 
-    String storedWifisHTML();
+    String buildStoredWifisHtml();
 
 private:
     Print *debugOut_ = nullptr;  // Optional debug output

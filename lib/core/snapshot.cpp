@@ -6,16 +6,16 @@
 #include <stddef.h>
 #include <textutil.h>
 
-static uint32_t snapshotChecksum(const EventSnapshot& s) {
+static uint32_t computeSnapshotChecksum(const EventSnapshot& s) {
     return fnv1a32(reinterpret_cast<const uint8_t *>(&s), offsetof(EventSnapshot, checksum));
 }
 
-void snapshotSeal(EventSnapshot& s, const String& fullId) {
+void sealSnapshot(EventSnapshot& s, const String& fullId) {
     s.magic = SNAPSHOT_MAGIC;
     s.idHash = fnv1a32(fullId);
-    s.checksum = snapshotChecksum(s);
+    s.checksum = computeSnapshotChecksum(s);
 }
 
-bool snapshotValid(const EventSnapshot& s, const String& fullId) {
-    return s.magic == SNAPSHOT_MAGIC && s.checksum == snapshotChecksum(s) && s.idHash == fnv1a32(fullId);
+bool isSnapshotValid(const EventSnapshot& s, const String& fullId) {
+    return s.magic == SNAPSHOT_MAGIC && s.checksum == computeSnapshotChecksum(s) && s.idHash == fnv1a32(fullId);
 }

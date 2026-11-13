@@ -23,7 +23,7 @@ struct EventSnapshot {
 
 // Sets magic, event ID hash and checksum; the snapshot must be zero-initialized before
 // filling the data, so padding bytes are deterministic for the checksum
-void snapshotSeal(EventSnapshot& s, const String& fullId);
+void sealSnapshot(EventSnapshot& s, const String& fullId);
 
 // Magic, checksum and event ID hash reject random content and another event
-bool snapshotValid(const EventSnapshot& s, const String& fullId);
+bool isSnapshotValid(const EventSnapshot& s, const String& fullId);

@@ -62,7 +62,7 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
 
 // ---- Round indicator (bottom row) ----
 
-void roundIndicator(int currentRound, int totalRounds, int width, RoundPixel out[]) {
+void layoutRoundIndicator(int currentRound, int totalRounds, int width, RoundPixel out[]) {
     for (int i = 0; i < width; i++) {
         out[i] = ROUND_PIXEL_OFF;
     }

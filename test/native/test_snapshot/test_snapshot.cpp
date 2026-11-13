@@ -21,20 +21,20 @@ static EventSnapshot makeSnapshot() {
     s.timerLength = 9000;
     s.roundStartEpoch = 1763456400;
     s.roundEndEpoch = 1763465400;
-    snapshotSeal(s, ID);
+    sealSnapshot(s, ID);
     return s;
 }
 
 static void test_sealed_isValid() {
     EventSnapshot s = makeSnapshot();
     TEST_ASSERT_EQUAL_HEX32(SNAPSHOT_MAGIC, s.magic);
-    TEST_ASSERT_TRUE(snapshotValid(s, ID));
+    TEST_ASSERT_TRUE(isSnapshotValid(s, ID));
 }
 
 static void test_otherEventId_rejected() {
     EventSnapshot s = makeSnapshot();
-    TEST_ASSERT_FALSE(snapshotValid(s, "AbC123"));   // same event, but entered differently
-    TEST_ASSERT_FALSE(snapshotValid(s, ""));
+    TEST_ASSERT_FALSE(isSnapshotValid(s, "AbC123"));   // same event, but entered differently
+    TEST_ASSERT_FALSE(isSnapshotValid(s, ""));
 }
 
 static void test_anyCorruptedByte_rejected() {
@@ -45,24 +45,24 @@ static void test_anyCorruptedByte_rejected() {
         reinterpret_cast<uint8_t *>(&s)[i] ^= 0x01;
         char msg[32];
         snprintf(msg, sizeof(msg), "byte %u", (unsigned) i);
-        TEST_ASSERT_FALSE_MESSAGE(snapshotValid(s, ID), msg);
+        TEST_ASSERT_FALSE_MESSAGE(isSnapshotValid(s, ID), msg);
     }
 }
 
 static void test_zeroAndRandomContent_rejected() {
     EventSnapshot s;
     memset(&s, 0, sizeof(s));
-    TEST_ASSERT_FALSE(snapshotValid(s, ""));
+    TEST_ASSERT_FALSE(isSnapshotValid(s, ""));
     memset(&s, 0xA5, sizeof(s));
-    TEST_ASSERT_FALSE(snapshotValid(s, ID));
+    TEST_ASSERT_FALSE(isSnapshotValid(s, ID));
 }
 
 static void test_dataChange_needsReseal() {
     EventSnapshot s = makeSnapshot();
     s.currentRound = 4;
-    TEST_ASSERT_FALSE(snapshotValid(s, ID));
-    snapshotSeal(s, ID);
-    TEST_ASSERT_TRUE(snapshotValid(s, ID));
+    TEST_ASSERT_FALSE(isSnapshotValid(s, ID));
+    sealSnapshot(s, ID);
+    TEST_ASSERT_TRUE(isSnapshotValid(s, ID));
 }
 
 int main() {

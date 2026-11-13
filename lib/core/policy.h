@@ -58,7 +58,7 @@ struct RefreshDecision {
     int failCount;
 };
 
-RefreshDecision onRefreshResult(bool ok, bool wifiConnected, int lastStatus, int failCount, int maxFailures);
+RefreshDecision decideRefresh(bool ok, bool wifiConnected, int lastStatus, int failCount, int maxFailures);
 
 // ---- User messages printed to the display (Tc001 is a Print) ----
 

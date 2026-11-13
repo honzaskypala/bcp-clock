@@ -13,8 +13,8 @@ public:
     void setID(const String& newID);
     inline const String& id() { return id_; }
     inline const String& fullId() { return fullId_; }
-    inline bool valid() { return idState_ == ID_VALID; }
-    inline bool invalid() { return idState_ == ID_INVALID; }
+    inline bool isValid() { return idState_ == ID_VALID; }
+    inline bool isInvalid() { return idState_ == ID_INVALID; }
 
     // ---- Refresh data from BCP API ----
     bool refreshData();
@@ -22,8 +22,8 @@ public:
 
     // ---- BCP event details ----
     inline const String& name() const { return name_; }
-    inline bool started() const { return started_; }
-    inline bool ended() const { return ended_; }
+    inline bool isStarted() const { return started_; }
+    inline bool isEnded() const { return ended_; }
     inline int numberOfRounds() const { return numberOfRounds_; }
     inline int currentRound() const { return currentRound_; }
 
@@ -33,7 +33,7 @@ public:
     inline const String& roundEndTime() const { return roundEndTime_; }
     inline time_t roundStartEpoch() const { return roundStartEpoch_; }
     inline time_t roundEndEpoch() const { return roundEndEpoch_; }
-    inline bool timerPaused() const { return timerPaused_; }
+    inline bool isTimerPaused() const { return timerPaused_; }
     inline uint32_t pausedTimeRemaining() const { return pausedTimeRemaining_; }
 
 #ifdef BCP_DEV
@@ -42,10 +42,10 @@ public:
     void setFakeData(bool started, int currentRound, int numberOfRounds, uint32_t timerLength,
                      time_t roundEndEpoch, bool paused, uint32_t pausedTimeRemaining);
     void clearFakeData() { fake_ = false; }
-    inline bool fake() const { return fake_; }
-    // Simulates connection errors (BCPRest returns -1)
-    void setFailNetwork(bool fail) { failNetwork_ = fail; }
-    inline bool failNetwork() const { return failNetwork_; }
+    inline bool isFake() const { return fake_; }
+    // Simulates connection errors (requestBcp returns -1)
+    void setNetworkFailing(bool fail) { failNetwork_ = fail; }
+    inline bool isNetworkFailing() const { return failNetwork_; }
 private:
     bool fake_ = false;
     bool failNetwork_ = false;
@@ -66,7 +66,7 @@ private:
 
     // ---- REST API ----
     // path after the host, e.g. /v2/events/<id>; onBody parses the response body of a 200 from the stream
-    int BCPRest(const String& path, void (CBCPEvent::*onBody)(Stream&));
+    int requestBcp(const String& path, void (CBCPEvent::*onBody)(Stream&));
     int lastStatus_ = 0;
 
     // ---- BCP event details ----

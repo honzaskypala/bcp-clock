@@ -41,11 +41,11 @@
 - [ ] test for captive portal and consider a failure if we cannot get real public internet response
 
 ## General
-- [ ] Refactor all code, method names to verbNouns()
 - [ ] Refactor code, unnest
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [General] [Refactor] Function and method names start with a verb (e.g. `updateDisplay`, `sealSnapshot`, `showSplashScreen`, `handleEvents`, `WebUI::buildPageStart`/`escapeHtml`); bool getters use `is`/`has` (`isValid`, `isStarted`, `hasTimeSyncFailed`), value getters stay nouns. No behaviour change, firmware size unchanged
 - [x] [General] [Tests] Device test firmware silences the buzzer as the first thing in `setup()` (the TC001 whistled during and after device tests)
 - [x] [BCP] JSON responses parsed directly from the HTTP stream instead of `getString()` (no ~6 KB body String on every refresh); requests use HTTP/1.0 so the body is never chunked
 - [x] [General] [Refactor] String replaced where it pays off: countdown text built with snprintf into a char buffer (no heap allocations in the per-second redraw), BCPEvent/Config getters return `const String&`, "Round N" and splash text without String. String cannot be removed completely (ESP32 core WebServer/HTTPClient/Preferences APIs use it)

@@ -10,7 +10,7 @@
 
 class Hw {
 public:
-    virtual void splashScreen(bool showProgress = true) {};
+    virtual void showSplashScreen(bool showProgress = true) {};
     virtual bool ensureConnection() = 0;
 
     static volatile DisplayState displayState;
@@ -23,7 +23,7 @@ public:
 
     virtual void tick() {};
 
-    virtual void configServerMsg(const char *msg) = 0;
+    virtual void showConfigServerMsg(const char *msg) = 0;
 
     virtual void reboot() = 0;
 };

@@ -37,4 +37,4 @@ enum RoundPixel : uint8_t {
 };
 
 // Fills out[0..width-1]; all off when totalRounds <= 0
-void roundIndicator(int currentRound, int totalRounds, int width, RoundPixel out[]);
+void layoutRoundIndicator(int currentRound, int totalRounds, int width, RoundPixel out[]);

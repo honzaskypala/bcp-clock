@@ -526,7 +526,7 @@ void CWifiMgr::handleRoot() {
     lastPortalActivityMs_ = millis();
     bool showFail = server_.hasArg("fail");
 
-    String page = WebUI::pageStart("BCP-clock Wi-Fi Setup",
+    String page = WebUI::buildPageStart("BCP-clock Wi-Fi Setup",
             "label.ssid{display:flex;align-items:center;gap:10px;font-size:22px;margin:10px 0}"
             "input[type=radio]{width:20px;height:20px}"
             ".rssi{color:#666;font-size:12px}"
@@ -541,7 +541,7 @@ void CWifiMgr::handleRoot() {
 
     page += "<form method='POST' action='/connect'"
             " onsubmit=\"var b=this.querySelector('.btnMain'); if(b){b.classList.add('spinning'); b.disabled=true;} return true;\">";
-    page += WebUI::sectionHeader("Found networks",
+    page += WebUI::buildSectionHeader("Found networks",
             "<button class='btn' type='button' onclick='onRescanClick(this)'><span class='icon'>↻</span><span>Rescan</span></button>",
             true);
 
@@ -557,8 +557,8 @@ void CWifiMgr::handleRoot() {
             const char* sec = wifiAuthModeToString(enc);
 
             page += "<label class='ssid'>";
-            page += "<input type='radio' name='ssid' value='" + WebUI::htmlEscape(ssid) + "'" + (order == 0 ? " checked" : "") + ">";
-            page += "<span>" + WebUI::htmlEscape(ssid) + "</span>";
+            page += "<input type='radio' name='ssid' value='" + WebUI::escapeHtml(ssid) + "'" + (order == 0 ? " checked" : "") + ">";
+            page += "<span>" + WebUI::escapeHtml(ssid) + "</span>";
             page += "<span class='rssi'>(" + String(sec) + ", " + String(rssi) + " dBm)</span>";
             page += "</label>";
         }
@@ -579,23 +579,23 @@ void CWifiMgr::handleRoot() {
             "}"
             "</script>";
 
-    page += storedWifisHTML();
-    page += WebUI::pageEnd();
+    page += buildStoredWifisHtml();
+    page += WebUI::buildPageEnd();
     server_.send(200, "text/html", page);
 }
 
-String CWifiMgr::storedWifisHTML() {
+String CWifiMgr::buildStoredWifisHtml() {
     std::vector<String> storedSsids;
     bool haveStoredNetworks = listStoredNetworks(storedSsids) && !storedSsids.empty();
 
-    String page = WebUI::sectionHeader("Stored Wi-Fi networks", haveStoredNetworks ?
+    String page = WebUI::buildSectionHeader("Stored Wi-Fi networks", haveStoredNetworks ?
             "<a class='btn btnDanger' href='#' onclick='delAll();return false;'>Delete all 👉🗑️</a>" : "");
     if (haveStoredNetworks) {
         page += "<div class='storedList'>";
         for (auto& s : storedSsids) {
             page += "<div class='storedRow'>"
-                    "<span class='storedSSID'>" + WebUI::htmlEscape(s) + "</span>"
-                    "<a class='del' href='#' data-ssid='" + WebUI::htmlEscape(s) + "' title='Delete'"
+                    "<span class='storedSSID'>" + WebUI::escapeHtml(s) + "</span>"
+                    "<a class='del' href='#' data-ssid='" + WebUI::escapeHtml(s) + "' title='Delete'"
                     " onclick='delNet(this.dataset.ssid);return false;'>👉🗑️</a>"
                     "</div>";
         }
@@ -646,11 +646,11 @@ void CWifiMgr::handleConnect() {
         connected_ = true;
         saveCredential(ssid.c_str(), pwd.c_str());
 
-        String resp = WebUI::pageStart("BCP-clock Wi-Fi Setup");
-        resp += "<div class='status ok'>Connected to " + WebUI::htmlEscape(ssid) + "</div>";
+        String resp = WebUI::buildPageStart("BCP-clock Wi-Fi Setup");
+        resp += "<div class='status ok'>Connected to " + WebUI::escapeHtml(ssid) + "</div>";
         resp += "<p>IP address: " + WiFi.localIP().toString() + "</p>";
         resp += "<p>Network saved. The setup portal shuts down now.</p>";
-        resp += WebUI::pageEnd();
+        resp += WebUI::buildPageEnd();
         server_.send(200, "text/html", resp);
         delay(500);
         stopPortal();

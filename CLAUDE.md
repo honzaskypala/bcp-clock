@@ -74,7 +74,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 
 | Path | Purpose |
 |---|---|
-| `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display state decisions (`displayUpdate()`), reboot after 5 consecutive fetch failures, mDNS `<hostname>.local` |
+| `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display state decisions (`updateDisplay()`), reboot after 5 consecutive fetch failures, mDNS `<hostname>.local` |
 | `src/devconsole.*` | Serial command console, dev build only |
 | `tools/` | Mac-side dev helpers: `devmon.py` (persistent serial monitor), `devcmd.sh` (send console command), `bcp_contract.py` (live BCP API contract test, `--dump` saves responses), `git-hooks/pre-commit` (runs the tests) |
 | `test/native/`, `test/device/` | Unit tests on the Mac / on the TC001 |
@@ -84,15 +84,15 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 | `lib/hw/tc001.*` | `Tc001` singleton: the TC001 implementation (matrix, buttons, display task, fonts) |
 | `lib/config/` | `CConfig` singleton `Config`: settings in NVS + on-demand HTTP config server |
 | `lib/wifimgr/` | `CWifiMgr` global `WifiMgr`: multi-network WiFi manager with captive portal, NTP + RTC time sync |
-| `lib/webui/` | Shared look of the web pages (captive portal, config page): page template, common CSS, `htmlEscape` |
+| `lib/webui/` | Shared look of the web pages (captive portal, config page): page template, common CSS, `escapeHtml` |
 | `lib/gfx/` | Adafruit_GFX helpers: `ScrollingText`, `ProgressIndicator`, `UTF8canvas16`, fonts |
 | `lib/*/*.html`, `wifimgr.css` | Gitignored, formatted copies of the generated pages used for styling, older than `lib/webui`; the real HTML/CSS is inlined as strings in the `.cpp` files |
 
 ## Runtime architecture
 
 ### Two execution contexts
-- **Arduino `loop()`** (main task, core 1 = `CONFIG_ARDUINO_RUNNING_CORE`): config change handling, data refresh, `displayUpdate()`, `delay(10)`.
-- **`Tc001::eventHandler`** FreeRTOS task (`xTaskCreatePinnedToCore`, core 1, priority 1, 8 KB stack),
+- **Arduino `loop()`** (main task, core 1 = `CONFIG_ARDUINO_RUNNING_CORE`): config change handling, data refresh, `updateDisplay()`, `delay(10)`.
+- **`Tc001::handleEvents`** FreeRTOS task (`xTaskCreatePinnedToCore`, core 1, priority 1, 8 KB stack),
   runs every 10 ms: mid-button handling, `Config.handleClient()`, scrolling text / progress indicator
   steps, and redrawing the countdown when `displayState == DISPLAY_EVENT_COUNTDOWN` (once per second,
   when `time(nullptr)` changes; the dev console `status` shows the redraw count).
@@ -105,19 +105,19 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 
 ### Display state machine (`DisplayState` in `lib/core/displaystate.h`)
 `displayState` says what is shown. Only the `Hw` implementation sets it (each `display*()` /
-`splashScreen()` / `configServerMsg()` method sets its state); `main.cpp` only reads it to skip
+`showSplashScreen()` / `showConfigServerMsg()` method sets its state); `main.cpp` only reads it to skip
 redrawing what is already shown.
 - `BOOT` — splash screen or connection messages (also while the event ID is not verified yet).
 - `EVENT_NAME` — event not running (not started or ended): scrolling event name.
 - `EVENT_ROUND` — event running, no timer for the current round: "Round N".
-- `EVENT_COUNTDOWN` — timer active; `eventHandler` redraws every second. Colours: green = time to round
+- `EVENT_COUNTDOWN` — timer active; `handleEvents` redraws every second. Colours: green = time to round
   start, white = running, yellow/red = below configured thresholds, blinking magenta = paused.
   Bottom row shows round progress (`displayRoundWithCountdown`).
 - `CONFIG_REQUIRED` — invalid event ID: red message once, then the config page address loops; config
   server runs with no timeout.
 - `CONFIG_MESSAGE` — config server started by the Mid button: the address scrolls once, data refreshes
-  do not redraw meanwhile; when it finishes, `eventHandler` sets `Hw::redrawRequested` and `loop()`
-  calls `displayUpdate()` without fetching data.
+  do not redraw meanwhile; when it finishes, `handleEvents` sets `Hw::redrawRequested` and `loop()`
+  calls `updateDisplay()` without fetching data.
 
 ### Buttons (TC001 pins)
 - Mid (GPIO 27): held at boot → force WiFi captive portal; pressed at runtime → start config server (5 min timeout).
@@ -162,7 +162,7 @@ plausible RTC time is used instead, otherwise the connection attempt counts as f
     terminated by an all-null entry. Code walking segments relies on that terminator.
   - Time fonts `F4x6` (mm:ss) and `F3x5_Fixed` (h:mm:ss) only cover `-` to `:`; the `/` glyph is an `X`
     bitmap, used to display overflow (`-//://`).
-  - Adafruit's `getTextBounds` clips to the display, so `ScrollingText` has its own `textDimensions`/`charBounds`.
+  - Adafruit's `getTextBounds` clips to the display, so `ScrollingText` has its own `measureText`/`measureChar`.
 - Singletons: `CBCPEvent`/`CConfig` use private ctor + friend `get...Instance()` + global reference
   (`BCPEvent`, `Config`); `Tc001::getInstance()`; `WifiMgr` is a plain global object.
 
@@ -171,6 +171,10 @@ plausible RTC time is used instead, otherwise the connection attempt counts as f
 - File header: one-line description, `// (c) 2025 Honza Skýpala`, `// WTFPL license applies`.
 - Classes `CName` for singletons, members with trailing underscore (`name_`), methods camelCase.
   (wifimgr/config have some older `_prefix` members.)
+- Function and method names start with a verb (`updateDisplay()`, `sealSnapshot()`, `startProgress()`).
+  Getters follow the Qt style: value getters are nouns (`name()`, `eventId()`), bool getters use
+  `is`/`has` (`isStarted()`, `hasTimeSyncFailed()`). `xToY()` conversions are fine (`secondsToTime()`).
+  Overrides of Arduino/Adafruit methods keep their names (`write`, `setFont`, `draw`).
 - Per-module debug macros printing `[Module] msg` to an optional `Print *debugOut`.
 - Arduino `String` is used widely; the TODO lists moving to `const String&` / `char*` where it makes sense.
 - Section comments in the form `// ---- Section ----`.

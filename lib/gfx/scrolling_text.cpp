@@ -4,11 +4,11 @@
 
 #include "scrolling_text.h"
 
-void ScrollingText::_ScrollingText(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont, int16_t color, uint16_t lpad, uint16_t rpad, bool loop, bool draw) {
+void ScrollingText::init(Adafruit_GFX *gfx, const char *text, int16_t x, int16_t y, const GFXfont *gfxFont, bool segmentedFont, int16_t color, uint16_t lpad, uint16_t rpad, bool loop, bool draw) {
     isSegFont_ = segmentedFont;
     int16_t x1;
     uint16_t w, h;
-    textDimensions(text, &x1, &y1_, &w, &h);
+    measureText(text, &x1, &y1_, &w, &h);
 #ifdef _UTF8_32BIT_FONT_H_
     if (isUTF8Font_) {
         UTF8canvas16 *utf8Canvas = new UTF8canvas16(w, h);
@@ -39,7 +39,7 @@ void ScrollingText::_ScrollingText(Adafruit_GFX *gfx, const char *text, int16_t 
 void ScrollingText::append(const char *text, int16_t color, bool newStart, uint16_t lpad, uint16_t rpad) {
     int16_t x1, y1;
     uint16_t w, h;
-    textDimensions(text, &x1, &y1, &w, &h);
+    measureText(text, &x1, &y1, &w, &h);
     int16_t new_y1 = _min(y1_, y1);
     uint16_t new_h = _max(y1_ + scrollCanvas_->height(), y1 + h) - new_y1;
 #ifdef _UTF8_32BIT_FONT_H_
@@ -132,7 +132,7 @@ void ScrollingText::drawBitmap(int16_t x, int16_t y, const uint16_t *bitmap, uin
     gfx_->endWrite();
 }
 
-void ScrollingText::textDimensions(const char *str, int16_t *x1, int16_t *y1, uint16_t *width, uint16_t *height) {
+void ScrollingText::measureText(const char *str, int16_t *x1, int16_t *y1, uint16_t *width, uint16_t *height) {
     int16_t x = x_, y = y_;
     *x1 = x_; // Initial position is value passed in
     *y1 = y_;
@@ -146,9 +146,9 @@ void ScrollingText::textDimensions(const char *str, int16_t *x1, int16_t *y1, ui
 
     uint8_t c; // Current character
     while ((c = *str++)) {
-        // charBounds() modifies x/y to advance for each character,
+        // measureChar() modifies x/y to advance for each character,
         // and min/max x/y are updated to incrementally build bounding rect.
-        charBounds(c, &x, &y, &minx, &miny, &maxx, &maxy);
+        measureChar(c, &x, &y, &minx, &miny, &maxx, &maxy);
     }
     if (maxx >= minx) {
         *x1 = minx;
@@ -160,7 +160,7 @@ void ScrollingText::textDimensions(const char *str, int16_t *x1, int16_t *y1, ui
     }
 }
 
-void ScrollingText::charBounds(const unsigned char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) {
+void ScrollingText::measureChar(const unsigned char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) {
     uint32_t cp = c;
 
 #ifdef _UTF8_32BIT_FONT_H_

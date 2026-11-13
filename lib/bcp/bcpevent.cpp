@@ -29,7 +29,7 @@ bool CBCPEvent::refreshData() {
     lastStatus_ = 0;
     if (id_.length() == 0) return false;
 
-    int status = BCPRest("/v2/events/" + id_, &CBCPEvent::handleEventOverviewPayload);
+    int status = requestBcp("/v2/events/" + id_, &CBCPEvent::handleEventOverviewPayload);
     lastStatus_ = status;
     if (status == HTTP_CODE_OK) {
         idState_ = ID_VALID;
@@ -62,7 +62,7 @@ void CBCPEvent::handleEventOverviewPayload(Stream& payload) {
 }
 
 void CBCPEvent::fetchTimerData() {
-    int status = BCPRest("/v1/events/" + id_ + "/timer?round=" + String(currentRound_),
+    int status = requestBcp("/v1/events/" + id_ + "/timer?round=" + String(currentRound_),
                          &CBCPEvent::handleEventTimerPayload);
     if (status == HTTP_CODE_NOT_FOUND) {
         clearTimerData();  // BCP returns 200 {} for no timer now; 404 handled in case that changes
@@ -93,7 +93,7 @@ void CBCPEvent::handleEventTimerPayload(Stream& payload) {
     }
 }
 
-int CBCPEvent::BCPRest(const String& path, void (CBCPEvent::*onBody)(Stream&)) {
+int CBCPEvent::requestBcp(const String& path, void (CBCPEvent::*onBody)(Stream&)) {
 #ifdef BCP_DEV
     if (failNetwork_) return HTTPC_ERROR_CONNECTION_REFUSED;
 #endif
@@ -156,12 +156,12 @@ void CBCPEvent::saveSnapshot() {
     s.roundEndEpoch = roundEndEpoch_;
     s.timerPaused = timerPaused_;
     s.pausedTimeRemaining = pausedTimeRemaining_;
-    snapshotSeal(s, fullId_);
+    sealSnapshot(s, fullId_);
     snapshot = s;
 }
 
 bool CBCPEvent::restoreSnapshot() {
-    if (!snapshotValid(snapshot, fullId_)) {
+    if (!isSnapshotValid(snapshot, fullId_)) {
         return false;
     }
     snapshot.name[sizeof(snapshot.name) - 1] = '\0';

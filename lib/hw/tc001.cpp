@@ -44,7 +44,7 @@ unsigned long Tc001::piMillis = 0;
 time_t Tc001::countdownDrawnAt = 0;
 
 // ---- Display lock ----
-// The matrix and the animations are used by both loop() and eventHandler (same core and priority,
+// The matrix and the animations are used by both loop() and handleEvents (same core and priority,
 // so they preempt each other). All display access goes through this recursive mutex.
 static SemaphoreHandle_t displayMutex = nullptr;  // created in the Tc001 constructor
 
@@ -77,7 +77,7 @@ Tc001::Tc001(Print *debugOut) : debugOut_(debugOut) {
 
     displayMutex = xSemaphoreCreateRecursiveMutex();
     xTaskCreatePinnedToCore(
-            eventHandler,     // Function to run
+            handleEvents,     // Function to run
             "EventHandler",   // Task name
             4096*2,           // Stack size
             NULL,             // Parameter
@@ -93,13 +93,13 @@ void Tc001::stopAnimations() {
         delete scrollingText;
         scrollingText = nullptr;
     }
-    progressStop();
+    stopProgress();
     stMillis = 0;
     piMillis = 0;
     countdownDrawnAt = 0;
 }
 
-void Tc001::splashScreen(bool showProgress) {
+void Tc001::showSplashScreen(bool showProgress) {
     DisplayLock lock;
     displayState = DISPLAY_BOOT;
     stopAnimations();
@@ -114,12 +114,12 @@ void Tc001::splashScreen(bool showProgress) {
     matrix.setCursor((matrix.width() - w), y);  
     matrix.print("clock");
     if (showProgress) {
-        progressStart();
+        startProgress();
     }
     matrix.show();
 }
 
-void Tc001::configServerMsg(const char *msg, bool loop) {
+void Tc001::showConfigServerMsg(const char *msg, bool loop) {
     DisplayLock lock;
     displayState = loop ? DISPLAY_CONFIG_REQUIRED : DISPLAY_CONFIG_MESSAGE;
     stopAnimations();
@@ -135,15 +135,15 @@ void Tc001::configServerMsg(const char *msg, bool loop) {
     matrix.show();
 }
 
-void Tc001::configServerMsg(const char *msg) {
-    configServerMsg(msg, true);
+void Tc001::showConfigServerMsg(const char *msg) {
+    showConfigServerMsg(msg, true);
 }
 
 void Tc001::displayRoundWithCountdown(int currentRound, int totalRounds) {
     const int line = 7;
     const int displayWidth = 32;
     RoundPixel pixels[displayWidth];
-    roundIndicator(currentRound, totalRounds, displayWidth, pixels);
+    layoutRoundIndicator(currentRound, totalRounds, displayWidth, pixels);
     for (int x = 0; x < displayWidth; x++) {
         uint16_t color = pixels[x] == ROUND_PIXEL_ACTIVE ? COLOR_DEEPSKYBLUE
                        : pixels[x] == ROUND_PIXEL_INACTIVE ? COLOR_DARKGRAY : COLOR_BLACK;
@@ -178,7 +178,7 @@ void Tc001::displayEventRound(const CBCPEvent& event) {
 
 void Tc001::displayCountdown(const CBCPEvent& event) {
     DisplayLock lock;
-    stopAnimations();  // also resets countdownDrawnAt, so eventHandler draws the countdown right away
+    stopAnimations();  // also resets countdownDrawnAt, so handleEvents draws the countdown right away
     countdownEvent = &event;
     displayState = DISPLAY_EVENT_COUNTDOWN;
 }
@@ -188,7 +188,7 @@ void Tc001::drawCountdown(const CBCPEvent& event) {
     countdownDraws++;
 #endif
     time_t now = time(nullptr);
-    CountdownView view = formatCountdown(event.roundEndEpoch() - now, event.timerLength(), event.timerPaused(),
+    CountdownView view = formatCountdown(event.roundEndEpoch() - now, event.timerLength(), event.isTimerPaused(),
                                          event.pausedTimeRemaining(), Config.yellowThreshold(),
                                          Config.redThreshold(), now % 2);
     uint16_t color;
@@ -211,20 +211,20 @@ void Tc001::drawCountdown(const CBCPEvent& event) {
     matrix.setFont((GFXfont *) defaultFont);
 }
 
-void Tc001::progressStart() {
+void Tc001::startProgress() {
     if (progressIndicator == nullptr) {
         progressIndicator = new ProgressIndicator(&matrix, 0, matrix.height() - 1, matrix.width(), COLOR_WHITE, COLOR_BLACK);
     }
     progressIndicator->isActive = true;
 }
 
-void Tc001::progressStep() {
+void Tc001::stepProgress() {
     if (progressIndicator != nullptr && progressIndicator->isActive) {
         progressIndicator->step(true);
     }
 }
 
-void Tc001::progressStop() {
+void Tc001::stopProgress() {
     if (progressIndicator != nullptr && progressIndicator->isActive) {
         progressIndicator->hide();
         progressIndicator->isActive = false;
@@ -290,7 +290,7 @@ bool Tc001::ensureConnection() {
     return retValue;
 }
 
-void Tc001::eventHandler(void * parameter) {
+void Tc001::handleEvents(void * parameter) {
     while (true) {
         bool showMatrix;
         showMatrix = false;
@@ -304,7 +304,7 @@ void Tc001::eventHandler(void * parameter) {
                 DisplayLock lock;
                 stopAnimations();
                 Config.startConfigServer();
-                configServerMsg("", false);
+                showConfigServerMsg("", false);
             }
         }
 
@@ -330,7 +330,7 @@ void Tc001::eventHandler(void * parameter) {
 
             if (progressIndicator && progressIndicator->isActive && (piMillis == 0 || millis() - piMillis > PROGRESS_INDICATOR_SPEED)) {
                 piMillis = (piMillis == 0) ? millis() : piMillis + PROGRESS_INDICATOR_SPEED;
-                progressStep();
+                stepProgress();
                 showMatrix = true;
             }
 
@@ -374,7 +374,7 @@ size_t Tc001::write(uint8_t c) {
             matrix.setCursor(2, 6);
             matrix.setTextColor(COLOR_WHITE);
             matrix.print("Connect");
-            progressStart();
+            startProgress();
 
         } else if (kind == MESSAGE_CONNECTED) {
             // do nothing, let the current status message continue

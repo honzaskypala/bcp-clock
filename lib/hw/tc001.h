@@ -30,16 +30,16 @@ private:
 
 // ---- Hw interface and related methods ----
 public:
-    virtual void splashScreen(bool showProgress = true) override;
+    virtual void showSplashScreen(bool showProgress = true) override;
     virtual bool ensureConnection() override;
 
     virtual void displayEventName(const CBCPEvent& event) override;
     virtual void displayEventRound(const CBCPEvent& event) override;
     virtual void displayCountdown(const CBCPEvent& event) override;
 
-    static void eventHandler(void * parameter);
+    static void handleEvents(void * parameter);
 
-    virtual void configServerMsg(const char *msg) override;
+    virtual void showConfigServerMsg(const char *msg) override;
 
     virtual void reboot() override;
 
@@ -75,17 +75,17 @@ private:
 
     static bool midButtonPressed;
 
-    static const CBCPEvent *countdownEvent;  // event drawn by eventHandler in DISPLAY_EVENT_COUNTDOWN
+    static const CBCPEvent *countdownEvent;  // event drawn by handleEvents in DISPLAY_EVENT_COUNTDOWN
     static void drawCountdown(const CBCPEvent& event);
     static void displayRoundWithCountdown(int currentRound, int totalRounds);
 
-    static void progressStart();
-    static void progressStep();
-    static void progressStop();
+    static void startProgress();
+    static void stepProgress();
+    static void stopProgress();
 
     // loop = true: invalid event ID, message + looping address (DISPLAY_CONFIG_REQUIRED);
     // loop = false: config server started by the user, address scrolled once (DISPLAY_CONFIG_MESSAGE)
-    static void configServerMsg(const char *msg, bool loop);
+    static void showConfigServerMsg(const char *msg, bool loop);
 
 // ---- Print interface ----
 public:

@@ -9,13 +9,13 @@
 namespace WebUI {
 
 // Start of a page: head with the common CSS plus pageCss, body and the title banner
-String pageStart(const String& title, const char *pageCss = "");
-String pageEnd();
+String buildPageStart(const String& title, const char *pageCss = "");
+String buildPageEnd();
 
 // Section heading with a separator line above it; buttonHtml is shown at the right end.
 // The first section right below the banner has no separator line.
-String sectionHeader(const String& title, const String& buttonHtml = "", bool first = false);
+String buildSectionHeader(const String& title, const String& buttonHtml = "", bool first = false);
 
-String htmlEscape(const String& in);
+String escapeHtml(const String& in);
 
 } // namespace WebUI

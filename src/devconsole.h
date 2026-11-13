@@ -9,6 +9,6 @@
 #include <hw.h>
 
 // Reads commands from Serial and executes them; call from loop()
-void devConsoleTick(Hw *hw);
+void tickDevConsole(Hw *hw);
 
 #endif

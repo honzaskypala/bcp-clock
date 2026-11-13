@@ -17,7 +17,7 @@ static const int WIDTH = 32;
 static std::string layout(int current, int total) {
     RoundPixel px[WIDTH + 1];
     px[WIDTH] = (RoundPixel) 0x5A;   // guard: must not be written
-    roundIndicator(current, total, WIDTH, px);
+    layoutRoundIndicator(current, total, WIDTH, px);
     TEST_ASSERT_EQUAL_HEX8(0x5A, px[WIDTH]);
     std::string s;
     for (int i = 0; i < WIDTH; i++) {
