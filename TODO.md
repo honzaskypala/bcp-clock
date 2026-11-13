@@ -14,6 +14,14 @@
 - [ ] support for rounds >= 10 hours (double digit hours)
 - [ ] show finished tables + config top / bottom / none
 
+## TC002 support (see CLAUDE.md "Planned: Ulanzi TC002 support")
+- [ ] Feasibility check on the device: static ARMv7 hello world via adb; stop the stock app `zkswe` and send one frame over SPI
+- [ ] Make `lib/core` platform neutral (`std::string` / `char*` instead of Arduino `String`, or a small `String` shim)
+- [ ] Interfaces for HTTP fetch, settings storage and config web server (ESP32 implementations unchanged)
+- [ ] Linux build (CMake, ARMv7 cross toolchain) next to PlatformIO
+- [ ] `Hw` implementation for the 52x16 matrix (SPI + latch), buttons and knob; layout for the larger display
+- [ ] Deployment: adb push to `/data`, autostart without writing the kernel/rootfs partitions
+
 ## GFX related
 - [ ] add negative chars to the font, eg. 🅽
 - [ ] [emojis](https://unicode.org/emoji/charts/full-emoji-list.html) support

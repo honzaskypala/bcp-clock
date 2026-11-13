@@ -171,6 +171,57 @@ plausible RTC time is used instead, otherwise the connection attempt counts as f
 - Arduino `String` is used widely; the TODO lists moving to `const String&` / `char*` where it makes sense.
 - Section comments in the form `// ---- Section ----`.
 
+## Planned: Ulanzi TC002 support
+
+Goal: one repository for several target devices. Nothing is implemented yet and we do not have the device.
+Findings from https://github.com/atomicstack/tc002-customisation (beta, based on a single unit; items
+marked *unverified* came only from a summary of its README). Researched 2026-11.
+
+### Hardware
+- **Not an ESP32.** Linux 4.9.84 (OpenWrt GCC 9.1.0 toolchain) on a SigmaStar SSD210 ("Pioneer3"), 2× Cortex-A7
+  at 1.0 GHz, 64 MB DRAM in package (~35 MB free for Linux), 32 MiB SPI NOR. Vendor SDK FlyThings/zkswe
+  (Windows-only C++ IDE); the stock app runs as the init service `zkswe`. Arduino, ESP-IDF and PlatformIO
+  do not apply, so this means a userspace Linux application, not a firmware port.
+- **Display:** 52×16 RGB LED matrix driven by a separate pixel MCU. Frames go over `/dev/spidev0.0`, SPI mode 0,
+  8 bit, 10 MHz. One frame is 3072 bytes: 16 rows × 192 bytes (52 px × RGB + 36 zero bytes). The latch on GPIO 35
+  idles high and is required (plain SPI writes do nothing): drive it low, write the frame, drive it high. The MCU is
+  double-buffered, so a frame shows one frame late. `/dev/ttyS1` (UART to the MCU) carries gain, mic, battery
+  and power commands and is not needed for pixels.
+- **Input:** 3 buttons on top (left, mid, right) plus a rotary encoder `BRI&VOL` with a push button. *Unverified*:
+  keys are polled GPIO 31–34 (31 = knob push, 32 left, 33 mid, 34 right), the knob is on GPIO 10/11, and
+  device tree names do not match positions. Reset key on GPIO 2 (hold for 5 s = recovery).
+- **No RTC** (no driver built in): the clock starts at 1970 on boot and comes only from SNTP. No buzzer, light sensor
+  or temperature sensor reported. It has a speaker (*unverified*: amp enable on GPIO 9), a mic read through the MCU,
+  and a battery of 3.7 V / 3600 mAh.
+- **WiFi:** AIC8800DC over SDIO and managed by the OS, so `lib/wifimgr` and NTP code mostly do not apply.
+
+### Access, storage, risks
+- adb with a root shell over USB and over WiFi (port 5555), vid:pid `18d1:d002`. On a factory-fresh unit USB boots
+  in host mode; switch it with `echo usb_device > /sys/bus/platform/devices/soc:usbotg/otg_role` and do not read the
+  neighbouring `usb_*` sysfs files. Serial pads `GND RX TX` are unpopulated (likely `ttyS0` 115200, untested).
+- Persistent writable storage is only `/data` (JFFS2, 8 MB). rootfs (squashfs 3.5 MB) and `/res` (mtd3) are
+  read-only, and `/mnt/storage` holds the vendor `update.img`.
+- Brick risk: kernel (mtd1) and rootfs writes have no fallback. The `res` image differs between units, so keep
+  a verified `mtd3` backup before any write. Running a vendor upgrade with the default directory can install an
+  older `update.img`. Whether boot verifies signatures is unknown. Stay in `/data` as long as possible.
+
+### What carries over from this project
+- `lib/core`: logic is reusable. It depends only on Arduino `String` and ArduinoJson; it needs `std::string`/`char*`
+  or a small `String` shim (ArduinoFake is a test mock, not for production).
+- `lib/gfx`: Adafruit_GFX is plain C++ and builds with an Arduino shim; fonts and `ScrollingText` are reusable.
+- `Hw` interface (`lib/hw/hw.h`): a new implementation renders to a 52×16 framebuffer, then SPI + latch, using a
+  thread instead of a FreeRTOS task. It needs a new layout (the TC001 code is tied to 32×8).
+- To be replaced: `lib/bcp` HTTP (`WiFiClientSecure`/`HTTPClient` → libcurl or mbedTLS), `lib/config` storage
+  (NVS → file in `/data`) and its web server (the `lib/webui` HTML stays), `setup()`/`loop()` → `main()`.
+  Missing abstractions: HTTP fetch, settings storage, config server.
+- TC002-only features must be gated per platform so they do not grow the TC001 flash usage.
+
+### Open issues / first steps
+1. Toolchain: cross-compile for ARMv7 against the device libc (OpenWrt: musl or uClibc?), probably a static binary.
+   Build with CMake next to PlatformIO.
+2. Stop or replace `zkswe` (it owns SPI/display) and autostart our binary without writing kernel/rootfs.
+3. Feasibility test: static hello world via adb, then one frame on SPI. If either fails, the plan is off.
+
 ## Planning
 
 `TODO.md` is the canonical backlog (features/refactors) with a "Done" log. `TODO.txt` (gitignored, Czech)
