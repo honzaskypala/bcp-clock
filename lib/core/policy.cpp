@@ -7,6 +7,25 @@
 
 // ---- What to show after a data refresh ----
 
+// What to show for a verified event: name, round or countdown
+static DisplayAction decideValidEvent(const DisplayInputs& in, DisplayMemory& memory) {
+    bool isEventRunning = in.started && !in.ended;
+    if (!isEventRunning) {
+        // event not running, show event name
+        if (in.state == DISPLAY_EVENT_NAME && memory.eventName == in.name) return SHOW_NOTHING_NEW;
+        memory.eventName = in.name;
+        return SHOW_EVENT_NAME;
+    }
+    if (in.timerLength == 0) {
+        // event running but no timer active, show round only
+        if (in.state == DISPLAY_EVENT_ROUND && memory.lastRound == in.currentRound) return SHOW_NOTHING_NEW;
+        memory.lastRound = in.currentRound;
+        return SHOW_EVENT_ROUND;
+    }
+    // timer active, the countdown is redrawn by the Hw implementation
+    return in.state == DISPLAY_EVENT_COUNTDOWN ? SHOW_NOTHING_NEW : SHOW_COUNTDOWN;
+}
+
 DisplayDecision decideDisplay(const DisplayInputs& in, DisplayMemory& memory) {
     DisplayDecision d = { SHOW_NOTHING_NEW, false };
 
@@ -20,25 +39,7 @@ DisplayDecision decideDisplay(const DisplayInputs& in, DisplayMemory& memory) {
             memory.wasInvalidEvent = false;
         }
 
-        bool isEventRunning = in.started && !in.ended;
-        if (!isEventRunning) {
-            // event not running, show event name
-            if (in.state != DISPLAY_EVENT_NAME || memory.eventName != in.name) {
-                d.action = SHOW_EVENT_NAME;
-                memory.eventName = in.name;
-            }
-
-        } else if (in.timerLength == 0) {
-            // event running but no timer active, show round only
-            if (in.state != DISPLAY_EVENT_ROUND || memory.lastRound != in.currentRound) {
-                d.action = SHOW_EVENT_ROUND;
-                memory.lastRound = in.currentRound;
-            }
-
-        } else if (in.state != DISPLAY_EVENT_COUNTDOWN) {
-            // timer active, the countdown is redrawn by the Hw implementation
-            d.action = SHOW_COUNTDOWN;
-        }
+        d.action = decideValidEvent(in, memory);
 
     } else if (!in.invalid) {
         // event ID not verified yet (no response from BCP), keep the splash screen

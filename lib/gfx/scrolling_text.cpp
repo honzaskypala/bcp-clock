@@ -45,24 +45,11 @@ void ScrollingText::append(const char *text, int16_t color, bool newStart, uint1
     measureText(text, &x1, &y1, &w, &h);
     int16_t new_y1 = _min(y1_, y1);
     uint16_t new_h = _max(y1_ + scrollCanvas_->height(), y1 + h) - new_y1;
-#ifdef _UTF8_32BIT_FONT_H_
-    UTF8canvas16 *newCanvas = new UTF8canvas16(scrollCanvas_->width() + rpad_ + lpad + w, new_h);
-#else
-    GFXcanvas16 *newCanvas = new GFXcanvas16(scrollCanvas_->width() + rpad_ + lpad + w, new_h);
-#endif // _UTF8_32BIT_FONT_H_
+    // same canvas type and font setup as the initial text, otherwise non-ASCII characters are not drawn
+    GFXcanvas16 *newCanvas = createCanvas(scrollCanvas_->width() + rpad_ + lpad + w, new_h, gfxFont_);
     newCanvas->fillScreen(0x0000);
     newCanvas->drawRGBBitmap(0, y1_ - new_y1, scrollCanvas_->getBuffer(), scrollCanvas_->width(), scrollCanvas_->height());
     y1_ = new_y1;
-#ifdef _UTF8_32BIT_FONT_H_
-    if (isUTF8Font_) {
-        // same font setup as the initial text, otherwise non-ASCII characters are not drawn
-        newCanvas->setFont((const UTF8_32BitFont *) gfxFont_, isSegFont_);
-    } else {
-        newCanvas->setFont(gfxFont_);
-    }
-#else
-    newCanvas->setFont(gfxFont_);
-#endif // _UTF8_32BIT_FONT_H_
     newCanvas->setTextColor(color);
     newCanvas->setCursor(scrollCanvas_->width() + rpad_ + lpad, y_ - y1_); // baseline
     newCanvas->print(text);

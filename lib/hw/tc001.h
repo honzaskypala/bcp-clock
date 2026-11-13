@@ -99,4 +99,6 @@ private:
     String initMsg_ = String();
     bool errorShown_ = false;
     void showMessage(const char *msg);
+    void showErrorMessage(const char *msg);
+    void showInfoMessage(const char *msg);
 };

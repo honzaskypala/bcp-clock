@@ -50,10 +50,14 @@ private:
 
     // ---- Portal ----
     void startConfigPortal();
+    void startAccessPoint();
+    void registerPortalRoutes();
+    void runPortal(uint32_t timeoutMs);
     void stopPortal();
 
     // ---- HTTP Handlers ----
     void handleRoot();
+    void appendScannedNetworksHtml(String& html);
     void handleRescan();
     void handleConnect();
     void handleDelete();

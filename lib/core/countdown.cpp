@@ -8,30 +8,8 @@
 
 // ---- Countdown ----
 
-CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused, uint32_t pausedRemaining,
-                              long yellowThreshold, long redThreshold, bool blinkOn) {
-    CountdownView view;
-    bool dontDisplayHours = timerLength <= 3600;
-
-    if (paused) {
-        // timer is paused
-        remaining = pausedRemaining;
-        view.color = blinkOn ? COUNTDOWN_MAGENTA : COUNTDOWN_BLACK;
-    } else if (remaining <= redThreshold) {
-        // we are below red threshold of the timer
-        view.color = COUNTDOWN_RED;
-    } else if (remaining <= yellowThreshold) {
-        // we are below yellow threshold of the timer
-        view.color = COUNTDOWN_YELLOW;
-    } else if (remaining > timerLength || (remaining == timerLength && timerLength <= 3600)) {
-        // event round not yet started, show time to start
-        view.color = COUNTDOWN_GREEN;
-        remaining -= timerLength;
-        dontDisplayHours = remaining < 3600 && timerLength <= 3600;
-    } else {
-        view.color = COUNTDOWN_WHITE;
-    }
-
+// Fills in the time text and its position: mm:ss, or h:mm:ss when hours are displayed
+static inline void formatTime(CountdownView& view, long remaining, bool dontDisplayHours) {
     const char *sign = remaining < 0 ? "-" : "";
     int absoluteTime = remaining < 0 ? -remaining : remaining;
     int hours = absoluteTime / 3600;
@@ -57,6 +35,33 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
             snprintf(view.text, sizeof(view.text), "%s%d:%02d:%02d", sign, hours, minutes, seconds);
         }
     }
+}
+
+CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused, uint32_t pausedRemaining,
+                              long yellowThreshold, long redThreshold, bool blinkOn) {
+    CountdownView view;
+    bool dontDisplayHours = timerLength <= 3600;
+
+    if (paused) {
+        // timer is paused
+        remaining = pausedRemaining;
+        view.color = blinkOn ? COUNTDOWN_MAGENTA : COUNTDOWN_BLACK;
+    } else if (remaining <= redThreshold) {
+        // we are below red threshold of the timer
+        view.color = COUNTDOWN_RED;
+    } else if (remaining <= yellowThreshold) {
+        // we are below yellow threshold of the timer
+        view.color = COUNTDOWN_YELLOW;
+    } else if (remaining > timerLength || (remaining == timerLength && timerLength <= 3600)) {
+        // event round not yet started, show time to start
+        view.color = COUNTDOWN_GREEN;
+        remaining -= timerLength;
+        dontDisplayHours = remaining < 3600 && timerLength <= 3600;
+    } else {
+        view.color = COUNTDOWN_WHITE;
+    }
+
+    formatTime(view, remaining, dontDisplayHours);
     return view;
 }
 

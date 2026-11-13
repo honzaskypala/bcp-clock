@@ -56,11 +56,18 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrM
         }
     }
 
-    if (portalTimeoutMs > 0) {
+    runPortal(portalTimeoutMs);
+    freeScanData();
+    return connected_;
+}
+
+// Runs the captive portal until connected or until the timeout since the last portal activity
+void CWifiMgr::runPortal(uint32_t timeoutMs) {
+    if (timeoutMs > 0) {
         std::vector<String> storedSsids;
         if (!listStoredNetworks(storedSsids)) {
             WIFIMGR_DEBUG("No stored networks to retry, portal will run with no timeout.");
-            portalTimeoutMs = 0;
+            timeoutMs = 0;
         }
     }
 
@@ -71,14 +78,11 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrM
         dnsServer_.processNextRequest();
         server_.handleClient();
         delay(10);
-        if (portalTimeoutMs > 0 && (millis() - lastPortalActivityMs_) > portalTimeoutMs) {
+        if (timeoutMs > 0 && (millis() - lastPortalActivityMs_) > timeoutMs) {
             WIFIMGR_DEBUG("Portal timeout reached, exiting without WiFi.");
             break;
         }
     }
-
-    freeScanData();
-    return connected_;
 }
 
 // Pass 1: known networks (DO NOT save credential here)
@@ -515,21 +519,33 @@ const char* CWifiMgr::wifiAuthModeToString(uint8_t m) {
 #define WIFIMGR_LOG_REQUEST(handler)
 #endif
 
+static const char PORTAL_PAGE_CSS[] =
+    "label.ssid{display:flex;align-items:center;gap:10px;font-size:22px;margin:10px 0}"
+    "input[type=radio]{width:20px;height:20px}"
+    ".rssi{color:#666;font-size:12px}"
+    "@keyframes spin{to{transform:rotate(360deg)}}"
+    ".waitIcon{display:none}"
+    ".spinning .waitIcon,.spinning .icon{display:inline-block;animation:spin .8s linear infinite}";
+
+static const char RESCAN_SCRIPT[] =
+    "<script>"
+    "function onRescanClick(btn){"
+        "if(btn.classList.contains('spinning')) return;"
+        "btn.classList.add('spinning');"
+        "btn.disabled=true;"
+        "void btn.offsetWidth;"
+        "requestAnimationFrame(function(){setTimeout(function(){window.location.href='/rescan';},100);});"
+    "}"
+    "</script>";
+
 void CWifiMgr::handleRoot() {
     WIFIMGR_LOG_REQUEST("root");
     lastPortalActivityMs_ = millis();
-    bool showFail = server_.hasArg("fail");
 
-    String page = WebUI::buildPageStart("BCP-clock Wi-Fi Setup",
-            "label.ssid{display:flex;align-items:center;gap:10px;font-size:22px;margin:10px 0}"
-            "input[type=radio]{width:20px;height:20px}"
-            ".rssi{color:#666;font-size:12px}"
-            "@keyframes spin{to{transform:rotate(360deg)}}"
-            ".waitIcon{display:none}"
-            ".spinning .waitIcon,.spinning .icon{display:inline-block;animation:spin .8s linear infinite}");
+    String page = WebUI::buildPageStart("BCP-clock Wi-Fi Setup", PORTAL_PAGE_CSS);
     page.reserve(10000);
 
-    if (showFail) {
+    if (server_.hasArg("fail")) {
         page += "<div class='status error'>" + String(timeSyncFailed_ ? NTP_TIME_SYNC_FAIL_MSG : CONNECTION_FAIL_MSG) + "</div>";
     }
 
@@ -538,44 +554,39 @@ void CWifiMgr::handleRoot() {
     page += WebUI::buildSectionHeader("Found networks",
             "<button class='btn' type='button' onclick='onRescanClick(this)'><span class='icon'>↻</span><span>Rescan</span></button>",
             true);
-
-    if (scanCount_ == 0) {
-        page += "<p>No scanned networks available.</p>";
-    } else {
-        for (int order = 0; order < scanCount_; ++order) {
-            int idx = scanIdx_[order];
-            const String& ssid = scanSsid_[idx];
-            if (ssid.length() == 0) continue;
-            int rssi = scanRssi_[order];
-            uint8_t enc = scanEnc_[idx];
-            const char* sec = wifiAuthModeToString(enc);
-
-            page += "<label class='ssid'>";
-            page += "<input type='radio' name='ssid' value='" + WebUI::escapeHtml(ssid) + "'" + (order == 0 ? " checked" : "") + ">";
-            page += "<span>" + WebUI::escapeHtml(ssid) + "</span>";
-            page += "<span class='rssi'>(" + String(sec) + ", " + String(rssi) + " dBm)</span>";
-            page += "</label>";
-        }
-        page += "<div class='row'><label for='pwd'>Password:</label>"
-                "<input id='pwd' type='password' name='pwd' placeholder='Leave empty for OPEN network'></div>";
-        page += "<div class='actions'>"
-                "<button class='btn btnMain' type='submit'><span>Connect</span><span class='waitIcon' aria-hidden='true'>⏳</span></button>"
-                "</div>";
-    }
+    appendScannedNetworksHtml(page);
     page += "</form>";
-    page += "<script>"
-            "function onRescanClick(btn){"
-                "if(btn.classList.contains('spinning')) return;"
-                "btn.classList.add('spinning');"
-                "btn.disabled=true;"
-                "void btn.offsetWidth;"
-                "requestAnimationFrame(function(){setTimeout(function(){window.location.href='/rescan';},100);});"
-            "}"
-            "</script>";
+    page += RESCAN_SCRIPT;
 
     page += buildStoredWifisHtml();
     page += WebUI::buildPageEnd();
     server_.send(200, "text/html", page);
+}
+
+// Radio buttons of the scanned networks (strongest first), password field and Connect button
+void CWifiMgr::appendScannedNetworksHtml(String& html) {
+    if (scanCount_ == 0) {
+        html += "<p>No scanned networks available.</p>";
+        return;
+    }
+
+    for (int order = 0; order < scanCount_; ++order) {
+        int idx = scanIdx_[order];
+        const String& ssid = scanSsid_[idx];
+        if (ssid.length() == 0) continue;
+        const char* sec = wifiAuthModeToString(scanEnc_[idx]);
+
+        html += "<label class='ssid'>";
+        html += "<input type='radio' name='ssid' value='" + WebUI::escapeHtml(ssid) + "'" + (order == 0 ? " checked" : "") + ">";
+        html += "<span>" + WebUI::escapeHtml(ssid) + "</span>";
+        html += "<span class='rssi'>(" + String(sec) + ", " + String(scanRssi_[order]) + " dBm)</span>";
+        html += "</label>";
+    }
+    html += "<div class='row'><label for='pwd'>Password:</label>"
+            "<input id='pwd' type='password' name='pwd' placeholder='Leave empty for OPEN network'></div>";
+    html += "<div class='actions'>"
+            "<button class='btn btnMain' type='submit'><span>Connect</span><span class='waitIcon' aria-hidden='true'>⏳</span></button>"
+            "</div>";
 }
 
 String CWifiMgr::buildStoredWifisHtml() {
@@ -709,6 +720,29 @@ void CWifiMgr::startConfigPortal() {
 
     WIFIMGR_DEBUG("Starting configuration & captive portal AP...");
 
+    startAccessPoint();
+
+    IPAddress apIP = WiFi.softAPIP();
+    WIFIMGR_DEBUG("AP IP address: " + apIP.toString());
+
+    WiFi.enableSTA(true);
+
+    if (!dnsServer_.start(DNS_PORT, "*", apIP)) {
+        WIFIMGR_DEBUG("DNS Server failed to start.");
+    } else {
+        WIFIMGR_DEBUG("DNS Server started for captive portal.");
+    }
+
+    registerPortalRoutes();
+    server_.begin();
+    portalActive_ = true;
+    lastPortalActivityMs_ = millis();
+    WIFIMGR_DEBUG("HTTP portal server started on port 80.");
+    WIFIMGR_MSG("AP mode - Connect to Wi-Fi '" + String(AP_SSID) + "', then open http://" + WiFi.softAPIP().toString() + " to configure.");
+}
+
+// Starts the open AP (AP + STA mode, so scanning still works)
+void CWifiMgr::startAccessPoint() {
     // Ensure previous AP is shut down
     WiFi.softAPdisconnect(true);
     delay(50);
@@ -740,18 +774,9 @@ void CWifiMgr::startConfigPortal() {
     } else {
         WIFIMGR_DEBUG("AP started. SSID: " + String(AP_SSID) + " (OPEN)");
     }
+}
 
-    IPAddress apIP = WiFi.softAPIP();
-    WIFIMGR_DEBUG("AP IP address: " + apIP.toString());
-
-    WiFi.enableSTA(true);
-
-    if (!dnsServer_.start(DNS_PORT, "*", apIP)) {
-        WIFIMGR_DEBUG("DNS Server failed to start.");
-    } else {
-        WIFIMGR_DEBUG("DNS Server started for captive portal.");
-    }
-
+void CWifiMgr::registerPortalRoutes() {
     server_.on("/",          [this]() { handleRoot(); });
     server_.on("/connect",   HTTP_POST, [this]() { handleConnect(); });
     server_.on("/rescan",    HTTP_GET,  [this]() { handleRescan(); });
@@ -771,12 +796,6 @@ void CWifiMgr::startConfigPortal() {
     const char *logHeaders[] = {"User-Agent"};
     server_.collectHeaders(logHeaders, 1);
 #endif
-
-    server_.begin();
-    portalActive_ = true;
-    lastPortalActivityMs_ = millis();
-    WIFIMGR_DEBUG("HTTP portal server started on port 80.");
-    WIFIMGR_MSG("AP mode - Connect to Wi-Fi '" + String(AP_SSID) + "', then open http://" + WiFi.softAPIP().toString() + " to configure.");
 }
 
 void CWifiMgr::stopPortal() {

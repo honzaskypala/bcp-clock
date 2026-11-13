@@ -167,37 +167,55 @@ void CConfig::handleClient() {
     }
 }
 
+static const char CONFIG_PAGE_CSS[] =
+    "label[for=yellow],label[for=red]{display:flex;align-items:center;background:#000;padding:0 8px;box-sizing:border-box}"
+    ".row.threshold{align-items:stretch}"
+    "label[for=yellow]{color:#ff0}"
+    "label[for=red]{color:red}"
+    ".row.threshold{margin:4px 0}"
+    ".input-wrapper{position:relative;flex:1 1 auto}"
+    ".clear-text{display:none}"
+    "@media (pointer:coarse){"
+        ".input-wrapper input{padding-right:2.5rem}"
+        ".clear-text{display:block;position:absolute;right:.7rem;top:50%;transform:translateY(-50%);text-decoration:none;cursor:pointer;color:grey}"
+    "}";
+
+static const char CONFIG_PAGE_SCRIPT[] =
+    "<script>"
+        "function clearInput(el) {"
+            "const wrapper=el.closest('.input-wrapper');"
+            "const input=wrapper.querySelector('input');"
+            "input.value='';"
+            "input.focus();"
+        "}"
+    "</script>";
+
 void CConfig::handleConfigRoot() {
-    String status = "";
-    if (configServer->hasArg("saved")) {
-        status = "Configuration saved";
-    }
-    if (configServer->hasArg("wifiDeleted")) {
-        status = "WiFi network deleted";
-    }
-    if (configServer->hasArg("wifiAllDeleted")) {
-        status = "All WiFi networks deleted";
-    }
-    
-    String page = WebUI::buildPageStart("BCP-clock config",
-            "label[for=yellow],label[for=red]{display:flex;align-items:center;background:#000;padding:0 8px;box-sizing:border-box}"
-            ".row.threshold{align-items:stretch}"
-            "label[for=yellow]{color:#ff0}"
-            "label[for=red]{color:red}"
-            ".row.threshold{margin:4px 0}"
-            ".input-wrapper{position:relative;flex:1 1 auto}"
-            ".clear-text{display:none}"
-            "@media (pointer:coarse){"
-                ".input-wrapper input{padding-right:2.5rem}"
-                ".clear-text{display:block;position:absolute;right:.7rem;top:50%;transform:translateY(-50%);text-decoration:none;cursor:pointer;color:grey}"
-            "}");
+    String status = statusMessage();
+    String page = WebUI::buildPageStart("BCP-clock config", CONFIG_PAGE_CSS);
     page.reserve(9000);
 
     if (status.length() > 0) {
         page += "<div class='status ok'>" + status + "</div>";
     }
+    appendConfigFormHtml(page);
+    page += CONFIG_PAGE_SCRIPT;
+    page += WifiMgr.buildStoredWifisHtml();
+    page += WebUI::buildPageEnd();
 
-    page += "<form method='POST' action='/config'>"
+    configServer->send(200, "text/html", page);
+}
+
+// Status bar text after a redirect from a form action, empty if none
+String CConfig::statusMessage() {
+    if (configServer->hasArg("wifiAllDeleted")) return "All WiFi networks deleted";
+    if (configServer->hasArg("wifiDeleted")) return "WiFi network deleted";
+    if (configServer->hasArg("saved")) return "Configuration saved";
+    return "";
+}
+
+void CConfig::appendConfigFormHtml(String& html) {
+    html += "<form method='POST' action='/config'>"
                 "<div class='row'>"
                     "<label for='event'>Event:</label>"
                     "<div class='input-wrapper'>"
@@ -205,8 +223,8 @@ void CConfig::handleConfigRoot() {
                         "<a class='clear-text' onclick='clearInput(this);return false;'>⨂</a>"
                     "</div>"
                 "</div>";
-    page += WebUI::buildSectionHeader("Colour thresholds");
-    page += "<div class='row threshold'>"
+    html += WebUI::buildSectionHeader("Colour thresholds");
+    html += "<div class='row threshold'>"
                 "<label for='yellow'>Yellow:</label>"
                 "<input type='text' id='yellow' name='yellow' value='" + secondsToTime(yellow_) + "'>"
             "</div>"
@@ -214,26 +232,13 @@ void CConfig::handleConfigRoot() {
                 "<label for='red'>Red:</label>"
                 "<input type='text' id='red' name='red' value='" + secondsToTime(red_) + "'>"
             "</div>";
-    page += WebUI::buildSectionHeader("Network");
-    page += "<div class='row'>"
+    html += WebUI::buildSectionHeader("Network");
+    html += "<div class='row'>"
                 "<label for='hostname'>Hostname:</label>"
                 "<input type='text' id='hostname' name='hostname' maxlength='32' value='" + WebUI::escapeHtml(hostname_) + "'>"
             "</div>"
             "<div class='actions'><button class='btn btnMain' type='submit'>Save</button></div>"
-            "</form>"
-            "<script>"
-                "function clearInput(el) {"
-                    "const wrapper=el.closest('.input-wrapper');"
-                    "const input=wrapper.querySelector('input');"
-                    "input.value='';"
-                    "input.focus();"
-                "}"
-            "</script>";
-
-    page += WifiMgr.buildStoredWifisHtml();
-    page += WebUI::buildPageEnd();
-
-    configServer->send(200, "text/html", page);
+            "</form>";
 }
 
 void CConfig::handleConfigPost() {

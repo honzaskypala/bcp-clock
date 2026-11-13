@@ -54,6 +54,8 @@ private:
     // ---- Configuration HTTP server ----
     WebServer* configServer = nullptr;
     void handleConfigRoot();
+    String statusMessage();
+    void appendConfigFormHtml(String& html);
     void handleConfigPost();
     void handleWifiDelete();
     void handleWifiDeleteAll();

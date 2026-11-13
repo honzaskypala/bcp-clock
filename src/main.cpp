@@ -35,10 +35,8 @@ void startMdns() {
 }
 
 // ---- update display after data refresh ----
-// The display state is set by the Hw implementation; here it is only read to avoid redrawing
-// what is already shown.
-void updateDisplay() {
-    static DisplayMemory memory;
+
+static inline DisplayInputs collectDisplayInputs() {
     DisplayInputs in;
     in.state = hw->displayState;
     in.redrawRequested = hw->redrawRequested;
@@ -49,18 +47,11 @@ void updateDisplay() {
     in.timerLength = BCPEvent.timerLength();
     in.name = BCPEvent.name();
     in.currentRound = BCPEvent.currentRound();
-    hw->redrawRequested = false;
-    MAIN_DEBUG("Updating display, current state: " + String(displayStateName(in.state)));
+    return in;
+}
 
-    DisplayDecision d = decideDisplay(in, memory);
-
-    if (d.restartConfigServer && Config.isConfigServerRunning()) {
-        // event ID became valid: restart config server with timeout
-        Config.stopConfigServer();
-        Config.startConfigServer();
-    }
-
-    switch (d.action) {
+static void applyDisplayAction(DisplayAction action) {
+    switch (action) {
         case SHOW_EVENT_NAME:
             MAIN_DEBUG("Displaying event name.");
             hw->displayEventName(BCPEvent);
@@ -90,6 +81,24 @@ void updateDisplay() {
         case SHOW_NOTHING_NEW:
             break;
     }
+}
+
+// The display state is set by the Hw implementation; here it is only read to avoid redrawing
+// what is already shown.
+void updateDisplay() {
+    static DisplayMemory memory;
+    DisplayInputs in = collectDisplayInputs();
+    hw->redrawRequested = false;
+    MAIN_DEBUG("Updating display, current state: " + String(displayStateName(in.state)));
+
+    DisplayDecision d = decideDisplay(in, memory);
+
+    if (d.restartConfigServer && Config.isConfigServerRunning()) {
+        // event ID became valid: restart config server with timeout
+        Config.stopConfigServer();
+        Config.startConfigServer();
+    }
+    applyDisplayAction(d.action);
 }
 
 // ---- Data refresh ----

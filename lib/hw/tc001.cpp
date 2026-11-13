@@ -370,20 +370,39 @@ size_t Tc001::write(uint8_t c) {
     return 1;
 }
 
+// Error message in red, followed by the first message (what the device is doing) in white.
+// Called with the display lock held.
+void Tc001::showErrorMessage(const char *msg) {
+    stopAnimations();
+    matrix.clear();
+    scrollingText = new ScrollingText(&matrix, msg, 0, 7, (const GFXfont *) defaultFont, false, COLOR_RED);
+    if (initMsg_.length() > 0) {
+        scrollingText->append(initMsg_, COLOR_WHITE, true);
+    } else {
+        errorShown_ = true;
+    }
+}
+
+// Other message in white, appended after an error shown before the first message.
+// Called with the display lock held.
+void Tc001::showInfoMessage(const char *msg) {
+    if (errorShown_) {
+        scrollingText->append(msg, COLOR_WHITE, true);
+        errorShown_ = false;
+    } else {
+        stopAnimations();
+        matrix.clear();
+        scrollingText = new ScrollingText(&matrix, msg, 0, 7, (const GFXfont *) defaultFont);
+    }
+    if (initMsg_.length() == 0) initMsg_ = String(msg);
+}
+
 // Shows one complete user message line, the line prefix decides how (see classifyMessage())
 void Tc001::showMessage(const char *msg) {
     DisplayLock lock;
     switch (classifyMessage(msg)) {
         case MESSAGE_ERROR:
-            // Error message, display in red
-            stopAnimations();
-            matrix.clear();
-            scrollingText = new ScrollingText(&matrix, msg, 0, 7, (const GFXfont *) defaultFont, false, COLOR_RED);
-            if (initMsg_.length() > 0) {
-                scrollingText->append(initMsg_, COLOR_WHITE, true);
-            } else {
-                errorShown_ = true;
-            }
+            showErrorMessage(msg);
             break;
 
         case MESSAGE_CONNECTING:
@@ -401,15 +420,7 @@ void Tc001::showMessage(const char *msg) {
             break;
 
         default:
-            if (errorShown_) {
-                scrollingText->append(msg, COLOR_WHITE, true);
-                errorShown_ = false;
-            } else {
-                stopAnimations();
-                matrix.clear();
-                scrollingText = new ScrollingText(&matrix, msg, 0, 7, (const GFXfont *) defaultFont);
-            }
-            if (initMsg_.length() == 0) initMsg_ = String(msg);
+            showInfoMessage(msg);
             break;
     }
     matrix.show();
