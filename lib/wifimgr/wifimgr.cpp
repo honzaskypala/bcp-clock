@@ -172,6 +172,7 @@ bool CWifiMgr::scanAndSort() {
     }
 
     WIFIMGR_DEBUG("Starting WiFi scan...");
+    freeScanData();
     int n = WiFi.scanNetworks();
     WIFIMGR_DEBUG("Scan done");
 

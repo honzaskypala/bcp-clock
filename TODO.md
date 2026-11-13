@@ -39,12 +39,12 @@
 ## WiFi Manager related
 - [ ] add callback to to validate established connection. Move NTP timesync out of WiFi Manager and have it run through the callback.
 - [ ] test for captive portal and consider a failure if we cannot get real public internet response
-- [ ] [Bugfix] memory leak: `scanAndSort()` allocates new scan arrays without freeing the previous ones, so every Rescan in the captive portal leaks them (call `freeScanData()` first)
 
 ## General
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [WiFi Manager] [Bugfix] Memory leak: `scanAndSort()` now calls `freeScanData()` before scanning, so a Rescan in the captive portal no longer leaks the previous scan arrays (a failed Rescan leaves the list empty)
 - [x] [General] [Refactor] Less nesting (guard clauses, extracted functions): WiFiMgr `connect` (known/open network passes) and `scanAndSort` (driver/fallback results, sort), shared `readStoredList`; Tc001 `handleEvents` (`handleMidButton`, `stepAnimations`) and `write` (`showMessage`); `loop()` (`handleConfigUpdate`, `refreshEventData`); round indicator layout; Config guard clauses. UTF-8 decoding and font segment lookup shared by UTF8canvas16 and ScrollingText (`lib/gfx/fontsegment.h`, inline). No behaviour change, firmware 20 B smaller
 - [x] [General] [Refactor] Function and method names start with a verb (e.g. `updateDisplay`, `sealSnapshot`, `showSplashScreen`, `handleEvents`, `WebUI::buildPageStart`/`escapeHtml`); bool getters use `is`/`has` (`isValid`, `isStarted`, `hasTimeSyncFailed`), value getters stay nouns. No behaviour change, firmware size unchanged
 - [x] [General] [Tests] Device test firmware silences the buzzer as the first thing in `setup()` (the TC001 whistled during and after device tests)
