@@ -92,6 +92,69 @@ void updateDisplay() {
     }
 }
 
+// ---- Data refresh ----
+
+static int failCount = 0;                   // consecutive connection failures
+static unsigned long lastDataRefresh = 0;   // millis() of the last refresh, 0 = refresh now
+
+// Applies a configuration saved on the config page
+void handleConfigUpdate() {
+    if (!Config.configUpdated) return;
+    MAIN_DEBUG("Configuration updated.");
+    Config.configUpdated = false;
+    if (Config.hostname() != mdnsHostname) {
+        MAIN_DEBUG("Hostname changed, restarting mDNS.");
+        WiFi.setHostname(Config.hostname().c_str());   // DHCP hostname applies at the next WiFi connection
+        MDNS.end();
+        startMdns();
+    }
+    if (Config.eventId() != BCPEvent.fullId()) {
+        MAIN_DEBUG("Event ID changed, updating BCP event.");
+        hw->showSplashScreen();
+        BCPEvent.setID(Config.eventId());
+        lastDataRefresh = 0; // force data refresh
+        failCount = 0;
+    }
+}
+
+bool isRefreshDue() {
+    return lastDataRefresh == 0 || millis() - lastDataRefresh >= DATA_REFRESH_INTERVAL_MS || hw->enforceUpdate;
+}
+
+// Fetches the event data and reacts to failures (WiFi reconnect, reboot after repeated connection errors)
+void refreshEventData() {
+    MAIN_DEBUG("Refreshing BCP event data...");
+    hw->enforceUpdate = false;
+    lastDataRefresh = millis();
+    bool ok = BCPEvent.refreshData();
+    RefreshDecision r = decideRefresh(ok, WiFi.status() == WL_CONNECTED, BCPEvent.lastStatus(),
+                                        failCount, MAX_CONNECTION_FAILURES);
+    failCount = r.failCount;
+    switch (r.outcome) {
+        case REFRESH_SUCCESS:
+            MAIN_DEBUG("BCP event data refreshed successfully");
+            break;
+        case REFRESH_WIFI_DOWN:
+            MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting");
+            WiFi.reconnect();
+            break;
+        case REFRESH_CONNECTION_ERROR:
+        case REFRESH_REBOOT:
+            MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()) +
+                       " (failure count " + String(failCount) + ")");
+            if (r.outcome == REFRESH_REBOOT) {
+                MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
+                hw->reboot();
+            }
+            break;
+        case REFRESH_HTTP_ERROR:
+            MAIN_DEBUG("Failed to refresh BCP event data, HTTP status " + String(BCPEvent.lastStatus()));
+            break;
+        case REFRESH_NO_REQUEST:
+            break;
+    }
+}
+
 // ---- core Arduino functions ----
 
 void setup() {
@@ -116,60 +179,11 @@ void setup() {
 }
 
 void loop() {
-    static int failCount = 0;
-    static unsigned long lastDataRefresh = 0;   // millis() of the last refresh, 0 = refresh now
+    handleConfigUpdate();
 
-    if (Config.configUpdated) {
-        MAIN_DEBUG("Configuration updated.");
-        Config.configUpdated = false;
-        if (Config.hostname() != mdnsHostname) {
-            MAIN_DEBUG("Hostname changed, restarting mDNS.");
-            WiFi.setHostname(Config.hostname().c_str());   // DHCP hostname applies at the next WiFi connection
-            MDNS.end();
-            startMdns();
-        }
-        if (Config.eventId() != BCPEvent.fullId()) {
-            MAIN_DEBUG("Event ID changed, updating BCP event.");
-            hw->showSplashScreen();
-            BCPEvent.setID(Config.eventId());
-            lastDataRefresh = 0; // force data refresh
-            failCount = 0;
-        }
-    }
-
-    if (lastDataRefresh == 0 || millis() - lastDataRefresh >= DATA_REFRESH_INTERVAL_MS || hw->enforceUpdate) {
-        MAIN_DEBUG("Refreshing BCP event data...");
-        hw->enforceUpdate = false;
-        lastDataRefresh = millis();
-        bool ok = BCPEvent.refreshData();
-        RefreshDecision r = decideRefresh(ok, WiFi.status() == WL_CONNECTED, BCPEvent.lastStatus(),
-                                            failCount, MAX_CONNECTION_FAILURES);
-        failCount = r.failCount;
-        switch (r.outcome) {
-            case REFRESH_SUCCESS:
-                MAIN_DEBUG("BCP event data refreshed successfully");
-                break;
-            case REFRESH_WIFI_DOWN:
-                MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting");
-                WiFi.reconnect();
-                break;
-            case REFRESH_CONNECTION_ERROR:
-            case REFRESH_REBOOT:
-                MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()) +
-                           " (failure count " + String(failCount) + ")");
-                if (r.outcome == REFRESH_REBOOT) {
-                    MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
-                    hw->reboot();
-                }
-                break;
-            case REFRESH_HTTP_ERROR:
-                MAIN_DEBUG("Failed to refresh BCP event data, HTTP status " + String(BCPEvent.lastStatus()));
-                break;
-            case REFRESH_NO_REQUEST:
-                break;
-        }
+    if (isRefreshDue()) {
+        refreshEventData();
         updateDisplay();
-
     } else if (hw->redrawRequested) {
         updateDisplay();
     }

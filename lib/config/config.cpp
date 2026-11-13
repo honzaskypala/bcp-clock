@@ -52,17 +52,17 @@ CConfig::CConfig() {
         return;
     }
     Preferences prefs;
-    if (prefs.begin(CONFIG_NS, true)) { // read-only
-        ConfigValues v = readConfig(prefs);
-        event_    = v.event;
-        yellow_   = v.yellow;
-        red_      = v.red;
-        hostname_ = v.hostname;
-        prefs.end();
-        CONFIG_DEBUG("Preferences loaded");
-    } else {
+    if (!prefs.begin(CONFIG_NS, true)) { // read-only
         CONFIG_DEBUG("Failed to open preferences for reading");
+        return;
     }
+    ConfigValues v = readConfig(prefs);
+    event_    = v.event;
+    yellow_   = v.yellow;
+    red_      = v.red;
+    hostname_ = v.hostname;
+    prefs.end();
+    CONFIG_DEBUG("Preferences loaded");
 }
 
 // ---- Save configuration to persistent storage ----
@@ -73,17 +73,17 @@ void CConfig::savePreferences() {
         return;
     }
     Preferences prefs;
-    if (prefs.begin(CONFIG_NS, false)) { // write mode
-        CONFIG_DEBUG("Saving preferences");
-        prefs.putString("event", event_);
-        prefs.putLong("yellow", yellow_);
-        prefs.putLong("red", red_);
-        prefs.putString("hostname", hostname_);
-        prefs.end();
-        CONFIG_DEBUG("Preferences saved");
-    } else {
+    if (!prefs.begin(CONFIG_NS, false)) { // write mode
         CONFIG_DEBUG("Failed to open preferences for writing");
+        return;
     }
+    CONFIG_DEBUG("Saving preferences");
+    prefs.putString("event", event_);
+    prefs.putLong("yellow", yellow_);
+    prefs.putLong("red", red_);
+    prefs.putString("hostname", hostname_);
+    prefs.end();
+    CONFIG_DEBUG("Preferences saved");
 }
 
 // ---- Erase configuration from persistent storage ----
@@ -94,19 +94,19 @@ void CConfig::erase() {
         return;
     }
     Preferences prefs;
-    if (prefs.begin(CONFIG_NS, false)) { // write mode
-        CONFIG_DEBUG("Clearing preferences");
-        prefs.clear();
-        prefs.end();
-        CONFIG_DEBUG("Preferences cleared");
-        // Reset to defaults
-        event_ = DEF_EVENT;
-        yellow_ = DEF_YELLOW;
-        red_ = DEF_RED;
-        hostname_ = DEF_HOSTNAME;
-    } else {
+    if (!prefs.begin(CONFIG_NS, false)) { // write mode
         CONFIG_DEBUG("Failed to open preferences for clearing");
+        return;
     }
+    CONFIG_DEBUG("Clearing preferences");
+    prefs.clear();
+    prefs.end();
+    CONFIG_DEBUG("Preferences cleared");
+    // Reset to defaults
+    event_ = DEF_EVENT;
+    yellow_ = DEF_YELLOW;
+    red_ = DEF_RED;
+    hostname_ = DEF_HOSTNAME;
 }
 
 // ---- Configuration HTTP server ----
@@ -150,22 +150,20 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
 }
 
 void CConfig::stopConfigServer() {
-    if (configServer != nullptr) {
-        configServer->stop();
-        delete configServer;
-        configServer = nullptr;
-        CONFIG_DEBUG("HTTP server stopped");
-    }
+    if (configServer == nullptr) return;
+    configServer->stop();
+    delete configServer;
+    configServer = nullptr;
+    CONFIG_DEBUG("HTTP server stopped");
 }
 
 void CConfig::handleClient() {
-    if (configServer != nullptr) {
-        configServer->handleClient();
-        // Stop server after timeout, if configured
-        if (_serverTimeoutMs > 0 && (millis() - _serverStartMs) >= _serverTimeoutMs) {
-            CONFIG_DEBUG("HTTP server timeout reached, stopping");
-            stopConfigServer();
-        }
+    if (configServer == nullptr) return;
+    configServer->handleClient();
+    // Stop server after timeout, if configured
+    if (_serverTimeoutMs > 0 && (millis() - _serverStartMs) >= _serverTimeoutMs) {
+        CONFIG_DEBUG("HTTP server timeout reached, stopping");
+        stopConfigServer();
     }
 }
 

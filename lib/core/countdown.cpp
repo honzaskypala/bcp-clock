@@ -62,6 +62,58 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
 
 // ---- Round indicator (bottom row) ----
 
+// Left offset of the round lines, chosen per number of rounds so the lines look centred
+static int roundLineOffset(int totalRounds) {
+    switch (totalRounds) {
+        case 3:
+        case 5:
+        case 14:
+            return 2;
+        case 7:
+        case 9:
+        case 13:
+            return 3;
+        case 12:
+            return 4;
+        case 11:
+            return 5;
+        default:
+            return 1;
+    }
+}
+
+// Few rounds (less than width / 2): one line per round
+static void layoutRoundLines(int currentRound, int totalRounds, int width, RoundPixel out[]) {
+    int lineWidth = width / totalRounds;
+    int offset = roundLineOffset(totalRounds);
+    for (int i = 0; i < totalRounds; i++) {
+        RoundPixel p = (i == currentRound - 1) ? ROUND_PIXEL_ACTIVE : ROUND_PIXEL_INACTIVE;
+        for (int j = 0; j < lineWidth - 1; j++) {
+            int x = i * lineWidth + offset + j;
+            if (x >= 0 && x < width) out[x] = p;
+        }
+    }
+}
+
+// Many rounds: one pixel per round (at most width), the current round separated by gaps if they fit
+static void layoutRoundDots(int currentRound, int totalRounds, int width, RoundPixel out[]) {
+    int t = totalRounds <= width ? totalRounds : width;
+    bool withGaps = totalRounds <= width - 2;
+    // gaps before and after the current round, only those that are drawn (none after the last round)
+    int gaps = 0;
+    if (withGaps) {
+        gaps = (currentRound - 1 >= 0 && currentRound - 1 < t) + (currentRound >= 0 && currentRound < t);
+    }
+    int start = (width - (t + gaps)) / 2;
+    for (int i = 0; i < t; i++) {
+        if (withGaps && (i == currentRound - 1 || i == currentRound)) {
+            start++;
+        }
+        int x = start + i;
+        if (x >= 0 && x < width) out[x] = (i == currentRound - 1) ? ROUND_PIXEL_ACTIVE : ROUND_PIXEL_INACTIVE;
+    }
+}
+
 void layoutRoundIndicator(int currentRound, int totalRounds, int width, RoundPixel out[]) {
     for (int i = 0; i < width; i++) {
         out[i] = ROUND_PIXEL_OFF;
@@ -69,50 +121,9 @@ void layoutRoundIndicator(int currentRound, int totalRounds, int width, RoundPix
     if (totalRounds <= 0) {
         return;  // number of rounds unknown, show the countdown only
     }
-    auto set = [&](int x, RoundPixel p) {
-        if (x >= 0 && x < width) out[x] = p;
-    };
     if (totalRounds < width / 2) {
-        int lineWidth = width / totalRounds, offset;
-        switch (totalRounds) {
-            case 3:
-            case 5:
-            case 14:
-                offset = 2;
-                break;
-            case 7:
-            case 9:
-            case 13:
-                offset = 3;
-                break;
-            case 12:
-                offset = 4;
-                break;
-            case 11:
-                offset = 5;
-                break;
-            default:
-                offset = 1;
-        }
-        for (int i = 0; i < totalRounds; i++) {
-            RoundPixel p = (i == currentRound - 1) ? ROUND_PIXEL_ACTIVE : ROUND_PIXEL_INACTIVE;
-            for (int j = 0; j < lineWidth - 1; j++) {
-                set(i * lineWidth + offset + j, p);
-            }
-        }
+        layoutRoundLines(currentRound, totalRounds, width, out);
     } else {
-        int t = totalRounds <= width ? totalRounds : width;
-        // gaps before and after the current round, only those that are drawn (none after the last round)
-        int gaps = 0;
-        if (totalRounds <= width - 2) {
-            gaps = (currentRound - 1 >= 0 && currentRound - 1 < t) + (currentRound >= 0 && currentRound < t);
-        }
-        int start = (width - (t + gaps)) / 2;
-        for (int i = 0; i < t; i++) {
-            if (totalRounds <= width - 2 && (i == currentRound - 1 || i == currentRound)) {
-                start++;
-            }
-            set(start + i, (i == currentRound - 1) ? ROUND_PIXEL_ACTIVE : ROUND_PIXEL_INACTIVE);
-        }
+        layoutRoundDots(currentRound, totalRounds, width, out);
     }
 }
