@@ -1,0 +1,112 @@
+#!/bin/sh
+# Git pre-commit hook: unit tests on the Mac always, on the TC001 only when the staged files need them
+# (c) 2025 Honza Skýpala
+# WTFPL license applies
+#
+# Enable once per clone:  git config core.hooksPath tools/git-hooks
+# Skip the device tests:  SKIP_DEVICE_TESTS=1 git commit ...    Skip everything: git commit --no-verify
+# Tests run on the working tree, not on the staged snapshot. Logs: .pio/precommit/
+
+ROOT=$(git rev-parse --show-toplevel) || exit 1
+cd "$ROOT" || exit 1
+PIO=~/.platformio/penv/bin/pio
+LOGDIR=.pio/precommit
+UPLOAD_ATTEMPTS=4
+mkdir -p "$LOGDIR"
+
+say() { echo "[pre-commit] $*"; }
+
+STAGED=$(git diff --cached --name-only)
+[ -z "$STAGED" ] && exit 0
+staged() { echo "$STAGED" | grep -qE "$1"; }
+
+PARTIAL=$(git diff --name-only | grep -Fx "$STAGED")
+if [ -n "$PARTIAL" ]; then
+    say "warning: files with unstaged changes, tests run on the working tree:"
+    echo "$PARTIAL" | sed 's/^/    /'
+fi
+
+# ---- Tests on the Mac: always ----
+
+say "native tests (pio test -e native)"
+if ! "$PIO" test -e native > "$LOGDIR/native.log" 2>&1; then
+    grep -E "\[(FAILED|ERRORED)\]|error:" "$LOGDIR/native.log" | sed 's/^/    /'
+    say "native tests failed, commit aborted (log: $LOGDIR/native.log)"
+    exit 1
+fi
+say "native tests passed: $(grep -E 'test cases' "$LOGDIR/native.log" | tr -d '=' | sed 's/^ *//')"
+
+# ---- Tests on the TC001: only suites related to the staged files ----
+
+SUITES=""
+staged '^(lib/gfx/|test/device/test_gfx/|platformio\.ini$)' && SUITES="$SUITES device/test_gfx"
+staged '^(lib/config/|lib/core/(bcpparse|textutil)\.|test/device/test_platform/|platformio\.ini$)' && SUITES="$SUITES device/test_platform"
+
+# code no automated test covers: remind to check it on the device
+UNCOVERED=$(echo "$STAGED" | grep -E '^(src/|lib/hw/|lib/wifimgr/|lib/bcp/|lib/config/)')
+if [ -n "$UNCOVERED" ]; then
+    say "note: not (fully) covered by automated tests, verify with the dev build on the device:"
+    echo "$UNCOVERED" | sed 's/^/    /'
+fi
+
+[ -z "$SUITES" ] && exit 0
+
+if [ "$SKIP_DEVICE_TESTS" = "1" ]; then
+    say "warning: SKIP_DEVICE_TESTS=1, device tests not run:$SUITES"
+    exit 0
+fi
+if ! ls /dev/cu.usbserial* > /dev/null 2>&1; then
+    say "device tests needed ($SUITES ) but no TC001 is connected; commit aborted"
+    say "connect it directly to the Mac, or commit with SKIP_DEVICE_TESTS=1"
+    exit 1
+fi
+if pgrep -f tools/devmon.py > /dev/null; then
+    say "device tests needed ($SUITES ) but devmon.py holds the serial port; stop it and commit again"
+    exit 1
+fi
+
+# Runs a pio command, retrying while the upload fails (unreliable CH340 transfers).
+# $1 = log file, $2 = grep pattern meaning "the upload went through", rest = pio arguments
+run_with_upload_retries() {
+    log=$1 done_pattern=$2
+    shift 2
+    attempt=1
+    while [ $attempt -le $UPLOAD_ATTEMPTS ]; do
+        "$PIO" "$@" > "$log" 2>&1
+        status=$?
+        grep -qE "$done_pattern" "$log" && return $status
+        say "  upload failed (attempt $attempt of $UPLOAD_ATTEMPTS)"
+        attempt=$((attempt + 1))
+        sleep 5
+    done
+    return 255
+}
+
+FAILED=0
+for suite in $SUITES; do
+    log="$LOGDIR/$(basename "$suite").log"
+    say "device tests $suite on the TC001"
+    run_with_upload_retries "$log" '\[(PASSED|FAILED)\]' test -e nodemcu-32s -f "$suite"
+    case $? in
+        0)   say "  passed: $(grep -E 'test cases' "$log" | tr -d '=' | sed 's/^ *//')" ;;
+        255) say "  could not upload the tests (log: $log)"; FAILED=1 ;;
+        *)   grep -E "\[FAILED\]" "$log" | sed 's/^/    /'
+             say "  failed (log: $log)"; FAILED=1 ;;
+    esac
+done
+
+# ---- Production firmware back on the TC001 ----
+
+say "flashing production firmware"
+if run_with_upload_retries "$LOGDIR/upload.log" '\[SUCCESS\]' run -e nodemcu-32s -t upload; then
+    say "  production firmware flashed"
+else
+    say "  warning: production firmware NOT flashed, the TC001 runs test firmware (log: $LOGDIR/upload.log)"
+    say "  flash it manually: $PIO run -t upload"
+fi
+
+if [ $FAILED -ne 0 ]; then
+    say "device tests failed, commit aborted"
+    exit 1
+fi
+exit 0

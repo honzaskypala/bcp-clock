@@ -55,6 +55,12 @@ PlatformIO CLI is not on PATH; use `~/.platformio/penv/bin/pio`.
   `-f device/<suite>`. Unity on the ESP32 has no 64-bit asserts. Logic that needs tests belongs to
   `lib/core` (no ESP-only includes). Display, WiFi, portal, config server and buttons are verified on the
   device with the dev console.
+- Git pre-commit hook `tools/git-hooks/pre-commit` (enable per clone: `git config core.hooksPath tools/git-hooks`):
+  native tests always; TC001 suites only for related staged files (`lib/gfx/` → `test_gfx`; `lib/config/`,
+  `lib/core/bcpparse.*`, `lib/core/textutil.*` → `test_platform`; `platformio.ini` → both), with upload
+  retries, then production is flashed back. Blocks the commit if the TC001 is needed but missing or devmon
+  holds the port; `SKIP_DEVICE_TESTS=1 git commit` skips the device part. A commit with device tests takes
+  several minutes: run it in the background (Bash timeout is 10 min). Logs in `.pio/precommit/`.
 - Claude may flash the device and read its serial output. USB is reliable when the TC001 is plugged
   directly into the MacBook, unreliable through a USB hub. If upload/monitor fails, suspect the hub first.
 - In 2025 the device occasionally froze after flashing. Recovery: hold Left + Right to power off, power on
@@ -68,7 +74,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 |---|---|
 | `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display state decisions (`displayUpdate()`), reboot after 5 consecutive fetch failures, mDNS `<hostname>.local` |
 | `src/devconsole.*` | Serial command console, dev build only |
-| `tools/` | Mac-side dev helpers: `devmon.py` (persistent serial monitor), `devcmd.sh` (send console command), `bcp_contract.py` (live BCP API contract test, `--dump` saves responses) |
+| `tools/` | Mac-side dev helpers: `devmon.py` (persistent serial monitor), `devcmd.sh` (send console command), `bcp_contract.py` (live BCP API contract test, `--dump` saves responses), `git-hooks/pre-commit` (runs the tests) |
 | `test/native/`, `test/device/` | Unit tests on the Mac / on the TC001 |
 | `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: calls BCP REST API, keeps event data, RTC snapshot |
 | `lib/core/` | Hardware independent logic, unit tested on the Mac: event ID / JSON / time parsing (`bcpparse`), countdown text + colour and round indicator layout (`countdown`), display / refresh decisions and message prefixes (`policy`), `DisplayState` (`displaystate.h`), snapshot validation, string helpers (`textutil`) |

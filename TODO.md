@@ -38,6 +38,7 @@
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [General] [Tests] Git pre-commit hook (tools/git-hooks): native tests on every commit, TC001 tests only when related files are staged, then production firmware is flashed back
 - [x] [GFX] [Bugfix] Scrolling text width skips invalid UTF-8 bytes like the canvas does (a lone byte 0xA0–0xFF was counted as a Latin-1 character)
 - [x] [Hw] [Bugfix] Round indicator centred also in the last round (16–30 rounds): only the gaps actually drawn around the current round are reserved
 - [x] [GFX] [Bugfix] Text appended to a scrolling text (e.g. a message after an error) keeps the UTF-8 segmented font, so non-ASCII characters are drawn

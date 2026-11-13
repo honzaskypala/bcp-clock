@@ -28,6 +28,7 @@ judges' desk and nobody has to check their phone.
 - [First setup](#first-setup)
 - [Configuration](#configuration)
 - [How it works](#how-it-works)
+- [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
 - [History](#history)
@@ -196,6 +197,33 @@ All settings are stored in the ESP32's non-volatile memory and survive reboots a
 | `lib/config/` | Settings storage and the configuration web server |
 | `lib/wifimgr/` | WiFi manager with captive portal, NTP and RTC time synchronisation |
 | `lib/gfx/` | Graphics helpers on top of Adafruit GFX: scrolling text, progress indicator, UTF-8 fonts |
+| `lib/core/` | Hardware independent logic: parsing of the BCP data, countdown text and colours, round indicator, display decisions |
+| `test/` | Unit tests: `native/` run on the computer, `device/` run on the TC001 |
+
+## Testing
+
+```sh
+pio test -e native                          # unit tests on the computer, no device needed
+pio test -e nodemcu-32s                     # unit tests on the TC001 connected over USB
+python tools/bcp_contract.py <eventId>      # checks the live Best Coast Pairings API
+```
+
+The tests on the computer cover the hardware independent logic in `lib/core` and the web page helpers: parsing of
+the event ID, of the BCP responses and of the times, colour thresholds, the countdown text and colours, the round
+indicator, what the display shows and when the clock reboots. They take a few seconds.
+
+The tests on the TC001 cover what needs the real hardware: fonts, UTF-8 text rendering, scrolling text, the
+progress indicator, time conversion and settings storage (in a separate namespace, your settings are not touched).
+They replace the firmware on the clock, so flash it again afterwards (`pio run -t upload`).
+
+The contract test calls the unofficial BCP API with a real event and checks that the responses still have the
+fields and formats the clock expects. Run it by hand, e.g. when the clock stops showing data.
+
+A git pre-commit hook runs the tests before every commit and stops the commit on a failure. The tests on the
+computer run always; the tests on the TC001 only when the commit changes code they cover (graphics, settings,
+time parsing), and then the production firmware is flashed back. If they are needed and the clock is not
+connected, the commit is stopped; `SKIP_DEVICE_TESTS=1 git commit` skips them. Turn the hook on once per clone:
+`git config core.hooksPath tools/git-hooks`.
 
 ## Troubleshooting
 
@@ -239,5 +267,6 @@ Released under the [WTFPL](http://www.wtfpl.net/) – Do What The F*ck You Want 
 - [Adafruit GFX Library](https://github.com/adafruit/Adafruit-GFX-Library)
 - [FastLED](https://github.com/FastLED/FastLED) and [FastLED NeoMatrix](https://github.com/marcmerlin/FastLED_NeoMatrix)
 - [ArduinoJson](https://arduinojson.org/)
+- [ArduinoFake](https://github.com/FabioBatSilva/ArduinoFake) for the unit tests on the computer
 - [RTClib](https://github.com/adafruit/RTClib)
 - [rroels/ulanzi_tc001_hardware](https://github.com/rroels/ulanzi_tc001_hardware) for the TC001 hardware documentation
