@@ -193,9 +193,67 @@ plausible RTC time is used instead, otherwise the connection attempt counts as f
 
 ## Planned: Ulanzi TC002 support
 
-Goal: one repository for several target devices. Nothing is implemented yet and we do not have the device.
-Findings from https://github.com/atomicstack/tc002-customisation (beta, based on a single unit; items
-marked *unverified* came only from a summary of its README). Researched 2026-11.
+Goal: one repository for several target devices. Nothing is implemented yet and we do not have the device
+(the user will buy one; continue only then). Findings from https://github.com/atomicstack/tc002-customisation
+(beta, based on a single unit; items marked *unverified* came only from a summary of its README). Researched 2026-11.
+
+### Requirements (agreed with the user, 2026-11-14)
+- **Keep the stock firmware**: its Linux, the stock UI (`zkgui`) and all built-in apps stay; BCP Clock is one more
+  app on the clock that the user can switch to. No replacement firmware (unlike TC001), no FlyThings app that
+  replaces the UI.
+- **Everything runs on the TC002 itself**: the clock is taken to tournaments, so no NAS, PC, Home Assistant or
+  phone may feed it. It only needs WiFi with internet access.
+- Further sources: official docs https://github.com/UlanziTechnology/Ulanzi-U-Clock-TC002 (Chinese, GPL-3.0;
+  `protocol/Ulanzi_TC002_protocol-http-mqtt_CN.md` is the full reference, `_en.md` a short summary;
+  AI-translated English fork https://github.com/klein0r/Ulanzi-U-Clock-TC002), fork with firmware unpack/rebuild
+  tools https://github.com/aquarat/tc002-customisation, https://github.com/Daniel-Nashed/tc002-tools (static musl
+  Dropbear, busybox-like tools in `/data/bin`). AWTRIX NG does not support the TC002 (maintainer, discussion #50).
+
+### Official ways to add an app (none runs our code next to the stock UI)
+- Ulanzi Studio (desktop) and Ulanzi Connect (mobile) cannot install third-party apps: no store, plugins or scripting.
+- **Custom apps ("DIY apps") over HTTP/MQTT**, stock firmware: a named app whose content is pushed from outside;
+  the clock only displays it. Port 80, **no authentication**:
+  - `POST /api/custom?name=<app>` with a JSON frame creates/replaces the app (`{"code":200,"message":"ok"}`);
+    body `{}` deletes it. `GET /api/customList` → `{"apps":["hello"],"count":1}`.
+    `POST /api/switchDiyApp?name=<app>` brings it to the front (firmware ≥ 1.1.0; 404 for an unknown name).
+  - Frame JSON: `text[]` (`content` printable ASCII 0x20–0x7E only, `fontHeight` 5 or 10, `x`/`y`, `align`, `valign`,
+    `color` `#RRGGBB`, `rect`, `charSpacing`; no scrolling, long text is clipped), `draw[]` (max 32 one-key commands:
+    `dp` pixel, `dl` line, `dr`/`df` rectangle, `dc`/`dfc` circle, `dt` text, `db [x,y,w,h,[0x00RRGGBB…]]` bitmap,
+    length = w·h), `image[]` (PNG or animated GIF as a data URL, base64 ≤ 60 KB, ≤ 3 PNG + ≤ 3 GIF, clipped not
+    scaled, PNG alpha ignored), `duration` (seconds; only in the README example, its effect is unclear).
+    Origin top-left, 52×16.
+  - MQTT: the same JSON to `<prefix>/custom/<app>`, `<prefix>/switchDiyApp` `{"name":…}`; prefix `ulanzi_` + last
+    4 hex digits of the MAC. One-way: buttons/knob are not reported.
+  - Other endpoints: `/getBase`, `/setConfig`, `/keyEvent`, `/switchApp`, `/setDiyImages` (stored images, own
+    carousel group), `/update` (flashes any `downloadUrl`, unauthenticated), `/resetConfig` (wipes `/data/diy`).
+  - *Unverified*: whether a custom app joins the automatic carousel or is only reachable via `switchDiyApp`,
+    whether it survives a reboot, whether Ulanzi Studio lists it, how often frames may be pushed.
+- **Native FlyThings C++ apps** (Windows IDE, platform `Z21`, sample `Z21_TC002_Demo`): run on the device, but the
+  built `update.img` replaces the stock app (`zkswe`), so the built-in apps are gone. Ruled out by the requirements.
+
+### Chosen direction: own daemon next to the stock UI (unofficial, untested by anyone)
+- A small static ARMv7 daemon on the device fetches BCP, renders the 52×16 frame itself (our fonts, UTF-8 –
+  the stock `text` is ASCII only) and pushes it as a `db` bitmap or PNG to `http://127.0.0.1/api/custom?name=bcp`.
+  It never touches `spidev0.0`/GPIO 35 (owned by `zkgui`). It serves its own config page on another port (e.g. 8080);
+  WiFi stays with the stock firmware.
+- **Autostart is the hard part.** Stock firmware has no hook that runs anything from writable storage: `/etc/init.rc`
+  is in the read-only rootfs, the loader reads `/tmp/EasyUI.cfg` (volatile) before `/res/etc/EasyUI.cfg`, tc002-tools
+  says persistent startup on stock "is still not implemented", the TC002 has no TF card slot, and a USB stick only
+  triggers the upgrade check (`update.img`), not a launcher. Started over adb, the daemon is gone after a reboot.
+- Only workable route found: patch the `res` partition (mtd3, 8 MiB squashfs). Point `startupLibPath` in
+  `/res/etc/EasyUI.cfg` at a small bootstrap library that forks our daemon and then loads the stock `libzkgui.so`
+  (atomicstack's bootstrap execs its own runtime instead – theirs replaces the UI). Tools: `tc002-update-img.py`
+  (unpack/pack `update.img`, byte-exact), `runtime/tools/tc002-mkimage.sh`, `tc002-flash.sh` (backs up mtd3 first),
+  `mksquashfs … -comp xz -b 128K`, added files mode 0755. The flasher checks magic, device code, CRC32 and md5,
+  no signature. The flash is done once over adb from a computer; afterwards the clock needs no computer.
+- Risks: zkdaemon starts recovery when `sys.zkapp.state` is not `running` ~15 s after boot (the stock UI sets it,
+  our bootstrap must not delay it); recovery and the reset key (5 s) reflash the older `/mnt/storage/update.img`
+  and the reset key wipes `/data`; an official OTA update most likely overwrites `res` (reinstall needed).
+- Device limits: ~12 MB `MemAvailable` with the stock UI running, load ~3 on two cores; no Python, curl or wget on
+  stock; libc probably glibc 2.30 (one source), so build fully static (zig or `arm-linux-musleabihf`), no libm
+  assumed; no system CA bundle usable (ship our own); stock DNS (`/etc/resolv.conf`) may not work; stock NTP uses
+  7 hardcoded IPv4 servers every 2 h, the clock starts at 1970 until the first sync. Stock cloud traffic to
+  `api.ulanzistudio.com` is plain HTTP. Tested firmware: appVer 1.1.1, mcuVer V1.0.17.
 
 ### Hardware
 - **Not an ESP32.** Linux 4.9.84 (OpenWrt GCC 9.1.0 toolchain) on a SigmaStar SSD210 ("Pioneer3"), 2× Cortex-A7
@@ -229,18 +287,22 @@ marked *unverified* came only from a summary of its README). Researched 2026-11.
 - `lib/core`: logic is reusable. It depends only on Arduino `String` and ArduinoJson; it needs `std::string`/`char*`
   or a small `String` shim (ArduinoFake is a test mock, not for production).
 - `lib/gfx`: Adafruit_GFX is plain C++ and builds with an Arduino shim; fonts and `ScrollingText` are reusable.
-- `Hw` interface (`lib/hw/hw.h`): a new implementation renders to a 52×16 framebuffer, then SPI + latch, using a
-  thread instead of a FreeRTOS task. It needs a new layout (the TC001 code is tied to 32×8).
+- `Hw` interface (`lib/hw/hw.h`): a new implementation renders to a 52×16 framebuffer, then pushes it to the stock
+  custom-app API (not SPI + latch, see "Chosen direction"), using a thread instead of a FreeRTOS task. Buttons are
+  owned by the stock UI. It needs a new layout (the TC001 code is tied to 32×8).
 - To be replaced: `lib/bcp` HTTP (`WiFiClientSecure`/`HTTPClient` → libcurl or mbedTLS), `lib/config` storage
   (NVS → file in `/data`) and its web server (the `lib/webui` HTML stays), `setup()`/`loop()` → `main()`.
   Missing abstractions: HTTP fetch, settings storage, config server.
 - TC002-only features must be gated per platform so they do not grow the TC001 flash usage.
 
 ### Open issues / first steps
-1. Toolchain: cross-compile for ARMv7 against the device libc (OpenWrt: musl or uClibc?), probably a static binary.
-   Build with CMake next to PlatformIO.
-2. Stop or replace `zkswe` (it owns SPI/display) and autostart our binary without writing kernel/rootfs.
-3. Feasibility test: static hello world via adb, then one frame on SPI. If either fails, the plan is off.
+1. Feasibility test without touching the firmware (adb, binaries in `/tmp`, gone after reboot): static hello world;
+   does the stock API answer on `127.0.0.1:80` (`/proc/net/tcp`: `00000000` = any address); push a `db` frame and
+   see whether the custom app shows in the carousel and survives a reboot; how fast frames can be pushed
+   (countdown needs 1/s, scrolling text more); DNS, HTTPS to BCP with our CA bundle, NTP time; free memory.
+   If the loopback push or HTTPS fails, the plan is off.
+2. Toolchain: static ARMv7 binary (zig or `arm-linux-musleabihf`), built with CMake next to PlatformIO.
+3. Autostart: dump and back up mtd3, repack `res` with the bootstrap that keeps the stock UI, test recovery first.
 
 ## Planning
 

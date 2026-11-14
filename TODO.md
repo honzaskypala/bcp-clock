@@ -15,12 +15,14 @@
 - [ ] show finished tables + config top / bottom / none
 
 ## TC002 support (see CLAUDE.md "Planned: Ulanzi TC002 support")
-- [ ] Feasibility check on the device: static ARMv7 hello world via adb; stop the stock app `zkswe` and send one frame over SPI
+Requirements: stock firmware and its apps stay, BCP Clock is an extra app; everything runs on the clock (no NAS/PC). Waiting for the device.
+- [ ] Feasibility check on the device, firmware untouched (adb, `/tmp`): static ARMv7 hello world; stock API reachable on `127.0.0.1:80`; push a `db` frame to `/api/custom?name=bcp` – shown in the carousel? survives reboot? max push rate?; DNS, HTTPS to BCP with own CA bundle, NTP; free memory
 - [ ] Make `lib/core` platform neutral (`std::string` / `char*` instead of Arduino `String`, or a small `String` shim)
 - [ ] Interfaces for HTTP fetch, settings storage and config web server (ESP32 implementations unchanged)
-- [ ] Linux build (CMake, ARMv7 cross toolchain) next to PlatformIO
-- [ ] `Hw` implementation for the 52x16 matrix (SPI + latch), buttons and knob; layout for the larger display
-- [ ] Deployment: adb push to `/data`, autostart without writing the kernel/rootfs partitions
+- [ ] Linux build (CMake, static ARMv7: zig or `arm-linux-musleabihf`) next to PlatformIO
+- [ ] `Hw` implementation for 52x16: render to a framebuffer, push it to the stock custom-app API (no SPI); layout for the larger display
+- [ ] Config page on its own port (e.g. 8080), settings file in `/data`; WiFi stays with the stock firmware
+- [ ] Autostart: back up mtd3, repack `res` with a bootstrap library that starts our daemon and then the stock `libzkgui.so`; test recovery; reinstall after official OTA updates
 
 ## GFX related
 - [ ] add negative chars to the font, eg. 🅽
