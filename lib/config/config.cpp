@@ -4,6 +4,7 @@
 
 #include "config.h"
 #include <Preferences.h>
+#include <ESPmDNS.h>
 #include <nvs_flash.h>
 #include <wifimgr.h>
 #include <webui.h>
@@ -156,6 +157,7 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
     });
     
     configServer->begin();
+    startMdns();
     _serverStartMs = millis();
     _serverTimeoutMs = timeoutMs; // 0 => no timeout
     CONFIG_DEBUG("HTTP server started on http://" + WiFi.localIP().toString() + (timeoutMs == 0 ? " (no timeout)" : " (with timeout)"));
@@ -163,10 +165,20 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
 
 void CConfig::stopConfigServer() {
     if (configServer == nullptr) return;
+    MDNS.end();
     configServer->stop();
     delete configServer;
     configServer = nullptr;
     CONFIG_DEBUG("HTTP server stopped");
+}
+
+// The config page is also reachable at http://<hostname>.local while the server runs
+void CConfig::startMdns() {
+    if (MDNS.begin(hostname_.c_str())) {
+        CONFIG_DEBUG("mDNS started: http://" + hostname_ + ".local");
+    } else {
+        CONFIG_DEBUG("mDNS start failed");
+    }
 }
 
 void CConfig::handleClient() {
@@ -274,7 +286,13 @@ void CConfig::handleConfigPost() {
         red_ = timeToSeconds(configServer->arg("red"));
     }
     if (configServer->hasArg("hostname")) {
-        hostname_ = sanitizeHostname(configServer->arg("hostname"));
+        String hostname = sanitizeHostname(configServer->arg("hostname"));
+        if (hostname != hostname_) {
+            hostname_ = hostname;
+            CONFIG_DEBUG("Hostname changed, restarting mDNS.");
+            MDNS.end();
+            startMdns();
+        }
     }
     
     savePreferences();

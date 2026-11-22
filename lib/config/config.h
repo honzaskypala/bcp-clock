@@ -60,6 +60,7 @@ private:
     void handleConfigPost();
     void handleWifiDelete();
     void handleWifiDeleteAll();
+    void startMdns();
 
     // ---- HTTP server timeout tracking ----
     unsigned long _serverStartMs;   // millis() when server started/reset

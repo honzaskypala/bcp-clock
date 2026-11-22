@@ -44,6 +44,7 @@ Requirements: stock firmware and its apps stay, BCP Clock is an extra app; every
 ## General
 
 ## Done
+- [x] [Config] [Refactor] mDNS moved from main.cpp to CConfig: announced only while the config server runs, restarted there on a hostname change
 - [x] [General] [Release] v1.0.2: install page loads the manifest bypassing the GitHub Pages cache (max-age=600 kept showing and offering the previous release)
 - [x] [General] [Release] v1.0.1: installer page and README say to tick "Erase device" on the first installation (ESP Web Tools leaves it unticked by default)
 - [x] [General] [Release] First release v1.0.0: browser installer (ESP Web Tools, `install/index.html`) on GitHub Pages, `tools/build_release.sh` builds the firmware with `BCP_VERSION` and the merged image, `.github/workflows/release.yml` publishes a GitHub Release and the installer on a pushed `v*` tag; firmware version in the configuration page footer (+128 B, 84.9 %); README Installation rewritten for non-developers, work-in-progress warning removed
