@@ -53,7 +53,8 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 |---|---|
 | `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display decisions (`updateDisplay()`), reboot after 5 failed fetches, mDNS |
 | `src/devconsole.*` | Serial command console, dev build only |
-| `tools/` | Host-side dev helpers (`devmon.py`, `devcmd.sh`, `bcp_contract.py`, `git-hooks/pre-commit`) |
+| `tools/` | Host-side dev helpers (`devmon.py`, `devcmd.sh`, `bcp_contract.py`, `build_release.sh`, `git-hooks/pre-commit`) |
+| `install/`, `.github/workflows/` | Browser installer page (ESP Web Tools) and the release workflow (see `docs/dev-build.md`) |
 | `test/native/`, `test/device/` | Unit tests on the host / on the TC001 |
 | `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: BCP REST API, event data, RTC snapshot |
 | `lib/core/` | Hardware independent logic, host-tested: parsing, countdown text/colour, display/refresh policy, `DisplayState`, string helpers |
@@ -92,7 +93,7 @@ Read only when the task touches the topic.
 | Document | Content |
 |---|---|
 | `docs/architecture.md` | Execution contexts, display state machine, buttons, buzzer, startup flow, NVS storage, time |
-| `docs/dev-build.md` | Dev build, serial console commands, devmon/devcmd, tests, pre-commit hook, troubleshooting |
+| `docs/dev-build.md` | Dev build, serial console commands, devmon/devcmd, tests, pre-commit hook, troubleshooting, release |
 | `docs/bcp-api.md` | BCP endpoints, response quirks, parsing |
 | `docs/contracts.md` | Non-obvious contracts (Print sink, fonts, singletons) and full code style |
 | `docs/tc002.md` | Planned Ulanzi TC002 support (no device yet; read only when working on TC002) |

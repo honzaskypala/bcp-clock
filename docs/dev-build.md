@@ -43,3 +43,16 @@
   USB-serial bridge is unreliable at higher rates.
 - Flash usage is ~85 % of the 1.25 MB app partition (dev build ~90 %). Watch the size when adding
   features/fonts/HTML.
+
+## Release
+- Push a tag `vX.Y.Z` (e.g. `git tag v1.0.1 && git push origin v1.0.1`). `.github/workflows/release.yml` runs the host
+  tests, builds with `tools/build_release.sh X.Y.Z`, creates a GitHub Release with the merged image
+  `bcp-clock-X.Y.Z.bin` and deploys the browser installer to GitHub Pages (https://honzaskypala.github.io/bcp-clock/).
+  Pages must have Source: GitHub Actions.
+- The version comes from the tag as the `BCP_VERSION` define (`PLATFORMIO_BUILD_FLAGS`) and is shown in the footer of the
+  configuration page; local builds show `dev`.
+- The installer (`install/index.html`, ESP Web Tools) flashes the bootloader, partition table, `boot_app0` and the
+  application as separate parts, so NVS (0x9000) is not touched and an update without "Erase device" keeps the settings.
+  The merged image covers NVS with `0xFF` and erases the settings.
+- Local test: `sh tools/build_release.sh X.Y.Z`, then serve `.pio/release/site` on `localhost` (Web Serial needs a
+  secure context) and open it in Chrome.

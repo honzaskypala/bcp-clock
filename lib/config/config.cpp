@@ -12,6 +12,11 @@
 
 #define CONFIG_DEBUG(msg) DEV_LOG("Config", msg)
 
+// Firmware version, set by the release build (PLATFORMIO_BUILD_FLAGS), "dev" for local builds
+#ifndef BCP_VERSION
+#define BCP_VERSION "dev"
+#endif
+
 static const String DEF_EVENT = "";
 static const long DEF_YELLOW = 600; // seconds
 static const long DEF_RED    = 0;   // seconds
@@ -187,7 +192,8 @@ static const char CONFIG_PAGE_CSS[] =
     "@media (pointer:coarse){"
         ".input-wrapper input{padding-right:2.5rem}"
         ".clear-text{display:block;position:absolute;right:.7rem;top:50%;transform:translateY(-50%);text-decoration:none;cursor:pointer;color:grey}"
-    "}";
+    "}"
+    ".version{margin-top:28px;text-align:center;font-size:12px;color:#888}";
 
 static const char CONFIG_PAGE_SCRIPT[] =
     "<script>"
@@ -210,6 +216,7 @@ void CConfig::handleConfigRoot() {
     appendConfigFormHtml(page);
     page += CONFIG_PAGE_SCRIPT;
     page += WifiMgr.buildStoredWifisHtml();
+    page += "<p class='version'>BCP Clock " BCP_VERSION "</p>";
     page += WebUI::buildPageEnd();
 
     configServer->send(200, "text/html", page);

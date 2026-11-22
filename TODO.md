@@ -42,9 +42,9 @@ Requirements: stock firmware and its apps stay, BCP Clock is an extra app; every
 - [ ] test for captive portal and consider a failure if we cannot get real public internet response
 
 ## General
-- [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [General] [Release] First release v1.0.0: browser installer (ESP Web Tools, `install/index.html`) on GitHub Pages, `tools/build_release.sh` builds the firmware with `BCP_VERSION` and the merged image, `.github/workflows/release.yml` publishes a GitHub Release and the installer on a pushed `v*` tag; firmware version in the configuration page footer (+128 B, 84.9 %); README Installation rewritten for non-developers, work-in-progress warning removed
 - [x] [General] [Docs] README tagline: works with any game system, as long as the tournament is run on BCP
 - [x] [General] [Docs] README pictures in `docs/img`: cover photo, animated GIF of all display states (dark/light variant via `<picture>`), WiFi portal and configuration page screenshots, labelled button photo; "Acoustic signals" row in the Configuration table, "Click Connect" in First setup
 - [x] [General] [Docs] CLAUDE.md slimmed to ~100 lines to save context; details moved to `docs/` (`architecture.md`, `dev-build.md`, `bcp-api.md`, `contracts.md`, `tc002.md`)

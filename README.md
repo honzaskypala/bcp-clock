@@ -7,10 +7,7 @@
 [![ESP32](https://img.shields.io/badge/platform-ESP32-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp32)
 [![Framework: Arduino](https://img.shields.io/badge/framework-Arduino-00979D?logo=arduino)](https://docs.arduino.cc/)
 [![License: WTFPL](https://img.shields.io/badge/license-WTFPL-brightgreen)](http://www.wtfpl.net/)
-
-> [!WARNING]
-> This project is a work in progress. There is no released version yet and it is not intended for
-> production use.
+[![Release](https://img.shields.io/github/v/release/honzaskypala/bcp-clock)](https://github.com/honzaskypala/bcp-clock/releases/latest)
 
 ![BCP Clock on a gaming table showing a running round countdown](docs/img/cover.jpg)
 
@@ -103,29 +100,59 @@ Detailed hardware documentation is available at
 
 ## Installation
 
-There are no prebuilt binaries yet; for now the firmware is built from source with PlatformIO.
-Prebuilt binaries and a simple way to flash them will be provided with the first release.
+The firmware is installed straight from the web browser. No software needs to be installed and no
+technical knowledge is needed.
 
-<!-- TODO RELEASE: Add a "Flash a prebuilt binary" section above "Build from source": download link
-     to the release binary and step-by-step flashing for non-developers (e.g. ESP Web Tools,
-     flashing from the browser via Web Serial). Keep "Build from source" for developers. -->
+### You need
+
+- A computer with **Google Chrome** or **Microsoft Edge** (Windows, macOS, Linux or ChromeOS).
+  Phones, tablets, Safari and Firefox cannot install firmware.
+- A USB-C **data** cable. Some cables only charge; if the clock is not found, try another cable.
+
+### Install
+
+1. Open the **[BCP Clock installer](https://honzaskypala.github.io/bcp-clock/)** in Chrome or Edge.
+2. Connect the clock to the computer with the USB-C cable, directly, not through a USB hub.
+3. Click **Install**, choose the port of the clock in the list (usually named *USB Serial*, *CH340* or
+   *usbserial*) and click **Connect**.
+4. Confirm the installation with **Erase device** ticked and wait about two minutes until it finishes.
+   The clock may beep while it is being installed; that is normal.
+5. The clock restarts with BCP Clock. Continue with the [first setup](#first-setup).
+
+> [!NOTE]
+> Installing replaces the original Ulanzi firmware. If you may want to go back to it, make a
+> [backup](#back-up-the-original-firmware) first.
+
+If no port appears in step 3, try another cable or USB port. On Windows, install the
+[CH340 USB driver](https://www.wch-ic.com/downloads/CH341SER_EXE.html) and reload the installer page.
+
+### Update
+
+Open the [installer](https://honzaskypala.github.io/bcp-clock/) again and follow the same steps, but
+**untick Erase device**. The stored WiFi networks and settings are kept. The installed version is shown
+at the bottom of the [configuration page](#configuration).
+
+### Back up the original firmware
+
+Optional, for users comfortable with the command line. Before installing BCP Clock, read the whole
+flash memory with [esptool](https://docs.espressif.com/projects/esptool/):
+
+```sh
+esptool.py --baud 921600 read_flash 0x0 0x400000 tc001-stock.bin
+```
+
+To restore the original firmware later: `esptool.py --baud 921600 write_flash 0x0 tc001-stock.bin`
+
+### Firmware file
+
+Each [release](https://github.com/honzaskypala/bcp-clock/releases) contains the complete image
+`bcp-clock-<version>.bin` for flashing with other tools, at offset `0x0`
+(e.g. `esptool.py write_flash 0x0 bcp-clock-1.0.0.bin`). It erases the stored WiFi networks and settings.
 
 ### Build from source
 
-#### Prerequisites
-
-- [PlatformIO](https://platformio.org/install), either as the VS Code extension or the CLI
-- A USB-C **data** cable (some cables only charge)
-
-> [!CAUTION]
-> Flashing replaces the original Ulanzi firmware. If you may want to go back to it, back it up first
-> with [esptool](https://docs.espressif.com/projects/esptool/):
->
-> ```sh
-> esptool.py --baud 921600 read_flash 0x0 0x400000 tc001-stock.bin
-> ```
->
-> To restore it later: `esptool.py --baud 921600 write_flash 0x0 tc001-stock.bin`
+For developers. You need [PlatformIO](https://platformio.org/install), either as the VS Code extension
+or the CLI.
 
 #### Build and flash
 
@@ -240,8 +267,8 @@ connected, the commit is stopped; `SKIP_DEVICE_TESTS=1 git commit` skips them. T
 | The setup page does not open by itself on iPhone | In Settings → Wi-Fi → ⓘ next to `BCP-clock`, turn on **Auto-Login**, then forget the network and connect again. Or open the address shown on the display in the browser. |
 | `Invalid event ID, please configure.` | The event was not found in BCP. Open the configuration page and check the event URL or ID. |
 | The clock reboots by itself | It could not fetch data 5 times in a row (about 5 minutes) and restarts to recover. Check the WiFi network and internet access. |
-| Upload or serial monitor fails | Connect the clock directly, without a USB hub, and use a data cable. |
-| Need more details | Enable debug output by uncommenting `debugOut_ = &Serial;` in `setup()` in `src/main.cpp`, rebuild and watch the serial console at 9600 baud. |
+| Installation, upload or serial monitor fails | Connect the clock directly, without a USB hub, and use a data cable. On Windows, install the [CH340 USB driver](https://www.wch-ic.com/downloads/CH341SER_EXE.html). |
+| Need more details | Build from source and flash the dev build (`pio run -e dev -t upload`). It prints debug output and has a command console on the serial port at 9600 baud, see [docs/dev-build.md](docs/dev-build.md). |
 
 ## Roadmap
 
@@ -250,7 +277,7 @@ Planned features and known tasks are tracked in [TODO.md](TODO.md). Highlights:
 - offline mode, counting down from a manually set time
 - chess clock mode
 - configurable display brightness
-- beeps when passing the thresholds
+- low battery warning
 
 ## History
 

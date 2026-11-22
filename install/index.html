@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<!-- Web installer for BCP Clock (ESP Web Tools), published on GitHub Pages by .github/workflows/release.yml -->
+<!-- (c) 2025 Honza Skýpala -->
+<!-- WTFPL license applies -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BCP Clock Installer</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+    :root {
+        --bg: #fff;
+        --fg: #111;
+        --muted: #555;
+        --brand: #5b1b66;
+        --box: #f4eef6;
+        --warn: #c3002f;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+            --bg: #161218;
+            --fg: #eee;
+            --muted: #aaa;
+            --brand: #8e3a9d;
+            --box: #2a2030;
+            --warn: #ff6b81;
+        }
+    }
+    :root[data-theme="dark"] {
+        --bg: #161218;
+        --fg: #eee;
+        --muted: #aaa;
+        --brand: #8e3a9d;
+        --box: #2a2030;
+        --warn: #ff6b81;
+    }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: Arial, Helvetica, sans-serif; line-height: 1.5; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+    h1 { background: var(--brand); color: #fff; text-align: center; font-size: 32px; padding: 14px 10px; margin: 8px 0 20px; }
+    h2 { font-size: 22px; margin: 28px 0 8px; }
+    a { color: var(--brand); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) a { color: #d9a3e3; } }
+    :root[data-theme="dark"] a { color: #d9a3e3; }
+    .version { text-align: center; color: var(--muted); margin-top: -12px; }
+    .install { background: var(--box); border-radius: 6px; padding: 20px 16px; text-align: center; margin: 20px 0; }
+    esp-web-install-button button[slot="activate"] {
+        font-size: 22px; font-weight: 700; padding: 14px 32px; border: 0; border-radius: 6px;
+        background: var(--brand); color: #fff; cursor: pointer;
+    }
+    .warn { color: var(--warn); font-weight: 600; }
+    ol li, ul li { margin: 6px 0; }
+    .small { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <h1>BCP Clock</h1>
+    <p class="version" id="version"></p>
+
+    <p>This page installs the BCP Clock firmware on an <strong>Ulanzi TC001</strong> pixel clock, directly from
+    your browser. Nothing else needs to be installed.</p>
+
+    <h2>You need</h2>
+    <ul>
+        <li>A computer with <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> (Windows, macOS, Linux or ChromeOS).
+            Phones, tablets, Safari and Firefox do not work.</li>
+        <li>A <strong>USB-C data cable</strong>. Some cables only charge; if the clock is not found, try another cable.</li>
+    </ul>
+
+    <div class="install">
+        <esp-web-install-button manifest="manifest.json">
+            <button slot="activate">Install</button>
+            <span slot="unsupported" class="warn">Your browser cannot install firmware. Open this page in Google Chrome or Microsoft Edge on a computer.</span>
+            <span slot="not-allowed" class="warn">The page must be opened over HTTPS.</span>
+        </esp-web-install-button>
+    </div>
+
+    <h2>Steps</h2>
+    <ol>
+        <li>Connect the clock to the computer with the USB-C cable, <strong>directly</strong>, not through a USB hub.</li>
+        <li>Click <strong>Install</strong> above. The browser lists the serial ports: choose the one that appeared
+            when you plugged in the clock (usually named <em>USB Serial</em>, <em>CH340</em> or <em>usbserial</em>) and click <strong>Connect</strong>.</li>
+        <li>Confirm the installation. On the first installation keep <strong>Erase device</strong> ticked;
+            when updating BCP Clock, untick it to keep your WiFi networks and settings.</li>
+        <li>Wait about two minutes until the installation finishes. Do not unplug the clock meanwhile.
+            The clock may beep while it is being installed; that is normal.</li>
+        <li>The clock restarts with BCP Clock. Continue with the
+            <a href="https://github.com/honzaskypala/bcp-clock#first-setup">first setup</a>: connect the clock to your WiFi and enter the event.</li>
+    </ol>
+
+    <h2>No port appears?</h2>
+    <ul>
+        <li>Try another USB-C cable or another USB port on the computer.</li>
+        <li>On Windows, install the
+            <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html">CH340 USB driver</a> and reload this page.</li>
+    </ul>
+
+    <p class="small">Installing replaces the original Ulanzi firmware. To be able to go back to it, back it up first
+        (<a href="https://github.com/honzaskypala/bcp-clock#back-up-the-original-firmware">how</a>).
+        More information, source code and all releases:
+        <a href="https://github.com/honzaskypala/bcp-clock">github.com/honzaskypala/bcp-clock</a>.</p>
+</div>
+<script>
+    fetch("manifest.json")
+        .then(r => r.json())
+        .then(m => { document.getElementById("version").textContent = "Version " + m.version; })
+        .catch(() => {});
+</script>
+</body>
+</html>

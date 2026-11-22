@@ -1,0 +1,61 @@
+# Release: on a pushed tag vX.Y.Z, run the host tests, build the firmware, create a GitHub Release with the
+# merged image and publish the web installer on GitHub Pages.
+# Requires Settings -> Pages -> Source: GitHub Actions.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Host unit tests
+        run: pio test -e native
+
+      - name: Build release
+        run: sh tools/build_release.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" .pio/release/*.bin --title "BCP Clock ${GITHUB_REF_NAME#v}" --generate-notes
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .pio/release/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
