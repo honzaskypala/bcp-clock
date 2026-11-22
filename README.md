@@ -11,8 +11,7 @@
 > This project is a work in progress. There is no released version yet and it is not intended for
 > production use.
 
-<!-- TODO PICTURE: Hero photo of a TC001 on a tournament table showing a running countdown
-     (white mm:ss digits, round indicator on the bottom row). Suggested file: docs/img/hero.jpg -->
+![BCP Clock on a gaming table showing a running round countdown](docs/img/cover.jpg)
 
 BCP Clock is custom firmware for the Ulanzi TC001 desktop pixel clock. Enter a Best Coast Pairings event once, and the clock shows the official round
 timer of that tournament: time to round start, the running countdown, a paused timer and overtime,
@@ -52,6 +51,14 @@ judges' desk and nobody has to check their phone.
 
 ## What the display shows
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/bcp-clock-dark.gif">
+  <img src="docs/img/bcp-clock-light.gif" alt="Display states: scrolling event name, green countdown to round start, white round countdown, yellow last minutes, red overtime, blinking paused timer">
+</picture>
+
+<sub>The round timer is run by the tournament organiser on the Best Coast Pairings website, not on the
+clock. You only enter the event, and the clock fetches everything else from BCP.</sub>
+
 | Situation | Display |
 |---|---|
 | Event not started yet, or already finished | Scrolling event name |
@@ -69,11 +76,6 @@ replaced by `X`, e.g. `-XX:XX`.
 
 While a timer is shown, the bottom row of LEDs is a round indicator: one segment per round, with the
 current round highlighted in blue.
-
-<!-- TODO PICTURE: Gallery of display states side by side (green pre-round, white, yellow, red overtime,
-     magenta paused). Close-up photos of the matrix work best. Suggested files: docs/img/state-*.jpg -->
-
-<!-- TODO PICTURE: Short GIF of the scrolling event name. Suggested file: docs/img/event-name.gif -->
 
 ## Hardware
 
@@ -96,8 +98,7 @@ Detailed hardware documentation is available at
 | Middle | Opens the WiFi setup portal | Opens the configuration page (for 5 minutes) |
 | Right | – | Refreshes the data from BCP immediately |
 
-<!-- TODO PICTURE: Photo of the top of the TC001 with the left / middle / right buttons labelled.
-     Suggested file: docs/img/buttons.jpg -->
+<img src="docs/img/buttons.jpg" alt="Top of the TC001 with the left, middle and right buttons labelled" width="800">
 
 ## Installation
 
@@ -145,17 +146,21 @@ pio device monitor -b 9600    # optional: serial console
    `BCP-clock`** and scrolls the address of the setup page.
 3. **Connect your phone** to `BCP-clock`. The setup page usually opens by itself (captive portal);
    if not, open the address shown on the display.
-4. **Choose your WiFi network** and enter its password. The clock connects and synchronises its time.
+
+   <img src="docs/img/wifi-portal.png" alt="WiFi setup page (captive portal) on a phone" width="300">
+
+   <sub>The setup page is optimised for phones, but works on a tablet or computer as well.</sub>
+
+4. **Choose your WiFi network** and enter its password. Click Connect. The clock connects and synchronises its time.
 5. With no event configured yet, the clock scrolls **`Config page http://<IP>`**. Open that address
    from a device in the same network.
+
+   <img src="docs/img/config-page.png" alt="Configuration page on a phone" width="300">
+
+   <sub>The configuration page is optimised for phones, but works on a tablet or computer as well.</sub>
+
 6. **Paste the event** (the URL of the event page in BCP, or just its ID) and press Save.
 7. The clock shows the event name, the round, or the countdown, depending on the state of the event.
-
-<!-- TODO PICTURE: Phone screenshot of the WiFi setup (captive portal) page.
-     Suggested file: docs/img/wifi-portal.png -->
-
-<!-- TODO PICTURE: Screenshot of the configuration page (event, yellow / red thresholds, stored networks).
-     Suggested file: docs/img/config-page.png -->
 
 ## Configuration
 
@@ -170,6 +175,7 @@ The configuration page is available at `http://<IP of the clock>`, or at `http:/
 | Event | BCP event URL (e.g. `https://www.bestcoastpairings.com/event/AbCdEf123456`) or just the event ID | empty |
 | Yellow | Remaining time below which the countdown turns yellow, as `m:ss` or `h:mm:ss` | `10:00` |
 | Red | Remaining time below which the countdown turns red, as `m:ss` or `h:mm:ss` | `0:00` |
+| Acoustic signals | Beep when the countdown reaches a threshold: one long beep at yellow, three long beeps at red | on |
 | Hostname | Device name in the network: shown in the router's client list and used for the `.local` address of the configuration page. Letters, digits and hyphens, up to 32 characters. A change of the router name applies at the next WiFi connection. | `BCP-clock` |
 
 The same page lists the **stored WiFi networks**, where you can delete individual networks or all of
