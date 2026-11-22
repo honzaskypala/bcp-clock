@@ -115,7 +115,7 @@ technical knowledge is needed.
 2. Connect the clock to the computer with the USB-C cable, directly, not through a USB hub.
 3. Click **Install**, choose the port of the clock in the list (usually named *USB Serial*, *CH340* or
    *usbserial*) and click **Connect**.
-4. Confirm the installation with **Erase device** ticked and wait about two minutes until it finishes.
+4. Tick **Erase device**, confirm the installation and wait about two minutes until it finishes.
    The clock may beep while it is being installed; that is normal.
 5. The clock restarts with BCP Clock. Continue with the [first setup](#first-setup).
 
@@ -129,7 +129,7 @@ If no port appears in step 3, try another cable or USB port. On Windows, install
 ### Update
 
 Open the [installer](https://honzaskypala.github.io/bcp-clock/) again and follow the same steps, but
-**untick Erase device**. The stored WiFi networks and settings are kept. The installed version is shown
+leave **Erase device** unticked. The stored WiFi networks and settings are kept. The installed version is shown
 at the bottom of the [configuration page](#configuration).
 
 ### Back up the original firmware

@@ -44,6 +44,7 @@ Requirements: stock firmware and its apps stay, BCP Clock is an extra app; every
 ## General
 
 ## Done
+- [x] [General] [Release] v1.0.1: installer page and README say to tick "Erase device" on the first installation (ESP Web Tools leaves it unticked by default)
 - [x] [General] [Release] First release v1.0.0: browser installer (ESP Web Tools, `install/index.html`) on GitHub Pages, `tools/build_release.sh` builds the firmware with `BCP_VERSION` and the merged image, `.github/workflows/release.yml` publishes a GitHub Release and the installer on a pushed `v*` tag; firmware version in the configuration page footer (+128 B, 84.9 %); README Installation rewritten for non-developers, work-in-progress warning removed
 - [x] [General] [Docs] README tagline: works with any game system, as long as the tournament is run on BCP
 - [x] [General] [Docs] README pictures in `docs/img`: cover photo, animated GIF of all display states (dark/light variant via `<picture>`), WiFi portal and configuration page screenshots, labelled button photo; "Acoustic signals" row in the Configuration table, "Click Connect" in First setup
