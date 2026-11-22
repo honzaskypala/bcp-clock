@@ -54,5 +54,7 @@
 - The installer (`install/index.html`, ESP Web Tools) flashes the bootloader, partition table, `boot_app0` and the
   application as separate parts, so NVS (0x9000) is not touched and an update without "Erase device" keeps the settings.
   The merged image covers NVS with `0xFF` and erases the settings.
+- GitHub Pages sends `max-age=600`; the install page loads `manifest.json` with a cache-busting query, so a new
+  release is offered at once. After a release, check in a browser that the installer shows the new version.
 - Local test: `sh tools/build_release.sh X.Y.Z`, then serve `.pio/release/site` on `localhost` (Web Serial needs a
   secure context) and open it in Chrome.

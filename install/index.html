@@ -102,7 +102,11 @@
         <a href="https://github.com/honzaskypala/bcp-clock">github.com/honzaskypala/bcp-clock</a>.</p>
 </div>
 <script>
-    fetch("manifest.json")
+    // GitHub Pages sends max-age=600: bypass the cache so a new release is offered right away
+    // (a stale manifest would point to firmware files that no longer exist)
+    const manifestUrl = "manifest.json?t=" + Date.now();
+    document.querySelector("esp-web-install-button").setAttribute("manifest", manifestUrl);
+    fetch(manifestUrl, { cache: "no-store" })
         .then(r => r.json())
         .then(m => { document.getElementById("version").textContent = "Version " + m.version; })
         .catch(() => {});
