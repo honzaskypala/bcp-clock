@@ -1,6 +1,7 @@
 # BCP Clock
 
 **A tournament round timer for the Ulanzi TC001 pixel clock, fed live from [Best Coast Pairings](https://www.bestcoastpairings.com).**
+**Works with any game system, as long as the tournament is run on BCP.**
 
 [![PlatformIO](https://img.shields.io/badge/built%20with-PlatformIO-orange?logo=platformio)](https://platformio.org/)
 [![ESP32](https://img.shields.io/badge/platform-ESP32-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp32)

@@ -45,6 +45,7 @@ Requirements: stock firmware and its apps stay, BCP Clock is an extra app; every
 - [ ] Release: prebuilt binary + simple flashing for users (e.g. [ESP Web Tools](https://esphome.github.io/esp-web-tools/) on GitHub Pages), document it in README Installation
 
 ## Done
+- [x] [General] [Docs] README tagline: works with any game system, as long as the tournament is run on BCP
 - [x] [General] [Docs] README pictures in `docs/img`: cover photo, animated GIF of all display states (dark/light variant via `<picture>`), WiFi portal and configuration page screenshots, labelled button photo; "Acoustic signals" row in the Configuration table, "Click Connect" in First setup
 - [x] [General] [Docs] CLAUDE.md slimmed to ~100 lines to save context; details moved to `docs/` (`architecture.md`, `dev-build.md`, `bcp-api.md`, `contracts.md`, `tc002.md`)
 - [x] [TC001] [Feature] Acoustic signals at thresholds: one 2 s beep when the countdown reaches the yellow threshold, three 2 s beeps (1 s gaps) at red. Non-blocking (`Tc001::stepBeep` in `handleEvents`, LEDC square wave on GPIO 15, pin pulled down again afterwards), no beep on the first redraw or while paused. Crossing detection and patterns in `lib/core/countdown` (native tests). Config checkbox "Acoustic signals" (NVS `beep`, default on), dev console `beep yellow|red`. Production firmware 7 628 B larger (84.3 % → 84.9 %)
