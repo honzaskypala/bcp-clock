@@ -4,7 +4,7 @@
 - [ ] WiFi disconnected warning
 - [ ] offline mode, just run countdown from configurable time
 - [ ] chess clock functionality
-- [ ] [Low battery warning](https://github.com/rroels/ulanzi_tc001_hardware?tab=readme-ov-file#battery-voltage-example-2-mapped-value)
+- [ ] [Battery] calibrate the battery thresholds: dev build on battery until it switches off, log `battery` readings
 
 ## TC001 hardware related
 - [ ] bliking every 0.5 sec instead of 1 sec
@@ -44,6 +44,7 @@ Requirements: stock firmware and its apps stay, BCP Clock is an extra app; every
 ## General
 
 ## Done
+- [x] [Hw] [Battery] Low battery warning: < 10 % blinking red status pixel top left, < 5 % red empty battery icon alternating with the content every 5 s (not during the config message after Mid); battery on GPIO 34, median of 15 readings, hysteresis 2 %; status overlay in `Tc001::showMatrix()` ready for more indicators stacked in column 0; dev console `battery [pct|off]`; flash +6.7 kB (84.9 % -> 85.4 %, of which 5.6 kB is the Arduino ADC driver), RAM +1 kB
 - [x] [Config] [Refactor] mDNS moved from main.cpp to CConfig: announced only while the config server runs, restarted there on a hostname change
 - [x] [General] [Release] v1.0.2: install page loads the manifest bypassing the GitHub Pages cache (max-age=600 kept showing and offering the previous release)
 - [x] [General] [Release] v1.0.1: installer page and README say to tick "Erase device" on the first installation (ESP Web Tools leaves it unticked by default)

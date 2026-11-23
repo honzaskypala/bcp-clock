@@ -16,6 +16,7 @@
 #define PIN_MID_BUTTON      27
 #define PIN_RIGHT_BUTTON    14
 #define PIN_LED_MATRIX      32
+#define PIN_BATTERY         34  // battery voltage, ADC1
 
 #define COLOR_WHITE matrix.Color24to16(CRGB::White)
 #define COLOR_BLACK matrix.Color24to16(CRGB::Black)
@@ -28,6 +29,8 @@
 
 #define SCROLLING_TEXT_SPEED 100 // miliseconds per step
 #define PROGRESS_INDICATOR_SPEED 100 // milliseconds per step
+#define INDICATOR_BLINK_MS 1000      // status indicators: on for this long, then off for this long
+#define BATTERY_READ_INTERVAL_MS 1000
 
 constexpr uint32_t BEEP_FREQ = 2000;   // Hz, the buzzer is passive and needs a square wave
 constexpr uint8_t BEEP_CHANNEL = 0;    // LEDC channel (FastLED uses RMT, not LEDC)
@@ -49,6 +52,11 @@ long Tc001::lastRemaining = LONG_MIN;
 BeepSignal Tc001::beepSignal = BEEP_NONE;
 unsigned long Tc001::beepStartMs = 0;
 bool Tc001::beepToneOn = false;
+volatile bool Tc001::indicatorActive[INDICATOR_COUNT] = {};
+uint8_t Tc001::shownOverlay = 0;
+BatteryMonitor Tc001::battery;
+volatile BatteryLevel Tc001::batteryLevel = BATTERY_UNKNOWN;
+unsigned long Tc001::batteryReadAt = 0;
 
 // ---- Display lock ----
 // The matrix and the animations are used by both loop() and handleEvents (same core and priority,
@@ -123,7 +131,7 @@ void Tc001::showSplashScreen(bool showProgress) {
     if (showProgress) {
         startProgress();
     }
-    matrix.show();
+    showMatrix();
 }
 
 void Tc001::showConfigServerMsg(const char *msg, bool loop) {
@@ -139,7 +147,7 @@ void Tc001::showConfigServerMsg(const char *msg, bool loop) {
     } else {
         scrollingText = new ScrollingText(&matrix, msgStr.c_str(), 0, 7, (const GFXfont *) defaultFont, false, COLOR_WHITE, 24, 8, loop);
     }
-    matrix.show();
+    showMatrix();
 }
 
 void Tc001::showConfigServerMsg(const char *msg) {
@@ -164,7 +172,7 @@ void Tc001::displayEventName(const CBCPEvent& event) {
     stopAnimations();
     matrix.clear();
     scrollingText = new ScrollingText(&matrix, event.name(), 0, 7, defaultFont, true);
-    matrix.show();
+    showMatrix();
 }
 
 void Tc001::displayEventRound(const CBCPEvent& event) {
@@ -180,7 +188,7 @@ void Tc001::displayEventRound(const CBCPEvent& event) {
     matrix.getTextBounds(msg, 0, 7, &x1, &y1, &w, &h);
     matrix.setCursor((matrix.width() - w) / 2, 7);
     matrix.print(msg);
-    matrix.show();
+    showMatrix();
 }
 
 void Tc001::displayCountdown(const CBCPEvent& event) {
@@ -225,7 +233,7 @@ void Tc001::drawCountdown(const CBCPEvent& event) {
     matrix.setCursor(view.x, 6);
     matrix.print(view.text);
     displayRoundWithCountdown(event.currentRound(), event.numberOfRounds());
-    matrix.show();
+    showMatrix();
     matrix.setFont((GFXfont *) defaultFont);
 }
 
@@ -285,6 +293,76 @@ void Tc001::stopProgress() {
     }
 }
 
+// ---- Status overlay ----
+// Called with the display lock held.
+
+static const uint8_t batteryIcon[] = {  // 15x7, empty battery with "LoW"
+    0x7F, 0xFE,  // .##############
+    0x40, 0x02,  // .#............#
+    0xD1, 0x2A,  // ##.#...#..#.#.#
+    0xD2, 0xBA,  // ##.#..#.#.###.#
+    0xD9, 0x3A,  // ##.##..#..###.#
+    0x40, 0x02,  // .#............#
+    0x7F, 0xFE   // .##############
+};
+static CRGB overlayBackup[256];  // content under the overlay while it is shown
+
+uint8_t Tc001::overlayState() {
+    if (isBatteryAlertPhase(batteryLevel, millis(), displayState)) return 1;
+    uint8_t mask = 0;
+    for (int i = 0; i < INDICATOR_COUNT; i++) {
+        if (indicatorActive[i]) mask |= 1 << i;
+    }
+    if (mask == 0 || (millis() / INDICATOR_BLINK_MS) % 2 == 1) return 0;
+    return mask << 1;
+}
+
+bool Tc001::drawOverlay(uint8_t state) {
+    if (state == 0) return false;
+    memcpy(overlayBackup, matrixleds, sizeof(overlayBackup));
+    if (state == 1) {
+        // battery body (columns 9..22) centred, rows 1..7
+        matrix.fillScreen(COLOR_BLACK);
+        matrix.drawBitmap(8, 1, batteryIcon, 15, 7, COLOR_RED);
+        return true;
+    }
+    static const uint16_t indicatorColors[INDICATOR_COUNT] = { COLOR_RED };
+    int y = 0;
+    for (int i = 0; i < INDICATOR_COUNT; i++) {
+        if (state & (1 << (i + 1))) matrix.drawPixel(0, y++, indicatorColors[i]);
+    }
+    return true;
+}
+
+void Tc001::restoreOverlay() {
+    memcpy(matrixleds, overlayBackup, sizeof(overlayBackup));
+}
+
+void Tc001::showMatrix() {
+    shownOverlay = overlayState();
+    bool drawn = drawOverlay(shownOverlay);
+    matrix.show();
+    if (drawn) restoreOverlay();
+}
+
+// ---- Battery ----
+// Called from handleEvents only.
+
+void Tc001::stepBattery() {
+    unsigned long now = millis();
+    if (batteryReadAt != 0 && now - batteryReadAt < BATTERY_READ_INTERVAL_MS) return;
+    batteryReadAt = now;
+    uint16_t raw = analogRead(PIN_BATTERY);
+    battery.addSample(raw);
+    BatteryLevel level = battery.level();
+#ifdef BCP_DEV
+    batteryRaw = raw;
+    if (simulatedBatteryPercent >= 0) level = nextBatteryLevel(BATTERY_UNKNOWN, simulatedBatteryPercent);
+#endif
+    batteryLevel = level;
+    indicatorActive[INDICATOR_LOW_BATTERY] = level == BATTERY_LOW || level == BATTERY_CRITICAL;
+}
+
 void Tc001::reboot() {
     ESP.restart();
 }
@@ -292,6 +370,8 @@ void Tc001::reboot() {
 #ifdef BCP_DEV
 uint32_t Tc001::countdownDraws = 0;
 volatile BeepSignal Tc001::beepRequest = BEEP_NONE;
+volatile int Tc001::simulatedBatteryPercent = -1;
+uint16_t Tc001::batteryRaw = 0;
 
 static constexpr uint32_t FORCE_PORTAL_MAGIC = 0xB0C1F0CE;
 RTC_NOINIT_ATTR static uint32_t forcePortalFlag;  // survives ESP.restart()
@@ -304,8 +384,10 @@ void Tc001::rebootToPortal() {
 // Prints the LED matrix as ASCII, one character per pixel:
 // '.' off, ':' dim, W white, R red, G green, B blue, Y yellow, M magenta, C cyan
 // Stored values are gamma corrected, so channels are compared relative to the strongest one.
+// Includes the status overlay as it was last shown.
 void Tc001::dumpScreen(Print& out) {
     DisplayLock lock;
+    bool overlayDrawn = drawOverlay(shownOverlay);
     for (int y = 0; y < matrix.height(); y++) {
         char line[33];
         for (int x = 0; x < matrix.width(); x++) {
@@ -328,6 +410,27 @@ void Tc001::dumpScreen(Print& out) {
         line[matrix.width()] = '\0';
         out.println(line);
     }
+    if (overlayDrawn) restoreOverlay();
+}
+
+static const char *batteryLevelName(BatteryLevel level) {
+    switch (level) {
+        case BATTERY_UNKNOWN: return "UNKNOWN";
+        case BATTERY_OK: return "OK";
+        case BATTERY_LOW: return "LOW";
+        case BATTERY_CRITICAL: return "CRITICAL";
+    }
+    return "?";
+}
+
+void Tc001::printBattery(Print& out) {
+    uint16_t filtered = battery.filteredRaw();
+    out.printf("Battery: raw %u, median %u (%d %%), level %s", batteryRaw, filtered,
+               filtered ? batteryPercent(filtered) : -1, batteryLevelName(battery.level()));
+    if (simulatedBatteryPercent >= 0) {
+        out.printf(", simulated %d %% -> %s", (int)simulatedBatteryPercent, batteryLevelName(batteryLevel));
+    }
+    out.println();
 }
 #endif
 
@@ -390,6 +493,11 @@ bool Tc001::stepAnimations() {
         showMatrix = true;
     }
 
+    // status indicator blinked or battery icon phase changed (also on a static screen)
+    if (overlayState() != shownOverlay) {
+        showMatrix = true;
+    }
+
     return showMatrix;
 }
 
@@ -404,11 +512,12 @@ void Tc001::handleEvents(void * parameter) {
         {
             DisplayLock lock;  // released before vTaskDelay()
             if (stepAnimations()) {
-                matrix.show();
+                showMatrix();
             }
         }
 
         stepBeep();
+        stepBattery();
 
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -480,5 +589,5 @@ void Tc001::showMessage(const char *msg) {
             showInfoMessage(msg);
             break;
     }
-    matrix.show();
+    showMatrix();
 }

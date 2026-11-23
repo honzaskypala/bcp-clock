@@ -32,6 +32,7 @@ static void handleHelp() {
     Serial.println("                    defaults: sec=300, length=9000, round 3/5");
     Serial.println("  bcpfail on|off    simulate BCP connection errors (counts toward reboot, reset by reboot)");
     Serial.println("  beep yellow|red   play the threshold signal (also when acoustic signals are off)");
+    Serial.println("  battery [pct|off] battery reading; pct simulates the charge level (0..100), off = real");
     Serial.println("  portal            reboot into the captive portal (= Mid held at boot)");
     Serial.println("  reboot            restart the device");
 }
@@ -139,6 +140,11 @@ static void executeCommand(const String& line, Hw *hw) {
     else if (cmd == "beep" && (arg == "yellow" || arg == "red")) {
         Tc001::playBeep(arg == "red" ? BEEP_RED : BEEP_YELLOW);
         Serial.printf("Playing %s signal\n", arg.c_str());
+    }
+    else if (cmd == "battery") {
+        if (arg == "off") Tc001::simulateBattery(-1);
+        else if (arg.length() > 0) Tc001::simulateBattery(constrain(arg.toInt(), 0, 100));
+        Tc001::printBattery(Serial);
     }
     else if (cmd == "portal") { Serial.println("Rebooting into portal..."); Serial.flush(); static_cast<Tc001 *>(hw)->rebootToPortal(); }
     else if (cmd == "reboot") { Serial.println("Rebooting..."); Serial.flush(); hw->reboot(); }

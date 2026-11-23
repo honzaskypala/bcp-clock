@@ -12,6 +12,7 @@
 #include <FastLED.h>
 #include <FastLED_NeoMatrix.h>
 
+#include <battery.h>
 #include <countdown.h>
 #include <progress_indicator.h>
 #include <scrolling_text.h>
@@ -53,6 +54,10 @@ public:
     static void playBeep(BeepSignal signal) { beepRequest = signal; }  // played by handleEvents
     static volatile BeepSignal beepRequest;
     void rebootToPortal();           // reboot and start the captive portal as if Mid was held
+    static void printBattery(Print& out);
+    static void simulateBattery(int percent) { simulatedBatteryPercent = percent; }  // -1 = real reading
+    static volatile int simulatedBatteryPercent;
+    static uint16_t batteryRaw;      // last ADC reading
 #endif
 
 private:
@@ -87,6 +92,23 @@ private:
     static void startProgress();
     static void stepProgress();
     static void stopProgress();
+
+    // ---- Status overlay ----
+    // Status indicators blink in the left column, from the top in enum order, without gaps.
+    // The overlay (indicators or the battery icon) is drawn over the content only for matrix.show()
+    // and removed right after, so the content in matrixleds never contains it.
+    enum StatusIndicator { INDICATOR_LOW_BATTERY, INDICATOR_COUNT };
+    static volatile bool indicatorActive[INDICATOR_COUNT];
+    static uint8_t shownOverlay;             // overlayState() of the last showMatrix()
+    static uint8_t overlayState();           // 0 none, 1 battery icon, else (active indicator mask << 1)
+    static bool drawOverlay(uint8_t state);  // returns true if drawn, then restoreOverlay() must follow
+    static void restoreOverlay();
+    static void showMatrix();                // matrix.show() with the overlay, display lock held
+
+    static BatteryMonitor battery;
+    static volatile BatteryLevel batteryLevel;
+    static unsigned long batteryReadAt;      // millis() of the last ADC reading, 0 = read now
+    static void stepBattery();
 
     // loop = true: invalid event ID, message + looping address (DISPLAY_CONFIG_REQUIRED);
     // loop = false: config server started by the user, address scrolled once (DISPLAY_CONFIG_MESSAGE)

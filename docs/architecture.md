@@ -30,6 +30,19 @@ redrawing what is already shown.
   do not redraw meanwhile; when it finishes, `handleEvents` sets `Hw::redrawRequested` and `loop()`
   calls `updateDisplay()` without fetching data.
 
+## Status overlay and battery (`Tc001`, `lib/core/battery`)
+- `Tc001::showMatrix()` replaces every `matrix.show()`: it saves the content, draws the overlay over it, shows
+  the matrix and restores the content, so `matrixleds` never contains the overlay and the drawing code ignores
+  it. `stepAnimations()` requests a show when `overlayState()` changes (blink, icon phase), also on static screens.
+- Status indicators (`enum StatusIndicator`, now only `INDICATOR_LOW_BATTERY`, red) blink 1 s on / 1 s off in
+  column 0, stacked from the top in enum order without gaps. A new indicator = enum entry + colour + where it is set.
+- Battery voltage on GPIO 34 (ADC1, works with WiFi), read by `stepBattery()` in `handleEvents` once a second.
+  `BatteryMonitor` keeps the median of the last 15 readings (no level for the first 15 s), maps raw 1900..2660
+  (12-bit, AWTRIX3 values x4, not calibrated yet; ~2710 when charging) linearly to 0..100 %. LOW < 10 %,
+  CRITICAL < 5 %, a level is left 2 % above its threshold (hysteresis).
+- CRITICAL: content and the 15x7 battery icon alternate every 5 s (`isBatteryAlertPhase`); not while the config
+  page address scrolls once after the Mid button (`DISPLAY_CONFIG_MESSAGE`).
+
 ## Buttons (TC001 pins)
 - Mid (GPIO 27): held at boot → force WiFi captive portal; pressed at runtime → start config server (5 min timeout).
 - Right (GPIO 14): immediate data refresh (`Hw::enforceUpdate`).

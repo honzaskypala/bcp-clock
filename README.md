@@ -75,6 +75,10 @@ replaced by `X`, e.g. `-XX:XX`.
 While a timer is shown, the bottom row of LEDs is a round indicator: one segment per round, with the
 current round highlighted in blue.
 
+Low battery: below about 10 % the top-left LED blinks red. Below about 5 % the display alternates every
+5 seconds between the normal content and a red empty battery icon; plug in the USB cable. The battery
+level is estimated from its voltage, so the percentages are approximate.
+
 ## Hardware
 
 The only hardware needed is an **Ulanzi TC001** (ESP32-WROOM, 32×8 WS2812 LED matrix, three buttons,
@@ -277,7 +281,6 @@ Planned features and known tasks are tracked in [TODO.md](TODO.md). Highlights:
 - offline mode, counting down from a manually set time
 - chess clock mode
 - configurable display brightness
-- low battery warning
 
 ## History
 
