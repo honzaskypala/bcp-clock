@@ -1,4 +1,4 @@
-// Unit tests of the battery level and the low battery alert phase (lib/core/battery)
+// Unit tests of the battery level (lib/core/battery)
 // (c) 2025 Honza Skýpala
 // WTFPL license applies
 
@@ -93,28 +93,6 @@ static void test_monitor_hysteresis() {
     TEST_ASSERT_EQUAL(BATTERY_OK, m.level());
 }
 
-// ---- isBatteryAlertPhase ----
-
-static void test_alertPhase_alternatesWhenCritical() {
-    TEST_ASSERT_FALSE(isBatteryAlertPhase(BATTERY_CRITICAL, 0, DISPLAY_EVENT_COUNTDOWN));
-    TEST_ASSERT_FALSE(isBatteryAlertPhase(BATTERY_CRITICAL, 4999, DISPLAY_EVENT_COUNTDOWN));
-    TEST_ASSERT_TRUE(isBatteryAlertPhase(BATTERY_CRITICAL, 5000, DISPLAY_EVENT_COUNTDOWN));
-    TEST_ASSERT_TRUE(isBatteryAlertPhase(BATTERY_CRITICAL, 9999, DISPLAY_EVENT_ROUND));
-    TEST_ASSERT_FALSE(isBatteryAlertPhase(BATTERY_CRITICAL, 10000, DISPLAY_EVENT_NAME));
-    TEST_ASSERT_TRUE(isBatteryAlertPhase(BATTERY_CRITICAL, 15000, DISPLAY_BOOT));
-}
-
-static void test_alertPhase_onlyWhenCritical() {
-    TEST_ASSERT_FALSE(isBatteryAlertPhase(BATTERY_UNKNOWN, 5000, DISPLAY_EVENT_COUNTDOWN));
-    TEST_ASSERT_FALSE(isBatteryAlertPhase(BATTERY_OK, 5000, DISPLAY_EVENT_COUNTDOWN));
-    TEST_ASSERT_FALSE(isBatteryAlertPhase(BATTERY_LOW, 5000, DISPLAY_EVENT_COUNTDOWN));
-}
-
-static void test_alertPhase_notDuringConfigMessage() {
-    TEST_ASSERT_FALSE(isBatteryAlertPhase(BATTERY_CRITICAL, 5000, DISPLAY_CONFIG_MESSAGE));
-    TEST_ASSERT_TRUE(isBatteryAlertPhase(BATTERY_CRITICAL, 5000, DISPLAY_CONFIG_REQUIRED));
-}
-
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_percent_linearAndClamped);
@@ -125,8 +103,5 @@ int main() {
     RUN_TEST(test_monitor_discardsInvalid);
     RUN_TEST(test_monitor_medianIgnoresSpikes);
     RUN_TEST(test_monitor_hysteresis);
-    RUN_TEST(test_alertPhase_alternatesWhenCritical);
-    RUN_TEST(test_alertPhase_onlyWhenCritical);
-    RUN_TEST(test_alertPhase_notDuringConfigMessage);
     return UNITY_END();
 }

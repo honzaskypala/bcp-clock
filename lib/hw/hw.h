@@ -7,6 +7,7 @@
 
 #include "bcpevent.h"
 #include <displaystate.h>
+#include <statusalert.h>
 
 class Hw {
 public:
@@ -24,6 +25,9 @@ public:
     virtual void tick() {};
 
     virtual void showConfigServerMsg(const char *msg) = 0;
+
+    // Connection problem after the last data refresh: blinking status indicator, icon if showIcon
+    virtual void setConnectionAlert(ConnectionProblem problem, bool showIcon) {};
 
     virtual void reboot() = 0;
 };

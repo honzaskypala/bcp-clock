@@ -1,7 +1,6 @@
 # TODO for BCP-clock project
 
 ## main related
-- [ ] WiFi disconnected warning
 - [ ] offline mode, just run countdown from configurable time
 - [ ] chess clock functionality
 - [ ] [Battery] calibrate the battery thresholds: dev build on battery until it switches off, log `battery` readings
@@ -44,6 +43,7 @@ Requirements: stock firmware and its apps stay, BCP Clock is an extra app; every
 ## General
 
 ## Done
+- [x] [Main] [Hw] Connection indicator: blinking status pixel amber (WiFi lost) or magenta (WiFi up, BCP connection or HTTP error), from the 4th failed refresh in a row a WiFi icon / unplugged plug icon in the alert cycle (content, battery, connection icon, 5 s each); WiFi outages now count toward the reboot after 5 failures like BCP connection errors; icon cycle moved to `lib/core/statusalert`; dev console `wififail on|off`, connection alert in `status`, `A` (amber) in `screen`; flash stays at 85.4 %
 - [x] [Hw] [Battery] Low battery warning: < 10 % blinking red status pixel top left, < 5 % red empty battery icon alternating with the content every 5 s (not during the config message after Mid); battery on GPIO 34, median of 15 readings, hysteresis 2 %; status overlay in `Tc001::showMatrix()` ready for more indicators stacked in column 0; dev console `battery [pct|off]`; flash +6.7 kB (84.9 % -> 85.4 %, of which 5.6 kB is the Arduino ADC driver), RAM +1 kB
 - [x] [Config] [Refactor] mDNS moved from main.cpp to CConfig: announced only while the config server runs, restarted there on a hostname change
 - [x] [General] [Release] v1.0.2: install page loads the manifest bypassing the GitHub Pages cache (max-age=600 kept showing and offering the previous release)

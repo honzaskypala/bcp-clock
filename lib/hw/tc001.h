@@ -16,6 +16,7 @@
 #include <countdown.h>
 #include <progress_indicator.h>
 #include <scrolling_text.h>
+#include <statusalert.h>
 
 class Tc001 : public Hw, public Print {
 
@@ -42,6 +43,8 @@ public:
     static void handleEvents(void * parameter);
 
     virtual void showConfigServerMsg(const char *msg) override;
+
+    virtual void setConnectionAlert(ConnectionProblem problem, bool showIcon) override;
 
     virtual void reboot() override;
 
@@ -95,12 +98,16 @@ private:
 
     // ---- Status overlay ----
     // Status indicators blink in the left column, from the top in enum order, without gaps.
-    // The overlay (indicators or the battery icon) is drawn over the content only for matrix.show()
+    // Alert icons alternate with the content (alertCyclePhase), in enum order.
+    // The overlay (indicators or an icon) is drawn over the content only for matrix.show()
     // and removed right after, so the content in matrixleds never contains it.
-    enum StatusIndicator { INDICATOR_LOW_BATTERY, INDICATOR_COUNT };
+    enum StatusIndicator { INDICATOR_LOW_BATTERY, INDICATOR_WIFI, INDICATOR_BCP, INDICATOR_COUNT };
+    enum AlertIcon { ICON_BATTERY, ICON_WIFI, ICON_BCP, ICON_COUNT };
+    static constexpr uint8_t OVERLAY_ICON = 0x80;  // overlay state flag: an icon instead of the indicators
     static volatile bool indicatorActive[INDICATOR_COUNT];
+    static volatile bool iconActive[ICON_COUNT];
     static uint8_t shownOverlay;             // overlayState() of the last showMatrix()
-    static uint8_t overlayState();           // 0 none, 1 battery icon, else (active indicator mask << 1)
+    static uint8_t overlayState();           // 0 none, OVERLAY_ICON | AlertIcon, else active indicator mask
     static bool drawOverlay(uint8_t state);  // returns true if drawn, then restoreOverlay() must follow
     static void restoreOverlay();
     static void showMatrix();                // matrix.show() with the overlay, display lock held

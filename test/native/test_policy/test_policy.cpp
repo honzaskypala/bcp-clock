@@ -111,10 +111,28 @@ static void test_refresh_success_resetsCount() {
     TEST_ASSERT_EQUAL(0, r.failCount);
 }
 
-static void test_refresh_wifiDown_keepsCount() {
-    RefreshDecision r = decideRefresh(false, false, -1, 3, MAX_FAILURES);
-    TEST_ASSERT_EQUAL(REFRESH_WIFI_DOWN, r.outcome);
-    TEST_ASSERT_EQUAL(3, r.failCount);
+static void test_refresh_wifiDown_countsTowardReboot() {
+    int count = 0;
+    for (int i = 1; i <= 4; i++) {
+        RefreshDecision r = decideRefresh(false, false, -1, count, MAX_FAILURES);
+        TEST_ASSERT_EQUAL(REFRESH_WIFI_DOWN, r.outcome);
+        count = r.failCount;
+        TEST_ASSERT_EQUAL(i, count);
+    }
+    RefreshDecision r = decideRefresh(false, false, -1, count, MAX_FAILURES);
+    TEST_ASSERT_EQUAL(REFRESH_REBOOT, r.outcome);
+    TEST_ASSERT_EQUAL(5, r.failCount);
+}
+
+static void test_refresh_wifiDownAndConnectionErrors_shareCount() {
+    RefreshDecision r = decideRefresh(false, false, -1, 0, MAX_FAILURES);
+    r = decideRefresh(false, false, -1, r.failCount, MAX_FAILURES);
+    r = decideRefresh(false, true, -1, r.failCount, MAX_FAILURES);
+    r = decideRefresh(false, true, -1, r.failCount, MAX_FAILURES);
+    TEST_ASSERT_EQUAL(REFRESH_CONNECTION_ERROR, r.outcome);
+    TEST_ASSERT_EQUAL(4, r.failCount);
+    r = decideRefresh(false, false, -1, r.failCount, MAX_FAILURES);
+    TEST_ASSERT_EQUAL(REFRESH_REBOOT, r.outcome);
 }
 
 static void test_refresh_rebootAfterFiveConnectionErrors() {
@@ -170,7 +188,8 @@ int main() {
     RUN_TEST(test_invalidId_configRequiredOnce_thenValidRestartsServer);
     RUN_TEST(test_configMessage_waitsForRedrawRequest);
     RUN_TEST(test_refresh_success_resetsCount);
-    RUN_TEST(test_refresh_wifiDown_keepsCount);
+    RUN_TEST(test_refresh_wifiDown_countsTowardReboot);
+    RUN_TEST(test_refresh_wifiDownAndConnectionErrors_shareCount);
     RUN_TEST(test_refresh_rebootAfterFiveConnectionErrors);
     RUN_TEST(test_refresh_httpError_resetsCount);
     RUN_TEST(test_refresh_noRequest);

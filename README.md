@@ -79,6 +79,12 @@ Low battery: below about 10 % the top-left LED blinks red. Below about 5 % the d
 5 seconds between the normal content and a red empty battery icon; plug in the USB cable. The battery
 level is estimated from its voltage, so the percentages are approximate.
 
+Connection problems: the top-left LED (below the battery one, if that is blinking too) blinks amber when the
+clock lost WiFi, or magenta when WiFi works but Best Coast Pairings does not respond correctly. Meanwhile the
+countdown keeps running from the last data. After about 4 minutes the display also alternates with a WiFi icon
+(amber) or an unplugged plug icon (magenta); after about 5 minutes without WiFi or without a connection to BCP
+the clock reboots.
+
 ## Hardware
 
 The only hardware needed is an **Ulanzi TC001** (ESP32-WROOM, 32×8 WS2812 LED matrix, three buttons,
@@ -270,7 +276,7 @@ connected, the commit is stopped; `SKIP_DEVICE_TESTS=1 git commit` skips them. T
 | The WiFi setup portal opens on every start | No stored network is in range, or the clock connected but could not synchronise time (`Error: NTP time sync failed`). Check that the network has internet access. |
 | The setup page does not open by itself on iPhone | In Settings → Wi-Fi → ⓘ next to `BCP-clock`, turn on **Auto-Login**, then forget the network and connect again. Or open the address shown on the display in the browser. |
 | `Invalid event ID, please configure.` | The event was not found in BCP. Open the configuration page and check the event URL or ID. |
-| The clock reboots by itself | It could not fetch data 5 times in a row (about 5 minutes) and restarts to recover. Check the WiFi network and internet access. |
+| The clock reboots by itself | It lost WiFi or could not connect to BCP 5 times in a row (about 5 minutes) and restarts to recover. Check the WiFi network and internet access. |
 | Installation, upload or serial monitor fails | Connect the clock directly, without a USB hub, and use a data cable. On Windows, install the [CH340 USB driver](https://www.wch-ic.com/downloads/CH341SER_EXE.html). |
 | Need more details | Build from source and flash the dev build (`pio run -e dev -t upload`). It prints debug output and has a command console on the serial port at 9600 baud, see [docs/dev-build.md](docs/dev-build.md). |
 

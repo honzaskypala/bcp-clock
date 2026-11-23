@@ -8,10 +8,11 @@
   each response ends with `[Console] done`. `help` lists commands: `status`, `screen` (ASCII dump of the
   matrix: `.` off, `:` dim, letters = colour), `refresh`, `mid`, `timeshift <sec>`, `beep yellow|red` (play a threshold signal),
   `fake <mode> [sec] [length] [round/rounds]` (fake event data: `name`, `round`, `start`, `run`, `pause`,
-  `over`, `off`; BCP is not contacted while active), `bcpfail on|off` (simulated BCP connection errors),
+  `over`, `off`; BCP is not contacted while active), `bcpfail on|off` (simulated BCP connection errors), `wififail on|off` (simulated WiFi outage: the refresh
+  fails and main sees WiFi as disconnected, no reconnect),
   `battery [pct|off]` (raw / median / percent / level; `pct` simulates a charge level, `off` returns to the
   real reading), `portal` (reboot into the captive portal), `reboot`. `screen` includes the status overlay as
-  it was last shown.
+  it was last shown (`A` = amber). `status` shows the connection alert and the reboot count.
 - Helpers in `tools/`: run `python tools/devmon.py` (PlatformIO's python, it needs pyserial) in the background (keeps the port
   open so the device is not reset, logs to `.pio/dev.log`, reads commands from `.pio/dev.fifo`), then
   `tools/devcmd.sh <command>` sends a command and prints the response. Stop devmon before flashing.

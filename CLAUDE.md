@@ -57,7 +57,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 | `install/`, `.github/workflows/` | Browser installer page (ESP Web Tools) and the release workflow (see `docs/dev-build.md`) |
 | `test/native/`, `test/device/` | Unit tests on the host / on the TC001 |
 | `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: BCP REST API, event data, RTC snapshot |
-| `lib/core/` | Hardware independent logic, host-tested: parsing, countdown text/colour, display/refresh policy, battery level, `DisplayState`, string helpers |
+| `lib/core/` | Hardware independent logic, host-tested: parsing, countdown text/colour, display/refresh policy, battery level, alert icon cycle and connection alert, `DisplayState`, string helpers |
 | `lib/hw/` | Abstract `Hw` interface (`hw.h`); `Tc001` singleton (matrix, buttons, display task, fonts, status overlay, battery ADC) |
 | `lib/config/` | `CConfig` singleton `Config`: settings in NVS + on-demand HTTP config server |
 | `lib/wifimgr/` | `CWifiMgr` global `WifiMgr`: multi-network WiFi, captive portal, NTP + RTC sync |

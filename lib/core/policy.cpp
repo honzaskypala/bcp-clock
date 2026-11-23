@@ -61,8 +61,9 @@ RefreshDecision decideRefresh(bool ok, bool wifiConnected, int lastStatus, int f
     if (ok) {
         return { REFRESH_SUCCESS, 0 };
     } else if (!wifiConnected) {
-        // WiFi outage: keep displaying the last data, rebooting would not help
-        return { REFRESH_WIFI_DOWN, failCount };
+        // WiFi outage: keep displaying the last data, counted toward reboot like connection errors
+        failCount++;
+        return { failCount >= maxFailures ? REFRESH_REBOOT : REFRESH_WIFI_DOWN, failCount };
     } else if (lastStatus < 0) {
         // connection error while WiFi is up, may be stuck TLS/HTTP
         failCount++;

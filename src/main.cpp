@@ -10,13 +10,14 @@
 #include <hw.h>
 #include <tc001.h>
 #include <policy.h>
+#include <statusalert.h>
 #include <devlog.h>
 #ifdef BCP_DEV
 #include "devconsole.h"
 #endif
 
 #define DATA_REFRESH_INTERVAL_MS 60000 // 60 seconds
-#define MAX_CONNECTION_FAILURES 5      // reboot after this many consecutive connection errors (stuck TLS/HTTP)
+#define MAX_CONNECTION_FAILURES 5      // reboot after this many consecutive WiFi outages or connection errors
 
 #define MAIN_DEBUG(msg) DEV_LOG("Main", msg)
 
@@ -91,7 +92,8 @@ void updateDisplay() {
 
 // ---- Data refresh ----
 
-static int failCount = 0;                   // consecutive connection failures
+static int failCount = 0;                   // consecutive WiFi outages and connection failures
+static ConnectionAlert connectionAlert;     // status indicator and icon of a connection problem
 static unsigned long lastDataRefresh = 0;   // millis() of the last refresh, 0 = refresh now
 
 // Applies a configuration saved on the config page
@@ -106,6 +108,8 @@ void handleConfigUpdate() {
         BCPEvent.setID(Config.eventId());
         lastDataRefresh = 0; // force data refresh
         failCount = 0;
+        connectionAlert = ConnectionAlert();
+        hw->setConnectionAlert(connectionAlert.problem, connectionAlert.isIconDue());
     }
 }
 
@@ -113,31 +117,40 @@ bool isRefreshDue() {
     return lastDataRefresh == 0 || millis() - lastDataRefresh >= DATA_REFRESH_INTERVAL_MS || hw->enforceUpdate;
 }
 
-// Fetches the event data and reacts to failures (WiFi reconnect, reboot after repeated connection errors)
+// Fetches the event data and reacts to failures (connection alert, WiFi reconnect, reboot after repeated
+// WiFi outages or connection errors)
 void refreshEventData() {
     MAIN_DEBUG("Refreshing BCP event data...");
     hw->enforceUpdate = false;
     lastDataRefresh = millis();
     bool ok = BCPEvent.refreshData();
-    RefreshDecision r = decideRefresh(ok, WiFi.status() == WL_CONNECTED, BCPEvent.lastStatus(),
-                                        failCount, MAX_CONNECTION_FAILURES);
+    bool wifiConnected = WiFi.status() == WL_CONNECTED;
+#ifdef BCP_DEV
+    if (devWifiFailing) wifiConnected = false;
+#endif
+    RefreshDecision r = decideRefresh(ok, wifiConnected, BCPEvent.lastStatus(), failCount, MAX_CONNECTION_FAILURES);
     failCount = r.failCount;
+    connectionAlert = nextConnectionAlert(connectionAlert, r.outcome);
+    hw->setConnectionAlert(connectionAlert.problem, connectionAlert.isIconDue());
     switch (r.outcome) {
         case REFRESH_SUCCESS:
             MAIN_DEBUG("BCP event data refreshed successfully");
             break;
         case REFRESH_WIFI_DOWN:
-            MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting");
+            MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting (failure count " +
+                       String(failCount) + ")");
+#ifdef BCP_DEV
+            if (devWifiFailing) break;
+#endif
             WiFi.reconnect();
             break;
         case REFRESH_CONNECTION_ERROR:
-        case REFRESH_REBOOT:
             MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()) +
                        " (failure count " + String(failCount) + ")");
-            if (r.outcome == REFRESH_REBOOT) {
-                MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
-                hw->reboot();
-            }
+            break;
+        case REFRESH_REBOOT:
+            MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
+            hw->reboot();
             break;
         case REFRESH_HTTP_ERROR:
             MAIN_DEBUG("Failed to refresh BCP event data, HTTP status " + String(BCPEvent.lastStatus()));
@@ -146,6 +159,15 @@ void refreshEventData() {
             break;
     }
 }
+
+#ifdef BCP_DEV
+void printConnectionStatus(Print& out) {
+    static const char *problemNames[] = { "OK", "WIFI", "BCP" };
+    out.printf("connection: %s, failures %d (icon %s), reboot count %d/%d, wififail=%d\n",
+               problemNames[connectionAlert.problem], connectionAlert.failures,
+               connectionAlert.isIconDue() ? "on" : "off", failCount, MAX_CONNECTION_FAILURES, devWifiFailing);
+}
+#endif
 
 // ---- core Arduino functions ----
 

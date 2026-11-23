@@ -1,11 +1,10 @@
-// Battery level from ADC samples and the low battery alert phase, independent of the hardware
+// Battery level from ADC samples, independent of the hardware
 // (c) 2025 Honza Skýpala
 // WTFPL license applies
 
 #pragma once
 
 #include <stdint.h>
-#include <displaystate.h>
 
 // ---- Battery level ----
 
@@ -49,11 +48,3 @@ private:
     int next_ = 0;                        // ring buffer position of the next sample
     BatteryLevel level_ = BATTERY_UNKNOWN;
 };
-
-// ---- Critical battery alert ----
-
-constexpr unsigned long BATTERY_ALERT_PHASE_MS = 5000;  // content and battery icon alternate in this period
-
-// True while the battery icon replaces the content: critical level, second half of the cycle and not while
-// the config page address scrolls after the mid button (it must not be interrupted)
-bool isBatteryAlertPhase(BatteryLevel level, unsigned long ms, DisplayState state);

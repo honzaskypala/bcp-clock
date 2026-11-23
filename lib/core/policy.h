@@ -46,9 +46,9 @@ DisplayDecision decideDisplay(const DisplayInputs& in, DisplayMemory& memory);
 
 enum RefreshOutcome {
     REFRESH_SUCCESS,           // data or 404 received
-    REFRESH_WIFI_DOWN,         // reconnect WiFi, keep the last data
+    REFRESH_WIFI_DOWN,         // reconnect WiFi, keep the last data, counted toward reboot
     REFRESH_CONNECTION_ERROR,  // counted toward reboot
-    REFRESH_REBOOT,            // too many consecutive connection errors
+    REFRESH_REBOOT,            // too many consecutive WiFi outages or connection errors
     REFRESH_HTTP_ERROR,        // server responded with an error, the connection works
     REFRESH_NO_REQUEST         // no request was made (empty event ID)
 };

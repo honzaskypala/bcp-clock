@@ -14,6 +14,7 @@
 #include <tc001.h>
 
 static long timeShift_ = 0;  // total seconds the system clock was shifted by "timeshift"
+bool devWifiFailing = false;
 
 // ---- Commands ----
 
@@ -31,6 +32,7 @@ static void handleHelp() {
     Serial.println("                    run (sec remaining), pause (sec remaining), over (sec over time), off");
     Serial.println("                    defaults: sec=300, length=9000, round 3/5");
     Serial.println("  bcpfail on|off    simulate BCP connection errors (counts toward reboot, reset by reboot)");
+    Serial.println("  wififail on|off   simulate a WiFi outage (counts toward reboot, reset by reboot)");
     Serial.println("  beep yellow|red   play the threshold signal (also when acoustic signals are off)");
     Serial.println("  battery [pct|off] battery reading; pct simulates the charge level (0..100), off = real");
     Serial.println("  portal            reboot into the captive portal (= Mid held at boot)");
@@ -54,6 +56,7 @@ static void handleStatus(Hw *hw) {
     Serial.printf("event: id=%s valid=%d invalid=%d fake=%d bcpfail=%d lastStatus=%d name=\"%s\"\n",
                   BCPEvent.id().c_str(), BCPEvent.isValid(), BCPEvent.isInvalid(), BCPEvent.isFake(),
                   BCPEvent.isNetworkFailing(), BCPEvent.lastStatus(), BCPEvent.name().c_str());
+    printConnectionStatus(Serial);
     Serial.printf("event: started=%d ended=%d round=%d/%d\n",
                   BCPEvent.isStarted(), BCPEvent.isEnded(), BCPEvent.currentRound(), BCPEvent.numberOfRounds());
     Serial.printf("timer: length=%u start=%s end=%s paused=%d pausedRemaining=%u\n",
@@ -136,6 +139,11 @@ static void executeCommand(const String& line, Hw *hw) {
     else if (cmd == "bcpfail") {
         BCPEvent.setNetworkFailing(arg == "on");
         Serial.printf("BCP connection errors %s\n", BCPEvent.isNetworkFailing() ? "on" : "off");
+    }
+    else if (cmd == "wififail") {
+        devWifiFailing = arg == "on";
+        BCPEvent.setNetworkFailing(devWifiFailing);
+        Serial.printf("WiFi outage %s\n", devWifiFailing ? "on" : "off");
     }
     else if (cmd == "beep" && (arg == "yellow" || arg == "red")) {
         Tc001::playBeep(arg == "red" ? BEEP_RED : BEEP_YELLOW);

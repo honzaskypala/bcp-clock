@@ -1,4 +1,4 @@
-// Battery level from ADC samples and the low battery alert phase, independent of the hardware
+// Battery level from ADC samples, independent of the hardware
 // (c) 2025 Honza Skýpala
 // WTFPL license applies
 
@@ -47,10 +47,4 @@ uint16_t BatteryMonitor::filteredRaw() const {
         sorted[j] = value;
     }
     return sorted[WINDOW / 2];
-}
-
-// ---- Critical battery alert ----
-
-bool isBatteryAlertPhase(BatteryLevel level, unsigned long ms, DisplayState state) {
-    return level == BATTERY_CRITICAL && state != DISPLAY_CONFIG_MESSAGE && (ms / BATTERY_ALERT_PHASE_MS) % 2 == 1;
 }

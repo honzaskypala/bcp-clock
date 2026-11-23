@@ -24,6 +24,7 @@
 #define COLOR_YELLOW matrix.Color24to16(CRGB::Yellow)
 #define COLOR_GREEN matrix.Color24to16(CRGB::Green)
 #define COLOR_MAGENTA matrix.Color24to16(CRGB::Magenta)
+#define COLOR_AMBER matrix.Color(255, 140, 0)  // (255, 77, 0) on the LEDs after the gamma correction
 #define COLOR_DEEPSKYBLUE matrix.Color24to16(CRGB::DeepSkyBlue)
 #define COLOR_DARKGRAY matrix.Color(20, 20, 20)
 
@@ -53,6 +54,7 @@ BeepSignal Tc001::beepSignal = BEEP_NONE;
 unsigned long Tc001::beepStartMs = 0;
 bool Tc001::beepToneOn = false;
 volatile bool Tc001::indicatorActive[INDICATOR_COUNT] = {};
+volatile bool Tc001::iconActive[ICON_COUNT] = {};
 uint8_t Tc001::shownOverlay = 0;
 BatteryMonitor Tc001::battery;
 volatile BatteryLevel Tc001::batteryLevel = BATTERY_UNKNOWN;
@@ -305,31 +307,56 @@ static const uint8_t batteryIcon[] = {  // 15x7, empty battery with "LoW"
     0x40, 0x02,  // .#............#
     0x7F, 0xFE   // .##############
 };
+static const uint8_t wifiIcon[] = {  // 8x7
+    0x3C,  // ..####..
+    0x42,  // .#....#.
+    0x18,  // ...##...
+    0x24,  // ..#..#..
+    0x00,  // ........
+    0x18,  // ...##...
+    0x18   // ...##...
+};
+static const uint8_t bcpIcon[] = {  // 24x5, unplugged plug and socket
+    0x0F, 0x03, 0xC0,  // ....####......####......
+    0x0F, 0xE1, 0xC0,  // ....#######....###......
+    0xFF, 0x03, 0xFF,  // ########......##########
+    0x0F, 0xE1, 0xC0,  // ....#######....###......
+    0x0F, 0x03, 0xC0   // ....####......####......
+};
 static CRGB overlayBackup[256];  // content under the overlay while it is shown
 
 uint8_t Tc001::overlayState() {
-    if (isBatteryAlertPhase(batteryLevel, millis(), displayState)) return 1;
+    uint8_t icons[ICON_COUNT];
+    int iconCount = 0;
+    for (int i = 0; i < ICON_COUNT; i++) {
+        if (iconActive[i]) icons[iconCount++] = i;
+    }
+    int phase = alertCyclePhase(iconCount, millis(), displayState);
+    if (phase > 0) return OVERLAY_ICON | icons[phase - 1];
     uint8_t mask = 0;
     for (int i = 0; i < INDICATOR_COUNT; i++) {
         if (indicatorActive[i]) mask |= 1 << i;
     }
-    if (mask == 0 || (millis() / INDICATOR_BLINK_MS) % 2 == 1) return 0;
-    return mask << 1;
+    if ((millis() / INDICATOR_BLINK_MS) % 2 == 1) return 0;
+    return mask;
 }
 
 bool Tc001::drawOverlay(uint8_t state) {
     if (state == 0) return false;
     memcpy(overlayBackup, matrixleds, sizeof(overlayBackup));
-    if (state == 1) {
-        // battery body (columns 9..22) centred, rows 1..7
+    if (state & OVERLAY_ICON) {
         matrix.fillScreen(COLOR_BLACK);
-        matrix.drawBitmap(8, 1, batteryIcon, 15, 7, COLOR_RED);
+        switch (state & ~OVERLAY_ICON) {
+            case ICON_BATTERY: matrix.drawBitmap(8, 1, batteryIcon, 15, 7, COLOR_RED); break;  // body in columns 9..22
+            case ICON_WIFI: matrix.drawBitmap(12, 1, wifiIcon, 8, 7, COLOR_AMBER); break;
+            case ICON_BCP: matrix.drawBitmap(4, 2, bcpIcon, 24, 5, COLOR_MAGENTA); break;
+        }
         return true;
     }
-    static const uint16_t indicatorColors[INDICATOR_COUNT] = { COLOR_RED };
+    static const uint16_t indicatorColors[INDICATOR_COUNT] = { COLOR_RED, COLOR_AMBER, COLOR_MAGENTA };
     int y = 0;
     for (int i = 0; i < INDICATOR_COUNT; i++) {
-        if (state & (1 << (i + 1))) matrix.drawPixel(0, y++, indicatorColors[i]);
+        if (state & (1 << i)) matrix.drawPixel(0, y++, indicatorColors[i]);
     }
     return true;
 }
@@ -361,6 +388,16 @@ void Tc001::stepBattery() {
 #endif
     batteryLevel = level;
     indicatorActive[INDICATOR_LOW_BATTERY] = level == BATTERY_LOW || level == BATTERY_CRITICAL;
+    iconActive[ICON_BATTERY] = level == BATTERY_CRITICAL;
+}
+
+// ---- Connection alert ----
+
+void Tc001::setConnectionAlert(ConnectionProblem problem, bool showIcon) {
+    indicatorActive[INDICATOR_WIFI] = problem == CONNECTION_WIFI;
+    indicatorActive[INDICATOR_BCP] = problem == CONNECTION_BCP;
+    iconActive[ICON_WIFI] = showIcon && problem == CONNECTION_WIFI;
+    iconActive[ICON_BCP] = showIcon && problem == CONNECTION_BCP;
 }
 
 void Tc001::reboot() {
@@ -382,7 +419,7 @@ void Tc001::rebootToPortal() {
 }
 
 // Prints the LED matrix as ASCII, one character per pixel:
-// '.' off, ':' dim, W white, R red, G green, B blue, Y yellow, M magenta, C cyan
+// '.' off, ':' dim, W white, R red, A amber, G green, B blue, Y yellow, M magenta, C cyan
 // Stored values are gamma corrected, so channels are compared relative to the strongest one.
 // Includes the status overlay as it was last shown.
 void Tc001::dumpScreen(Print& out) {
@@ -402,6 +439,7 @@ void Tc001::dumpScreen(Print& out) {
             else if (r && g) ch = 'Y';
             else if (r && b) ch = 'M';
             else if (g && b) ch = 'C';
+            else if (r && c.g > maxChannel / 8) ch = 'A';
             else if (r) ch = 'R';
             else if (g) ch = 'G';
             else ch = 'B';
