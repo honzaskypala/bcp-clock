@@ -35,6 +35,13 @@ static void test_running_longRound_hmmss() {
     assertView("0:10:01", COUNTDOWN_WHITE, true, 3, run(601, 9000));
 }
 
+static void test_running_tenHourRound_twoDigitHours() {
+    assertView("10:00:00", COUNTDOWN_WHITE, true, 1, run(36000, 36000));
+    assertView("09:59:59", COUNTDOWN_WHITE, true, 1, run(35999, 36000));
+    assertView("00:00:01", COUNTDOWN_YELLOW, true, 1, run(1, 36000));
+    assertView("00:00", COUNTDOWN_RED, false, 5, run(0, 3600));   // short rounds unchanged
+}
+
 // ---- Thresholds ----
 
 static void test_yellowThreshold_inclusive() {
@@ -74,6 +81,13 @@ static void test_beforeStart_longRound_greenHmmss() {
     assertView("0:00:01", COUNTDOWN_GREEN, true, 3, run(9001, 9000));
 }
 
+static void test_beforeStart_twoDigitHours() {
+    assertView("00:00:01", COUNTDOWN_GREEN, true, 1, run(36001, 36000));
+    // time to start >= 10 h of a shorter round
+    assertView("10:00:00", COUNTDOWN_GREEN, true, 1, run(3600 + 36000, 3600));
+    assertView("9:59:59", COUNTDOWN_GREEN, true, 3, run(3600 + 35999, 3600));
+}
+
 // ---- Over time ----
 
 static void test_overTime_mmss() {
@@ -86,6 +100,11 @@ static void test_overTime_hmmss() {
     assertView("-0:00:01", COUNTDOWN_RED, true, -1, run(-1, 9000));
     assertView("-9:59:59", COUNTDOWN_RED, true, -1, run(-35999, 9000));
     assertView("-/://://", COUNTDOWN_RED, true, -1, run(-36000, 9000));
+}
+
+static void test_overTime_tenHourRound_singleDigitHours() {
+    // "-hh:mm:ss" would not fit the display
+    assertView("-0:00:01", COUNTDOWN_RED, true, -1, run(-1, 36000));
 }
 
 // ---- Paused ----
@@ -103,12 +122,13 @@ static void test_paused_precedesThresholds() {
 
 static void test_paused_longRound_hmmss() {
     assertView("1:15:00", COUNTDOWN_MAGENTA, true, 3, formatCountdown(0, 9000, true, 4500, YELLOW, RED, true));
+    assertView("01:15:00", COUNTDOWN_MAGENTA, true, 1, formatCountdown(0, 40000, true, 4500, YELLOW, RED, true));
 }
 
 // ---- Invariants over a range of values ----
 
 static void test_invariants_fontCharsAndHours() {
-    const uint32_t lengths[] = { 0, 600, 3599, 3600, 3601, 5400, 9000, 35999 };
+    const uint32_t lengths[] = { 0, 600, 3599, 3600, 3601, 5400, 9000, 35999, 36000, 43200 };
     for (uint32_t len : lengths) {
         for (long rem = -40000; rem <= 75000; rem += 7) {
             CountdownView v = run(rem, len);
@@ -124,8 +144,11 @@ static void test_invariants_fontCharsAndHours() {
                 TEST_ASSERT_TRUE_MESSAGE(overflow ? shown <= -3600 : shown > -3600 && shown < 3600, t);
                 TEST_ASSERT_TRUE(strlen(t) <= 6);
             } else {
-                // single digit hours only (rounds >= 10 h are a TODO): "h:mm:ss" or "-h:mm:ss"
+                // "h:mm:ss", "hh:mm:ss" or "-h:mm:ss"; every glyph advances 4 px, the last one is 3 px
+                // wide ('-' starts 1 px into its cell), so the text fits the 32 px display
                 TEST_ASSERT_TRUE_MESSAGE(strlen(t) <= 8, t);
+                TEST_ASSERT_TRUE_MESSAGE(v.x + 4 * (int) strlen(t) - 1 <= 32, t);
+                TEST_ASSERT_TRUE_MESSAGE(t[0] == '-' ? v.x >= -1 : v.x >= 0, t);
             }
         }
     }
@@ -207,13 +230,16 @@ int main() {
     UNITY_BEGIN();
     RUN_TEST(test_running_shortRound_mmss);
     RUN_TEST(test_running_longRound_hmmss);
+    RUN_TEST(test_running_tenHourRound_twoDigitHours);
     RUN_TEST(test_yellowThreshold_inclusive);
     RUN_TEST(test_redThreshold_inclusive_defaultZero);
     RUN_TEST(test_thresholdsBeforeStart_takePrecedence);
     RUN_TEST(test_beforeStart_shortRound_green);
     RUN_TEST(test_beforeStart_longRound_greenHmmss);
+    RUN_TEST(test_beforeStart_twoDigitHours);
     RUN_TEST(test_overTime_mmss);
     RUN_TEST(test_overTime_hmmss);
+    RUN_TEST(test_overTime_tenHourRound_singleDigitHours);
     RUN_TEST(test_paused_showsPausedRemaining_blinks);
     RUN_TEST(test_paused_precedesThresholds);
     RUN_TEST(test_paused_longRound_hmmss);

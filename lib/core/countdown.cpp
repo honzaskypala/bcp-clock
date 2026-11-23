@@ -8,8 +8,9 @@
 
 // ---- Countdown ----
 
-// Fills in the time text and its position: mm:ss, or h:mm:ss when hours are displayed
-static inline void formatTime(CountdownView& view, long remaining, bool dontDisplayHours) {
+// Fills in the time text and its position: mm:ss, or h:mm:ss / hh:mm:ss when hours are displayed;
+// negative time keeps a single hour digit, "-hh:mm:ss" would not fit the display
+static inline void formatTime(CountdownView& view, long remaining, bool dontDisplayHours, bool twoDigitHours) {
     const char *sign = remaining < 0 ? "-" : "";
     int absoluteTime = remaining < 0 ? -remaining : remaining;
     int hours = absoluteTime / 3600;
@@ -31,6 +32,10 @@ static inline void formatTime(CountdownView& view, long remaining, bool dontDisp
         view.x = remaining < 0 ? -1 : 3;
         if (remaining < -35999) {
             strcpy(view.text, "-/://://");  // To save space in the font, X bitmap mapped to / character
+        } else if (twoDigitHours && remaining >= 0) {
+            // hh:mm:ss
+            view.x = 1;
+            snprintf(view.text, sizeof(view.text), "%02d:%02d:%02d", hours, minutes, seconds);
         } else {
             snprintf(view.text, sizeof(view.text), "%s%d:%02d:%02d", sign, hours, minutes, seconds);
         }
@@ -61,7 +66,9 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
         view.color = COUNTDOWN_WHITE;
     }
 
-    formatTime(view, remaining, dontDisplayHours);
+    // a round that starts with two-digit hours keeps them until the end (09:59:59, ...)
+    bool twoDigitHours = timerLength >= 36000 || remaining >= 36000;
+    formatTime(view, remaining, dontDisplayHours, twoDigitHours);
     return view;
 }
 

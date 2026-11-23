@@ -18,7 +18,7 @@ enum CountdownColor {
 };
 
 struct CountdownView {
-    char text[12];         // "mm:ss" / "h:mm:ss", "-" prefix over time; '/' = X glyph for overflow
+    char text[12];         // "mm:ss" / "h:mm:ss" / "hh:mm:ss", "-" prefix over time; '/' = X glyph for overflow
     CountdownColor color;
     bool hmmss;            // true: h:mm:ss font, false: mm:ss font
     int x;                 // cursor x position
