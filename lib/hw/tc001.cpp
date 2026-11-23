@@ -316,6 +316,16 @@ static const uint8_t wifiIcon[] = {  // 8x7
     0x18,  // ...##...
     0x18   // ...##...
 };
+static const uint8_t wifiOffText[] = {  // 25x8, drawn over wifiIcon: strike-through and "Wi-Fi"
+    0x01, 0x00, 0x00, 0x00,  // .......#.................
+    0x02, 0x00, 0x00, 0x00,  // ......#..................
+    0x04, 0x55, 0x0E, 0x80,  // .....#...#.#.#.#....###.#
+    0x08, 0x54, 0x08, 0x00,  // ....#....#.#.#......#....
+    0x10, 0x55, 0x6C, 0x80,  // ...#.....#.#.#.#.##.##..#
+    0x20, 0x55, 0x08, 0x80,  // ..#......#.#.#.#....#...#
+    0x40, 0x29, 0x08, 0x80,  // .#........#.#..#....#...#
+    0x80, 0x00, 0x00, 0x00   // #........................
+};
 static const uint8_t bcpIcon[] = {  // 24x5, unplugged plug and socket
     0x0F, 0x03, 0xC0,  // ....####......####......
     0x0F, 0xE1, 0xC0,  // ....#######....###......
@@ -348,7 +358,10 @@ bool Tc001::drawOverlay(uint8_t state) {
         matrix.fillScreen(COLOR_BLACK);
         switch (state & ~OVERLAY_ICON) {
             case ICON_BATTERY: matrix.drawBitmap(8, 1, batteryIcon, 15, 7, COLOR_RED); break;  // body in columns 9..22
-            case ICON_WIFI: matrix.drawBitmap(12, 1, wifiIcon, 8, 7, COLOR_AMBER); break;
+            case ICON_WIFI:  // 25x8 in columns 3..27
+                matrix.drawBitmap(3, 1, wifiIcon, 8, 7, COLOR_AMBER);
+                matrix.drawBitmap(3, 0, wifiOffText, 25, 8, COLOR_RED);
+                break;
             case ICON_BCP: matrix.drawBitmap(4, 2, bcpIcon, 24, 5, COLOR_MAGENTA); break;
         }
         return true;

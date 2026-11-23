@@ -81,8 +81,8 @@ level is estimated from its voltage, so the percentages are approximate.
 
 Connection problems: the top-left LED (below the battery one, if that is blinking too) blinks amber when the
 clock lost WiFi, or magenta when WiFi works but Best Coast Pairings does not respond correctly. Meanwhile the
-countdown keeps running from the last data. After about 4 minutes the display also alternates with a WiFi icon
-(amber) or an unplugged plug icon (magenta); after about 5 minutes without WiFi or without a connection to BCP
+countdown keeps running from the last data. After about 4 minutes the display also alternates with a crossed-out WiFi icon
+and "Wi-Fi" or an unplugged plug icon (magenta); after about 5 minutes without WiFi or without a connection to BCP
 the clock reboots.
 
 ## Hardware

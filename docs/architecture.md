@@ -46,7 +46,8 @@ redrawing what is already shown.
   CRITICAL < 5 %, a level is left 2 % above its threshold (hysteresis).
 - CRITICAL: the 15x7 battery icon joins the icon cycle.
 - Connection: after each data refresh `main.cpp` updates `ConnectionAlert` (`nextConnectionAlert`) and passes it
-  to `Hw::setConnectionAlert()`. A failed refresh with WiFi disconnected = WiFi problem (amber, 8x7 WiFi icon),
+  to `Hw::setConnectionAlert()`. A failed refresh with WiFi disconnected = WiFi problem (amber pixel; 25x8 icon: amber WiFi symbol crossed out
+  in red + red "Wi-Fi"),
   with WiFi up (connection or HTTP error) = BCP problem (magenta, 24x5 unplugged plug icon); a successful refresh
   clears it, so the indicator reacts within one refresh interval (60 s). The icon joins the cycle from the 4th
   consecutive failed refresh of any kind.
