@@ -75,9 +75,10 @@ replaced by `X`, e.g. `-XX:XX`.
 While a timer is shown, the bottom row of LEDs is a round indicator: one segment per round, with the
 current round highlighted in blue.
 
-Low battery: below about 10 % the top-left LED blinks red. Below about 5 % the display alternates every
-5 seconds between the normal content and a red empty battery icon; plug in the USB cable. The battery
-level is estimated from its voltage, so the percentages are approximate.
+Low battery: about 30 minutes before the battery runs out, the top-left LED blinks red. About 10 minutes
+before, the display alternates every 5 seconds between the normal content and a red empty battery icon;
+plug in the USB cable. The time is estimated from the battery voltage, so it is approximate. A full
+battery lasts about 2 hours with a countdown on the display.
 
 Connection problems: the top-left LED (below the battery one, if that is blinking too) blinks amber when the
 clock lost WiFi, or magenta when WiFi works but Best Coast Pairings does not respond correctly. Meanwhile the
@@ -95,7 +96,7 @@ Detailed hardware documentation is available at
 [rroels/ulanzi_tc001_hardware](https://github.com/rroels/ulanzi_tc001_hardware).
 
 > [!NOTE]
-> The built-in battery lasts roughly 2–4 hours. For all-day tournaments, connect the clock to a
+> The built-in battery lasts about 2 hours with a countdown on the display (measured). For all-day tournaments, connect the clock to a
 > power bank or a USB power adapter.
 
 ### Buttons

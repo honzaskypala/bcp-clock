@@ -34,7 +34,8 @@ static void handleHelp() {
     Serial.println("  bcpfail on|off    simulate BCP connection errors (counts toward reboot, reset by reboot)");
     Serial.println("  wififail on|off   simulate a WiFi outage (counts toward reboot, reset by reboot)");
     Serial.println("  beep yellow|red   play the threshold signal (also when acoustic signals are off)");
-    Serial.println("  battery [pct|off] battery reading; pct simulates the charge level (0..100), off = real");
+    Serial.println("  battery [raw|off] battery reading; raw simulates the ADC median (e.g. 2300), off = real");
+    Serial.println("  battlog [start [sec]|stop]  battery calibration log in NVS (default every 60 s), no arg = CSV");
     Serial.println("  portal            reboot into the captive portal (= Mid held at boot)");
     Serial.println("  reboot            restart the device");
 }
@@ -151,8 +152,17 @@ static void executeCommand(const String& line, Hw *hw) {
     }
     else if (cmd == "battery") {
         if (arg == "off") Tc001::simulateBattery(-1);
-        else if (arg.length() > 0) Tc001::simulateBattery(constrain(arg.toInt(), 0, 100));
+        else if (arg.length() > 0) Tc001::simulateBattery(constrain(arg.toInt(), 0, 4095));
         Tc001::printBattery(Serial);
+    }
+    else if (cmd == "battlog") {
+        if (arg.startsWith("start")) {
+            int sec = arg.length() > 5 ? arg.substring(5).toInt() : 60;
+            Tc001::startBatteryLog(constrain(sec, 1, 3600));
+            Serial.printf("Battery log started, every %d s (previous log erased)\n", constrain(sec, 1, 3600));
+        }
+        else if (arg == "stop") { Tc001::stopBatteryLog(); Serial.println("Battery log stopped"); }
+        else Tc001::printBatteryLog(Serial);
     }
     else if (cmd == "portal") { Serial.println("Rebooting into portal..."); Serial.flush(); static_cast<Tc001 *>(hw)->rebootToPortal(); }
     else if (cmd == "reboot") { Serial.println("Rebooting..."); Serial.flush(); hw->reboot(); }

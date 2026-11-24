@@ -41,9 +41,11 @@ redrawing what is already shown.
   Mid button (`DISPLAY_CONFIG_MESSAGE`). Amber is `Color(255, 140, 0)`, (255, 77, 0) on the LEDs after the
   gamma correction of Framebuffer_GFX (a lower green looks red).
 - Battery voltage on GPIO 34 (ADC1, works with WiFi), read by `stepBattery()` in `handleEvents` once a second.
-  `BatteryMonitor` keeps the median of the last 15 readings (no level for the first 15 s), maps raw 1900..2660
-  (12-bit, AWTRIX3 values x4, not calibrated yet; ~2710 when charging) linearly to 0..100 %. LOW < 10 %,
-  CRITICAL < 5 %, a level is left 2 % above its threshold (hysteresis).
+  `BatteryMonitor` keeps the median of the last 15 readings (no level for the first 15 s) and compares it with
+  raw thresholds measured by one discharge (2026-11-24, full brightness, white countdown: 2514 after
+  unplugging, off at 2256 after 112 min, ~2700 when charging): LOW < 2321 (~30 min left), CRITICAL < 2288
+  (~10 min left), a level is left 10 above its threshold (hysteresis). Fewer lit LEDs = less voltage sag, so
+  the time left is approximate (+-5 min). Recalibrate with the dev console `battlog`.
 - CRITICAL: the 15x7 battery icon joins the icon cycle.
 - Connection: after each data refresh `main.cpp` updates `ConnectionAlert` (`nextConnectionAlert`) and passes it
   to `Hw::setConnectionAlert()`. A failed refresh with WiFi disconnected = WiFi problem (amber pixel; 25x8 icon: amber WiFi symbol crossed out

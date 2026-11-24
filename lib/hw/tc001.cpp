@@ -11,6 +11,9 @@
 #include <bcpevent.h>
 #include <countdown.h>
 #include <policy.h>
+#ifdef BCP_DEV
+#include <Preferences.h>
+#endif
 
 #define PIN_BUZZER          15
 #define PIN_MID_BUTTON      27
@@ -397,7 +400,8 @@ void Tc001::stepBattery() {
     BatteryLevel level = battery.level();
 #ifdef BCP_DEV
     batteryRaw = raw;
-    if (simulatedBatteryPercent >= 0) level = nextBatteryLevel(BATTERY_UNKNOWN, simulatedBatteryPercent);
+    stepBatteryLog();
+    if (simulatedBatteryRaw >= 0) level = nextBatteryLevel(BATTERY_UNKNOWN, simulatedBatteryRaw);
 #endif
     batteryLevel = level;
     indicatorActive[INDICATOR_LOW_BATTERY] = level == BATTERY_LOW || level == BATTERY_CRITICAL;
@@ -420,8 +424,74 @@ void Tc001::reboot() {
 #ifdef BCP_DEV
 uint32_t Tc001::countdownDraws = 0;
 volatile BeepSignal Tc001::beepRequest = BEEP_NONE;
-volatile int Tc001::simulatedBatteryPercent = -1;
+volatile int Tc001::simulatedBatteryRaw = -1;
 uint16_t Tc001::batteryRaw = 0;
+
+// ---- Battery calibration log ----
+// Runs in handleEvents. The whole log is one NVS blob rewritten at every sample (2 kB, fine for a one-off
+// discharge measurement); the recording state is restored after a restart.
+
+static constexpr int BATTERY_LOG_SIZE = 1024;
+static uint16_t batteryLog[BATTERY_LOG_SIZE];
+static uint16_t batteryLogCount = 0;
+static uint16_t batteryLogInterval = 60;    // seconds
+static bool batteryLogRecording = false;
+static unsigned long batteryLogAt = 0;      // millis() of the last sample
+static bool batteryLogLoaded = false;
+volatile int Tc001::batteryLogRequest = 0;
+
+static void saveBatteryLog() {
+    Preferences prefs;
+    prefs.begin("battlog", false);
+    prefs.putBool("on", batteryLogRecording);
+    prefs.putUShort("interval", batteryLogInterval);
+    prefs.putUShort("count", batteryLogCount);
+    prefs.putBytes("data", batteryLog, batteryLogCount * sizeof(uint16_t));
+    prefs.end();
+}
+
+void Tc001::stepBatteryLog() {
+    if (!batteryLogLoaded) {
+        batteryLogLoaded = true;
+        Preferences prefs;
+        prefs.begin("battlog", true);
+        batteryLogRecording = prefs.getBool("on", false);
+        batteryLogInterval = prefs.getUShort("interval", 60);
+        batteryLogCount = prefs.getUShort("count", 0);
+        if (batteryLogCount > BATTERY_LOG_SIZE) batteryLogCount = 0;
+        prefs.getBytes("data", batteryLog, batteryLogCount * sizeof(uint16_t));
+        prefs.end();
+    }
+    int request = batteryLogRequest;
+    if (request != 0) {
+        batteryLogRequest = 0;
+        if (request > 0) {
+            batteryLogCount = 0;
+            batteryLogInterval = request;
+            batteryLogRecording = true;
+            batteryLogAt = millis();
+        } else {
+            batteryLogRecording = false;
+        }
+        saveBatteryLog();
+    }
+    if (!batteryLogRecording || batteryLogCount >= BATTERY_LOG_SIZE) return;
+    if (millis() - batteryLogAt < batteryLogInterval * 1000UL) return;
+    uint16_t median = battery.filteredRaw();
+    if (median == 0) return;  // window not full yet after a restart
+    batteryLogAt += batteryLogInterval * 1000UL;
+    batteryLog[batteryLogCount++] = median;
+    saveBatteryLog();
+}
+
+void Tc001::printBatteryLog(Print& out) {
+    out.printf("# battery log: %u samples, interval %u s, %s\n", batteryLogCount, batteryLogInterval,
+               batteryLogRecording ? "recording" : "stopped");
+    out.println("seconds,raw");
+    for (int i = 0; i < batteryLogCount; i++) {
+        out.printf("%lu,%u\n", (unsigned long)(i + 1) * batteryLogInterval, batteryLog[i]);
+    }
+}
 
 static constexpr uint32_t FORCE_PORTAL_MAGIC = 0xB0C1F0CE;
 RTC_NOINIT_ATTR static uint32_t forcePortalFlag;  // survives ESP.restart()
@@ -475,11 +545,10 @@ static const char *batteryLevelName(BatteryLevel level) {
 }
 
 void Tc001::printBattery(Print& out) {
-    uint16_t filtered = battery.filteredRaw();
-    out.printf("Battery: raw %u, median %u (%d %%), level %s", batteryRaw, filtered,
-               filtered ? batteryPercent(filtered) : -1, batteryLevelName(battery.level()));
-    if (simulatedBatteryPercent >= 0) {
-        out.printf(", simulated %d %% -> %s", (int)simulatedBatteryPercent, batteryLevelName(batteryLevel));
+    out.printf("Battery: raw %u, median %u, level %s (low < %u, critical < %u)", batteryRaw, battery.filteredRaw(),
+               batteryLevelName(battery.level()), BATTERY_RAW_LOW, BATTERY_RAW_CRITICAL);
+    if (simulatedBatteryRaw >= 0) {
+        out.printf(", simulated %d -> %s", (int)simulatedBatteryRaw, batteryLevelName(batteryLevel));
     }
     out.println();
 }

@@ -10,8 +10,10 @@
   `fake <mode> [sec] [length] [round/rounds]` (fake event data: `name`, `round`, `start`, `run`, `pause`,
   `over`, `off`; BCP is not contacted while active), `bcpfail on|off` (simulated BCP connection errors), `wififail on|off` (simulated WiFi outage: the refresh
   fails and main sees WiFi as disconnected, no reconnect),
-  `battery [pct|off]` (raw / median / percent / level; `pct` simulates a charge level, `off` returns to the
-  real reading), `portal` (reboot into the captive portal), `reboot`. `screen` includes the status overlay as
+  `battery [raw|off]` (raw / median / level; `raw` simulates the ADC median, e.g. `2300` = low, `2280` =
+  critical, `off` returns to the real reading), `battlog [start [sec]|stop]` (battery calibration log: the median every `sec` seconds, default 60,
+  up to 1024 samples in NVS namespace `battlog`; survives power loss and restarts, `start` erases the previous
+  log, no argument prints CSV `seconds,raw`; seconds count samples, so the gap of a restart is not included), `portal` (reboot into the captive portal), `reboot`. `screen` includes the status overlay as
   it was last shown (`A` = amber). `status` shows the connection alert and the reboot count.
 - Helpers in `tools/`: run `python tools/devmon.py` (PlatformIO's python, it needs pyserial) in the background (keeps the port
   open so the device is not reset, logs to `.pio/dev.log`, reads commands from `.pio/dev.fifo`), then

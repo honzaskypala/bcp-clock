@@ -58,9 +58,17 @@ public:
     static volatile BeepSignal beepRequest;
     void rebootToPortal();           // reboot and start the captive portal as if Mid was held
     static void printBattery(Print& out);
-    static void simulateBattery(int percent) { simulatedBatteryPercent = percent; }  // -1 = real reading
-    static volatile int simulatedBatteryPercent;
+    static void simulateBattery(int raw) { simulatedBatteryRaw = raw; }  // -1 = real reading
+    static volatile int simulatedBatteryRaw;
     static uint16_t batteryRaw;      // last ADC reading
+    // Battery calibration log: median every interval stored in NVS, survives power loss
+    static void startBatteryLog(uint16_t intervalSec) { batteryLogRequest = intervalSec; }
+    static void stopBatteryLog() { batteryLogRequest = -1; }
+    static void printBatteryLog(Print& out);
+private:
+    static volatile int batteryLogRequest;  // 0 none, > 0 start with this interval (s), -1 stop
+    static void stepBatteryLog();           // called from stepBattery()
+public:
 #endif
 
 private:

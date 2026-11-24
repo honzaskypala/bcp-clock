@@ -6,22 +6,16 @@
 
 // ---- Battery level ----
 
-int batteryPercent(uint16_t raw) {
-    if (raw <= BATTERY_RAW_EMPTY) return 0;
-    if (raw >= BATTERY_RAW_FULL) return 100;
-    return (int)(raw - BATTERY_RAW_EMPTY) * 100 / (BATTERY_RAW_FULL - BATTERY_RAW_EMPTY);
-}
-
-static BatteryLevel classifyPercent(int percent) {
-    if (percent < BATTERY_CRITICAL_PERCENT) return BATTERY_CRITICAL;
-    if (percent < BATTERY_LOW_PERCENT) return BATTERY_LOW;
+static BatteryLevel classifyRaw(int raw) {
+    if (raw < BATTERY_RAW_CRITICAL) return BATTERY_CRITICAL;
+    if (raw < BATTERY_RAW_LOW) return BATTERY_LOW;
     return BATTERY_OK;
 }
 
-BatteryLevel nextBatteryLevel(BatteryLevel current, int percent) {
-    BatteryLevel now = classifyPercent(percent);
+BatteryLevel nextBatteryLevel(BatteryLevel current, uint16_t raw) {
+    BatteryLevel now = classifyRaw(raw);
     if (current == BATTERY_UNKNOWN || now > current) return now;
-    BatteryLevel withHysteresis = classifyPercent(percent - BATTERY_HYSTERESIS_PERCENT);
+    BatteryLevel withHysteresis = classifyRaw((int)raw - BATTERY_RAW_HYSTERESIS);
     return withHysteresis < current ? withHysteresis : current;
 }
 
@@ -31,7 +25,7 @@ void BatteryMonitor::addSample(uint16_t raw) {
     next_ = (next_ + 1) % WINDOW;
     if (count_ < WINDOW) count_++;
     if (count_ == WINDOW) {
-        level_ = nextBatteryLevel(level_, batteryPercent(filteredRaw()));
+        level_ = nextBatteryLevel(level_, filteredRaw());
     }
 }
 

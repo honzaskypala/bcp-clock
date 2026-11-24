@@ -3,7 +3,6 @@
 ## main related
 - [ ] offline mode, just run countdown from configurable time
 - [ ] chess clock functionality
-- [ ] [Battery] calibrate the battery thresholds: dev build on battery until it switches off, log `battery` readings
 
 ## TC001 hardware related
 - [ ] bliking every 0.5 sec instead of 1 sec
@@ -42,6 +41,7 @@ Requirements: stock firmware and its apps stay, BCP Clock is an extra app; every
 ## General
 
 ## Done
+- [x] [Hw] [Battery] Battery thresholds calibrated by one discharge (full brightness, white countdown, 112 min on battery, ADC median 2514 -> 2256): low < 2321 (~30 min left), critical < 2288 (~10 min left), hysteresis 10; percentages removed; dev console `battery [raw|off]` and `battlog [start [sec]|stop]` (calibration log in NVS)
 - [x] [Hw] Rounds >= 10 hours: countdown in hh:mm:ss shifted 2 px left (x=1) so it fits the display; a round starting with two-digit hours keeps them until the end (09:59:59, ...), also paused and time to start >= 10 h; over time stays -h:mm:ss (-hh:mm:ss does not fit)
 - [x] [Main] [Hw] Connection indicator: blinking status pixel amber (WiFi lost) or magenta (WiFi up, BCP connection or HTTP error), from the 4th failed refresh in a row a WiFi icon / unplugged plug icon in the alert cycle (content, battery, connection icon, 5 s each); WiFi outages now count toward the reboot after 5 failures like BCP connection errors; icon cycle moved to `lib/core/statusalert`; dev console `wififail on|off`, connection alert in `status`, `A` (amber) in `screen`; flash stays at 85.4 %
 - [x] [Hw] [Battery] Low battery warning: < 10 % blinking red status pixel top left, < 5 % red empty battery icon alternating with the content every 5 s (not during the config message after Mid); battery on GPIO 34, median of 15 readings, hysteresis 2 %; status overlay in `Tc001::showMatrix()` ready for more indicators stacked in column 0; dev console `battery [pct|off]`; flash +6.7 kB (84.9 % -> 85.4 %, of which 5.6 kB is the Arduino ADC driver), RAM +1 kB
