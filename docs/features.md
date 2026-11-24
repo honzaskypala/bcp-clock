@@ -24,15 +24,17 @@ A build of BCP-clock contains a chosen set of features. The choice is a **build 
 |---|---|---|
 | `configs/tc001.ini` | `tc001`, `tc001-dev` | TC001 release: all features |
 | `configs/tc001-minimal.ini` | `tc001-minimal`, `tc001-minimal-dev` | TC001, BCP mode without the optional features (build check) |
+| `configs/tc001-offline.ini` | `tc001-offline`, `tc001-offline-dev` | TC001 without network: offline mode and battery monitoring, no WiFi, no config page |
 
 ## Features
 
 | Define | Contents | Requires |
 |---|---|---|
-| `BCP_FEATURE_WIFIMGR` | WiFi manager: stored networks, captive portal (Mid held at power-on), NTP + RTC time sync, stored networks on the config page, hostname setting (DHCP) | – |
+| `BCP_FEATURE_WIFIMGR` | WiFi manager: stored networks, captive portal (Mid held at power-on), NTP + RTC time sync, the config page (with the stored networks and the hostname setting) | – |
 | `BCP_FEATURE_MDNS` | Config page at `http://<hostname>.local` | `WIFIMGR` |
 | `BCP_FEATURE_BATTERY` | Battery voltage monitoring: low battery status pixel and icon, dev console `battery`, `battlog` | – |
 | `BCP_FEATURE_CONNECTION_MONITOR` | WiFi / BCP status pixels and icons, reboot after 5 consecutive failed refreshes, dev console connection status | `BCP_MODE_BCP` |
+| `BCP_MODE_OFFLINE` | Offline mode (`src/offlinemode.*`): round length on the config page, state in NVS `state/offline`, dev console `offline` status line | – |
 | `BCP_MODE_BCP` | BCP mode (`src/bcpmode.*`, `lib/bcp`): event field on the config page, event name / round / countdown with the round indicator, dev console `refresh`, `fake`, `bcpfail`, `wififail` and the event status | `WIFIMGR` |
 
 A build needs at least one mode (`BCP_MODE_*`), the build fails otherwise. Modes are switched by a short press of

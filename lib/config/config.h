@@ -16,6 +16,9 @@ struct ConfigValues {
     bool beep;          // acoustic signals at thresholds
     String hostname;
     uint8_t mode;       // ModeId of the last mode
+#if BCP_MODE_OFFLINE
+    long offline;       // seconds, length of the offline countdown
+#endif
 };
 
 // Reads the configuration from an opened Preferences namespace, defaults for missing keys
@@ -30,9 +33,15 @@ public:
     bool isAcousticSignalsEnabled() const { return beep_; }
     const String& hostname() const { return hostname_; }
     uint8_t mode() const { return mode_; }  // ModeId of the last mode, also when not in the build
+#if BCP_MODE_OFFLINE
+    long offlineLength() const { return offline_; }
+#endif
 
     // ---- State saved outside the config page ----
     void setMode(uint8_t mode);             // saved right away
+    // State of a mode (plain data) in NVS namespace "state"; load fails if missing or of another size
+    bool loadState(const char *key, void *data, size_t size);
+    void saveState(const char *key, const void *data, size_t size);
 
     // ---- Erase configuration from persistent storage ----
     void erase();
@@ -57,6 +66,9 @@ private:
     bool beep_;
     String hostname_;
     uint8_t mode_;
+#if BCP_MODE_OFFLINE
+    long offline_;
+#endif
     void savePreferences();
     
     // ---- Configuration HTTP server ----

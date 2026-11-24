@@ -35,12 +35,13 @@ constexpr const char* NTP_TIME_SYNC_FAIL_MSG = "Error: NTP time sync failed";
 CWifiMgr WifiMgr;
 
 // ---------- Public API ----------
-bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrMsg) {
+bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrMsg, bool allowPortal) {
     usrMsg_ = usrMsg;
 
     WIFIMGR_DEBUG("Attempting automatic WiFi connection.");
     connected_ = false;
     timeSyncFailed_ = false;
+    abortPortal_ = false;
 
     if (!scanAndSort()) {
         WIFIMGR_DEBUG("Scan failed or found no networks.");
@@ -56,8 +57,16 @@ bool CWifiMgr::connect(bool enforcePortal, uint32_t portalTimeoutMs, Print *usrM
         }
     }
 
+    if (!allowPortal && !enforcePortal) {
+        WIFIMGR_DEBUG("No network connected, continuing without WiFi.");
+        freeScanData();
+        return false;
+    }
     runPortal(portalTimeoutMs);
     freeScanData();
+    if (!connected_) {
+        stopPortal();  // timeout or aborted: the caller continues without WiFi or reboots
+    }
     return connected_;
 }
 
@@ -80,6 +89,10 @@ void CWifiMgr::runPortal(uint32_t timeoutMs) {
         delay(10);
         if (timeoutMs > 0 && (millis() - lastPortalActivityMs_) > timeoutMs) {
             WIFIMGR_DEBUG("Portal timeout reached, exiting without WiFi.");
+            break;
+        }
+        if (abortPortal_) {
+            WIFIMGR_DEBUG("Portal aborted, exiting without WiFi.");
             break;
         }
     }

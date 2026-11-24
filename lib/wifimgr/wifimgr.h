@@ -13,7 +13,10 @@
 class CWifiMgr {
 public:
     // ---- Public API ----
-    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0, Print *usrMsg = &Serial);
+    // allowPortal = false: only known and open networks, no captive portal when they fail (unless enforcePortal)
+    bool connect(bool enforcePortal = false, uint32_t portalTimeoutMs = 0, Print *usrMsg = &Serial,
+                 bool allowPortal = true);
+    void abortPortal() { abortPortal_ = true; }  // from another task: leave the portal without a connection
     bool isConnected() const { return connected_; }
     bool eraseStoredNetworks();
     bool listStoredNetworks(std::vector<String>& out);
@@ -27,6 +30,7 @@ private:
 
     // ---- Core state ----
     volatile bool connected_ = false;
+    volatile bool abortPortal_ = false;
 
     // ---- Core steps ----
     bool scanAndSort();

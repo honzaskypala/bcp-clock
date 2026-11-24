@@ -18,6 +18,7 @@ class Mode {
 public:
     virtual ModeId id() const = 0;
     virtual const char *name() const = 0;     // shown after switching, font f3x5
+    virtual bool needsNetwork() const { return false; }  // true: WiFi must be connected before enter()
     virtual void enter(Hw& hw) = 0;           // became the current mode (also at boot)
     virtual void leave(Hw& hw) {}
     virtual void tick(Hw& hw) = 0;            // every loop()

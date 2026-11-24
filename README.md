@@ -56,6 +56,29 @@ The clock works in one of several modes; a short press of the middle button swit
 | Mode | Name on the display | What it does |
 |---|---|---|
 | BCP mode | `BCP` | Countdown of the round timer of a tournament on Best Coast Pairings (see below) |
+| Offline mode | `Offline` | Countdown of a round length set on the configuration page, started and paused with the buttons; no internet needed |
+
+### Offline mode
+
+A countdown for games without Best Coast Pairings. Its length is set on the configuration page (default
+`1:00:00`). It uses the same colours, yellow and red thresholds and acoustic signals as BCP mode; there is no
+round indicator and no connection indicator (the low battery warning stays).
+
+| Button | Action |
+|---|---|
+| Right | Starts the countdown, or resumes it when paused |
+| Middle (short) | Running: pauses it (the time blinks magenta). Stopped: switches to the next mode |
+| Left | Stopped: resets it to the configured length. Running: nothing |
+
+The countdown is computed from its end time, so it keeps running while the clock is switched off or in
+another mode, and continues as if nothing happened when you come back. A white time is a countdown that has
+not been started yet. After zero it keeps counting into overtime in red. A new length from the configuration
+page applies at once to a countdown that has not been started, otherwise after the next reset.
+
+Without WiFi: when the clock starts in a mode that does not need the internet and no stored network is
+available, it continues without WiFi (the time comes from the built-in clock chip); the configuration page is
+then not available, and holding the middle button shows `No WiFi`. When the clock waits in the WiFi setup portal
+for BCP mode, a short press of the middle button leaves it and continues in offline mode.
 
 ## What the display shows
 
@@ -115,9 +138,9 @@ Detailed hardware documentation is available at
 
 | Button | Held while powering on | Pressed while running |
 |---|---|---|
-| Left | – | not used in BCP mode |
+| Left | – | Offline mode: resets the countdown |
 | Middle | Opens the WiFi setup portal | Short press: switches to the next mode (if the firmware has more modes). Hold for 1 second: opens the configuration page (for 5 minutes) |
-| Right | – | BCP mode: refreshes the data from BCP immediately |
+| Right | – | BCP mode: refreshes the data from BCP immediately. Offline mode: starts / resumes the countdown |
 
 After a mode switch, the display shows the name of the new mode for 5 seconds (a name too long for the
 display scrolls once). Any button press ends it right away, and the button does its usual action too. The
@@ -239,6 +262,7 @@ The configuration page is available at `http://<IP of the clock>`, or at `http:/
 | Event | BCP event URL (e.g. `https://www.bestcoastpairings.com/event/AbCdEf123456`) or just the event ID | empty |
 | Yellow | Remaining time below which the countdown turns yellow, as `m:ss` or `h:mm:ss` | `10:00` |
 | Red | Remaining time below which the countdown turns red, as `m:ss` or `h:mm:ss` | `0:00` |
+| Offline mode: Round | Length of the offline mode countdown, as `h:mm:ss` or `m:ss` | `1:00:00` |
 | Acoustic signals | Beep when the countdown reaches a threshold: one long beep at yellow, three long beeps at red | on |
 | Hostname | Device name in the network: shown in the router's client list and used for the `.local` address of the configuration page. Letters, digits and hyphens, up to 32 characters. A change of the router name applies at the next WiFi connection. | `BCP-clock` |
 
@@ -263,6 +287,7 @@ All settings are stored in the ESP32's non-volatile memory and survive reboots a
 |---|---|
 | `src/main.cpp` | Main loop: modes, buttons, mode switching |
 | `src/bcpmode.*` | BCP mode: data refresh, display state decisions |
+| `src/offlinemode.*` | Offline mode: countdown controlled by the buttons |
 | `lib/bcp/` | Best Coast Pairings API client |
 | `lib/hw/` | Hardware abstraction and the TC001 implementation (matrix, buttons, display task) |
 | `lib/config/` | Settings storage and the configuration web server |
@@ -314,7 +339,6 @@ connected, the commit is stopped; `SKIP_DEVICE_TESTS=1 git commit` skips them. T
 
 Planned features and known tasks are tracked in [TODO.md](TODO.md). Highlights:
 
-- offline mode, counting down from a manually set time
 - chess clock mode
 - configurable display brightness
 

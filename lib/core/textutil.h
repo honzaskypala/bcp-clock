@@ -7,7 +7,7 @@
 #include <Arduino.h>
 #include <vector>
 
-// ---- Time thresholds ("m:ss", "m.ss" or minutes) ----
+// ---- Durations ("h:mm:ss", "m:ss", "m.ss" or minutes; a leading "-" negates) ----
 String secondsToTime(long seconds);
 long timeToSeconds(const String& time);
 

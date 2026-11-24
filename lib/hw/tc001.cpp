@@ -6,7 +6,12 @@
 
 #include <f3x5.h>
 #include <f4x6.h>
+#include <WiFi.h>
+#include <sys/time.h>
+#include <RTClib.h>
+#if BCP_FEATURE_WIFIMGR
 #include <wifimgr.h>
+#endif
 #include <config.h>
 #if BCP_MODE_BCP
 #include <bcpevent.h>
@@ -63,6 +68,8 @@ long Tc001::lastRemaining[MAX_COUNTDOWN_TIMERS] = { LONG_MIN, LONG_MIN };
 CountdownDisplay Tc001::countdown;
 unsigned long Tc001::messageUntil = 0;
 volatile bool Tc001::buttonsEnabled = false;
+volatile bool Tc001::connecting = false;
+volatile bool Tc001::connectAbortable = false;
 static QueueHandle_t buttonQueue = nullptr;  // ButtonEvent from handleEvents to loop(), created in the ctor
 static PressDetector leftButton, midButton, rightButton;  // set in ensureConnection()
 BeepSignal Tc001::beepSignal = BEEP_NONE;
@@ -122,8 +129,8 @@ Tc001::Tc001() {
 }
 
 void Tc001::stopAnimations() {
-    if (scrollingText && scrollingText->isActive) {
-        scrollingText->isActive = false;
+    if (scrollingText) {
+        // also a finished one, else a message shown next would look finished at once
         delete scrollingText;
         scrollingText = nullptr;
     }
@@ -305,7 +312,8 @@ void Tc001::drawCountdown() {
     matrix.setFont(view.hmmss ? hmmssFont : mmssFont);
 
     matrix.clear();
-    matrix.setCursor(view.x, 6);
+    // above the round indicator in the bottom row, else vertically centred one row lower
+    matrix.setCursor(view.x, countdown.numberOfRounds > 0 ? 6 : 7);
     matrix.print(view.text);
     if (countdown.numberOfRounds > 0) {
         displayRoundWithCountdown(countdown.currentRound, countdown.numberOfRounds);
@@ -663,13 +671,19 @@ void Tc001::simulateButton(ButtonEvent event) {
 void Tc001::stepButtons() {
     if (!buttonsEnabled) return;
     unsigned long now = millis();
-    if (leftButton.update(digitalRead(PIN_LEFT_BUTTON) == LOW, now) == PRESS_DOWN) queueButton(BUTTON_LEFT);
-    if (rightButton.update(digitalRead(PIN_RIGHT_BUTTON) == LOW, now) == PRESS_DOWN) queueButton(BUTTON_RIGHT);
-    switch (midButton.update(digitalRead(PIN_MID_BUTTON) == LOW, now)) {
-        case PRESS_SHORT: queueButton(BUTTON_MID_SHORT); break;
-        case PRESS_LONG:  queueButton(BUTTON_MID_LONG); break;
-        default: break;
+    PressKind left = leftButton.update(digitalRead(PIN_LEFT_BUTTON) == LOW, now);
+    PressKind right = rightButton.update(digitalRead(PIN_RIGHT_BUTTON) == LOW, now);
+    PressKind mid = midButton.update(digitalRead(PIN_MID_BUTTON) == LOW, now);
+    if (connecting) {
+#if BCP_FEATURE_WIFIMGR
+        if (mid == PRESS_SHORT && connectAbortable) WifiMgr.abortPortal();
+#endif
+        return;  // presses while connecting are not passed to the modes
     }
+    if (left == PRESS_DOWN) queueButton(BUTTON_LEFT);
+    if (right == PRESS_DOWN) queueButton(BUTTON_RIGHT);
+    if (mid == PRESS_SHORT) queueButton(BUTTON_MID_SHORT);
+    if (mid == PRESS_LONG) queueButton(BUTTON_MID_LONG);
 }
 
 ButtonEvent Tc001::nextButtonEvent() {
@@ -682,21 +696,45 @@ ButtonEvent Tc001::nextButtonEvent() {
     return event;
 }
 
-bool Tc001::ensureConnection() {
-    bool enforcePortal = digitalRead(PIN_MID_BUTTON) == LOW;   // if mid button pressed, enforce portal with no timeout
+bool Tc001::ensureConnection(bool required, bool abortable) {
+    bool enforcePortal = false;
+    if (!buttonsEnabled) {
+        // first attempt (boot): Mid held = portal with no timeout; a button still held counts only after
+        // its release
+        enforcePortal = digitalRead(PIN_MID_BUTTON) == LOW;
 #ifdef BCP_DEV
-    if (forcePortalFlag == FORCE_PORTAL_MAGIC) enforcePortal = true;
-    forcePortalFlag = 0;
+        if (forcePortalFlag == FORCE_PORTAL_MAGIC) enforcePortal = true;
+        forcePortalFlag = 0;
 #endif
-    bool retValue = WifiMgr.connect(enforcePortal, enforcePortal ? 0 : PORTAL_TIMEOUT_MS, this);
-    if (retValue) {
-        // a button still held (Mid for the portal) counts only after its release
         leftButton = PressDetector(digitalRead(PIN_LEFT_BUTTON) == LOW);
         midButton = PressDetector(digitalRead(PIN_MID_BUTTON) == LOW);
         rightButton = PressDetector(digitalRead(PIN_RIGHT_BUTTON) == LOW);
         buttonsEnabled = true;
     }
-    return retValue;
+    bool connected = false;
+#if BCP_FEATURE_WIFIMGR
+    connectAbortable = abortable;
+    connecting = true;
+    connected = WifiMgr.connect(enforcePortal, enforcePortal ? 0 : PORTAL_TIMEOUT_MS, this, required);
+    connecting = false;
+#endif
+    if (!connected) setTimeFromRtc();
+    return connected;
+}
+
+bool Tc001::isConnected() {
+    return WiFi.status() == WL_CONNECTED;
+}
+
+// The RTC keeps the time while the clock is off (written after each NTP sync)
+void Tc001::setTimeFromRtc() {
+    static const uint32_t MIN_PLAUSIBLE_EPOCH = 1763487357;   // 2025-11-18, older RTC time is considered invalid
+    RTC_DS1307 rtc;
+    if (!rtc.begin() || rtc.now().unixtime() <= MIN_PLAUSIBLE_EPOCH) return;
+    struct timeval tv;
+    tv.tv_sec = rtc.now().unixtime();
+    tv.tv_usec = 0;
+    settimeofday(&tv, nullptr);
 }
 
 // Advances the animations and the countdown that are due, returns true if the matrix needs to be shown.
@@ -743,9 +781,11 @@ void Tc001::handleEvents(void * parameter) {
     while (true) {
         stepButtons();
 
+#if BCP_FEATURE_WIFIMGR
         if (Config.isConfigServerRunning()) {
             Config.handleClient();
         }
+#endif
 
         {
             DisplayLock lock;  // released before vTaskDelay()

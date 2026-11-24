@@ -17,6 +17,12 @@ static void test_timeToSeconds_formats() {
     TEST_ASSERT_EQUAL(300, timeToSeconds("05.00"));
     TEST_ASSERT_EQUAL(125, timeToSeconds(" 2:05 "));
     TEST_ASSERT_EQUAL(600, timeToSeconds("10:00"));
+    TEST_ASSERT_EQUAL(3600, timeToSeconds("1:00:00"));
+    TEST_ASSERT_EQUAL(5430, timeToSeconds("1:30:30"));
+    TEST_ASSERT_EQUAL(36000, timeToSeconds("10:00:00"));
+    TEST_ASSERT_EQUAL(3600, timeToSeconds("60:00"));
+    TEST_ASSERT_EQUAL(-90, timeToSeconds("-1:30"));
+    TEST_ASSERT_EQUAL(-3600, timeToSeconds("-1:00:00"));
 }
 
 // Documents current behaviour for unusual input
@@ -33,11 +39,15 @@ static void test_secondsToTime() {
     TEST_ASSERT_EQUAL_STRING("0:59", secondsToTime(59).c_str());
     TEST_ASSERT_EQUAL_STRING("1:00", secondsToTime(60).c_str());
     TEST_ASSERT_EQUAL_STRING("10:00", secondsToTime(600).c_str());
-    TEST_ASSERT_EQUAL_STRING("60:00", secondsToTime(3600).c_str());
+    TEST_ASSERT_EQUAL_STRING("59:59", secondsToTime(3599).c_str());
+    TEST_ASSERT_EQUAL_STRING("1:00:00", secondsToTime(3600).c_str());
+    TEST_ASSERT_EQUAL_STRING("2:05:09", secondsToTime(7509).c_str());
+    TEST_ASSERT_EQUAL_STRING("-1:30", secondsToTime(-90).c_str());
+    TEST_ASSERT_EQUAL_STRING("-1:00:00", secondsToTime(-3600).c_str());
 }
 
 static void test_timeRoundTrip() {
-    for (long n = 0; n <= 7200; n++) {
+    for (long n = -7200; n <= 40000; n++) {
         TEST_ASSERT_EQUAL(n, timeToSeconds(secondsToTime(n)));
     }
 }

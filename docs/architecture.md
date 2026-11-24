@@ -24,6 +24,17 @@
   single mode ignores the short Mid press (only ends a message).
 - BCP mode (`src/bcpmode.*`): the former main loop. Leaving it switches the connection alert off and gives a
   config server running with no timeout (invalid event ID) the normal timeout; entering it refreshes at once.
+- Offline mode (`src/offlinemode.*`): one `ManualTimer` (`lib/core/manualtimer`: ready / running with an end
+  epoch / paused with the remaining seconds), button logic in `handleOfflineButton()`; saved with
+  `Config.saveState()` at every change and loaded at the first `enter()`, so it runs on while the clock is off or
+  in another mode. A countdown without a round indicator is drawn one row lower (vertically centred).
+- Network: `Mode::needsNetwork()` (BCP mode). At boot a mode that needs it calls `ensureConnection(required)`
+  (portal with timeout); other modes try the stored networks only (`WifiMgr.connect(..., allowPortal=false)`,
+  portal only with Mid held) and run without WiFi, the time then comes from the RTC (`Tc001::setTimeFromRtc()`,
+  it keeps the time while the clock is off). Switching to a mode that needs the network while offline connects
+  first. A short Mid press during the connection (`Tc001::connecting`) leaves the portal (`WifiMgr.abortPortal()`)
+  when the build has a mode without network, which is entered instead; other presses are dropped. Long Mid
+  without WiFi shows `No WiFi` (like a mode name).
 - A countdown is passed to the `Hw` as a `CountdownDisplay` copy (`lib/core/countdown.h`: one `CountdownTimer` per
   player, thresholds, round indicator), never as a pointer to mode data, so `handleEvents` never reads data that
   `loop()` is changing. `displayCountdown()` starts a countdown (the first redraw never beeps),
@@ -102,7 +113,9 @@ connects or NTP fails) → `BCPEvent.setID(Config.eventId())`. An invalid/empty 
 server with no timeout and scrolls "Config page http://<IP>".
 
 ## Persistent storage (NVS / Preferences)
-- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`, `mode` (uchar `ModeId` of the last mode, saved at each switch).
+- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`, `mode` (uchar `ModeId` of the last mode, saved at each switch), `offline` (long seconds, offline mode length).
+- Namespace `state`: plain data of the modes (`Config.loadState()` / `saveState()`, ignored when the size differs):
+  `offline` (`ManualTimer`).
 - Namespace `wificreds`: `__ssids` (newline-separated list), `pwd_<fnv1a32(ssid) hex>` per network.
 - Config web form (`/`, `POST /config`, `/wifi/delete`, `/wifi/deleteAll`) also lists/deletes stored WiFi networks.
 

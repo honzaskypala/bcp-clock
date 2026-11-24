@@ -19,6 +19,7 @@ class BcpMode : public Mode {
 public:
     ModeId id() const override { return MODE_BCP; }
     const char *name() const override { return "BCP"; }
+    bool needsNetwork() const override { return true; }
     void enter(Hw& hw) override;
     void leave(Hw& hw) override;
     void tick(Hw& hw) override;

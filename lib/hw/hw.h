@@ -17,7 +17,11 @@
 class Hw {
 public:
     virtual void showSplashScreen(bool showProgress = true) {};
-    virtual bool ensureConnection() = 0;
+    // Connects to WiFi (blocking, shows the progress). required: the captive portal runs when no network
+    // connects (5 min, then false); otherwise only stored and open networks are tried. abortable: a short Mid
+    // press leaves the portal (false is returned). Without a connection the time is taken from the RTC.
+    virtual bool ensureConnection(bool required, bool abortable) = 0;
+    virtual bool isConnected() = 0;
 
     static volatile DisplayState displayState;
     static volatile bool enforceUpdate;    // refresh BCP data now (dev console)

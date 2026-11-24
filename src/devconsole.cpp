@@ -15,6 +15,9 @@
 #include <bcpevent.h>
 #include "bcpmode.h"
 #endif
+#if BCP_MODE_OFFLINE
+#include "offlinemode.h"
+#endif
 
 static long timeShift_ = 0;  // total seconds the system clock was shifted by "timeshift"
 bool devWifiFailing = false;
@@ -63,6 +66,11 @@ static void handleStatus(Hw *hw) {
     Serial.printf("config: event=%s yellow=%ld red=%ld beep=%s\n",
                   Config.eventId().c_str(), Config.yellowThreshold(), Config.redThreshold(),
                   Config.isAcousticSignalsEnabled() ? "on" : "off");
+#if BCP_MODE_OFFLINE
+    static const char *timerStates[] = { "ready", "running", "paused" };
+    Serial.printf("offline: %s, remaining=%ld s, length=%ld s\n", timerStates[offlineMode.timer().state % 3],
+                  offlineMode.timer().remainingAt(now), Config.offlineLength());
+#endif
 #if BCP_MODE_BCP
     Serial.printf("event: id=%s valid=%d invalid=%d fake=%d bcpfail=%d lastStatus=%d name=\"%s\"\n",
                   BCPEvent.id().c_str(), BCPEvent.isValid(), BCPEvent.isInvalid(), BCPEvent.isFake(),

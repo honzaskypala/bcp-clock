@@ -28,6 +28,10 @@ static const long DEF_RED    = 0;   // seconds
 static const bool DEF_BEEP   = true;
 static const String DEF_HOSTNAME = "BCP-clock";
 static const uint8_t DEF_MODE = 0;   // MODE_BCP, the first mode of the build if not in it
+#if BCP_MODE_OFFLINE
+static const long DEF_OFFLINE = 3600; // seconds
+#endif
+static constexpr const char* STATE_NS = "state";
 static constexpr const char* CONFIG_NS = "config";
 // ---- Read configuration values from an opened Preferences namespace ----
 
@@ -49,6 +53,9 @@ ConfigValues readConfig(Preferences& prefs) {
     v.beep = prefs.getBool("beep", DEF_BEEP);
     v.hostname = sanitizeHostname(prefs.getString("hostname", DEF_HOSTNAME));
     v.mode = prefs.getUChar("mode", DEF_MODE);
+#if BCP_MODE_OFFLINE
+    v.offline = prefs.getLong("offline", DEF_OFFLINE);
+#endif
     return v;
 }
 
@@ -62,6 +69,9 @@ CConfig::CConfig() {
     beep_ = DEF_BEEP;
     hostname_ = DEF_HOSTNAME;
     mode_ = DEF_MODE;
+#if BCP_MODE_OFFLINE
+    offline_ = DEF_OFFLINE;
+#endif
 
     // Load configuration from persistent storage if available
     if (!ensureNvsReady()) {
@@ -80,6 +90,9 @@ CConfig::CConfig() {
     beep_     = v.beep;
     hostname_ = v.hostname;
     mode_     = v.mode;
+#if BCP_MODE_OFFLINE
+    offline_  = v.offline;
+#endif
     prefs.end();
     CONFIG_DEBUG("Preferences loaded");
 }
@@ -102,6 +115,9 @@ void CConfig::savePreferences() {
     prefs.putLong("red", red_);
     prefs.putBool("beep", beep_);
     prefs.putString("hostname", hostname_);
+#if BCP_MODE_OFFLINE
+    prefs.putLong("offline", offline_);
+#endif
     prefs.end();
     CONFIG_DEBUG("Preferences saved");
 }
@@ -116,6 +132,26 @@ void CConfig::setMode(uint8_t mode) {
         return;
     }
     prefs.putUChar("mode", mode_);
+    prefs.end();
+}
+
+bool CConfig::loadState(const char *key, void *data, size_t size) {
+    if (!ensureNvsReady()) return false;
+    Preferences prefs;
+    if (!prefs.begin(STATE_NS, true)) return false;  // fails until the namespace exists
+    bool ok = prefs.getBytesLength(key) == size && prefs.getBytes(key, data, size) == size;
+    prefs.end();
+    return ok;
+}
+
+void CConfig::saveState(const char *key, const void *data, size_t size) {
+    if (!ensureNvsReady()) return;
+    Preferences prefs;
+    if (!prefs.begin(STATE_NS, false)) {
+        CONFIG_DEBUG("Failed to open state for writing");
+        return;
+    }
+    prefs.putBytes(key, data, size);
     prefs.end();
 }
 
@@ -142,6 +178,9 @@ void CConfig::erase() {
     beep_ = DEF_BEEP;
     hostname_ = DEF_HOSTNAME;
     mode_ = DEF_MODE;
+#if BCP_MODE_OFFLINE
+    offline_ = DEF_OFFLINE;
+#endif
 }
 
 // ---- Configuration HTTP server ----
@@ -300,6 +339,13 @@ void CConfig::appendConfigFormHtml(String& html) {
                 "<input type='checkbox' id='beep' name='beep' value='1'" + (beep_ ? " checked" : "") + ">"
                 "<label for='beep'>Acoustic signals</label>"
             "</div>";
+#if BCP_MODE_OFFLINE
+    html += WebUI::buildSectionHeader("Offline mode");
+    html += "<div class='row'>"
+                "<label for='offline'>Round:</label>"
+                "<input type='text' id='offline' name='offline' value='" + secondsToTime(offline_) + "'>"
+            "</div>";
+#endif
 #if BCP_FEATURE_WIFIMGR
     html += WebUI::buildSectionHeader("Network");
     html += "<div class='row'>"
@@ -325,6 +371,12 @@ void CConfig::handleConfigPost() {
     if (configServer->hasArg("red")) {
         red_ = timeToSeconds(configServer->arg("red"));
     }
+#if BCP_MODE_OFFLINE
+    if (configServer->hasArg("offline")) {
+        long offline = timeToSeconds(configServer->arg("offline"));
+        if (offline > 0) offline_ = offline;  // keep the previous length on an invalid value
+    }
+#endif
     if (configServer->hasArg("hostname")) {
         String hostname = sanitizeHostname(configServer->arg("hostname"));
         if (hostname != hostname_) {

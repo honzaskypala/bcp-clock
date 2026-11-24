@@ -37,13 +37,14 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
 enum TimerPhase : uint8_t {
     TIMER_RUNNING,  // remaining = endEpoch - now
     TIMER_PAUSED,   // remaining fixed, blinks magenta
-    TIMER_READY     // not started (reset), remaining fixed, white
+    TIMER_READY,    // not started (reset), remaining fixed, white
+    TIMER_WAITING   // stopped, remaining fixed, colours by the thresholds (chess player not on turn)
 };
 
 struct CountdownTimer {
     TimerPhase phase = TIMER_READY;
     time_t endEpoch = 0;     // TIMER_RUNNING
-    long remaining = 0;      // TIMER_PAUSED / TIMER_READY: seconds shown
+    long remaining = 0;      // not TIMER_RUNNING: seconds shown
     uint32_t length = 0;     // round length; up to one hour mm:ss, longer h:mm:ss
     bool startPhase = false; // remaining above length = time to the round start (BCP)
 

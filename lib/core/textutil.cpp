@@ -10,11 +10,16 @@ static constexpr unsigned int MAX_HOSTNAME_LEN = 32;   // ESP-IDF netif limit
 
 // ---- Time thresholds ----
 
+// m:ss below one hour, h:mm:ss from one hour
 String secondsToTime(long seconds) {
-    long m = seconds / 60;
-    long s = seconds % 60;
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%ld:%02ld", m, s);
+    const char *sign = seconds < 0 ? "-" : "";
+    long a = seconds < 0 ? -seconds : seconds;
+    char buf[20];
+    if (a >= 3600) {
+        snprintf(buf, sizeof(buf), "%s%ld:%02ld:%02ld", sign, a / 3600, (a % 3600) / 60, a % 60);
+    } else {
+        snprintf(buf, sizeof(buf), "%s%ld:%02ld", sign, a / 60, a % 60);
+    }
     return String(buf);
 }
 
@@ -22,17 +27,27 @@ long timeToSeconds(const String& time) {
     String t = time;
     t.replace(".", ":");  // if time entered as 05.00, replace dots by colons
     t.trim();
+    long sign = 1;
+    if (t.startsWith("-")) {
+        sign = -1;
+        t.remove(0, 1);
+    }
 
     int colonPos = t.indexOf(':');
     if (colonPos == -1) {
         // Interpret single number as minutes
-        long m = t.toInt();
-        return m * 60;
+        return sign * t.toInt() * 60;
     }
-
-    long m = t.substring(0, colonPos).toInt();
-    long s = t.substring(colonPos + 1).toInt();
-    return m * 60 + s;
+    int secondColon = t.indexOf(':', colonPos + 1);
+    if (secondColon == -1) {
+        // m:ss
+        return sign * (t.substring(0, colonPos).toInt() * 60 + t.substring(colonPos + 1).toInt());
+    }
+    // h:mm:ss
+    long h = t.substring(0, colonPos).toInt();
+    long m = t.substring(colonPos + 1, secondColon).toInt();
+    long s = t.substring(secondColon + 1).toInt();
+    return sign * (h * 3600 + m * 60 + s);
 }
 
 // ---- Hostname ----

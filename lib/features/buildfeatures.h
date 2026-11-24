@@ -9,14 +9,14 @@
 #pragma once
 
 #if !defined(BCP_FEATURE_WIFIMGR) || !defined(BCP_FEATURE_MDNS) || !defined(BCP_FEATURE_BATTERY) || \
-    !defined(BCP_FEATURE_CONNECTION_MONITOR) || !defined(BCP_MODE_BCP)
+    !defined(BCP_FEATURE_CONNECTION_MONITOR) || !defined(BCP_MODE_BCP) || !defined(BCP_MODE_OFFLINE)
 #error "Build feature not defined, build with an env from configs/*.ini (see docs/features.md)"
 #endif
 
 // ---- Dependencies ----
 
-#if !BCP_MODE_BCP
-#error "A build needs at least one mode: enable BCP_MODE_BCP"
+#if !BCP_MODE_BCP && !BCP_MODE_OFFLINE
+#error "A build needs at least one mode: enable BCP_MODE_BCP or BCP_MODE_OFFLINE"
 #endif
 
 #if BCP_MODE_BCP && !BCP_FEATURE_WIFIMGR

@@ -37,7 +37,8 @@ private:
 // ---- Hw interface and related methods ----
 public:
     virtual void showSplashScreen(bool showProgress = true) override;
-    virtual bool ensureConnection() override;
+    virtual bool ensureConnection(bool required, bool abortable) override;
+    virtual bool isConnected() override;
 
     virtual ButtonEvent nextButtonEvent() override;
 
@@ -101,7 +102,10 @@ private:
 
     // ---- Buttons ----
     // Polled by handleEvents (debounced, short / long Mid press), passed to loop() through a queue
-    static volatile bool buttonsEnabled;     // after the WiFi connection (Mid held at power-on = portal)
+    static volatile bool buttonsEnabled;     // from the first connection attempt (Mid held at power-on = portal)
+    static volatile bool connecting;         // in ensureConnection(): buttons are not queued
+    static volatile bool connectAbortable;   // a short Mid press aborts the portal
+    static void setTimeFromRtc();
     static void stepButtons();
     static void queueButton(ButtonEvent event);
     static void finishMessage();             // ends the mode name / config page address, requests a redraw
