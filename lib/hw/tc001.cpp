@@ -313,8 +313,24 @@ void Tc001::drawCountdown() {
 
     matrix.clear();
     // above the round indicator in the bottom row, else vertically centred one row lower
-    matrix.setCursor(view.x, countdown.numberOfRounds > 0 ? 6 : 7);
+    int x = view.x, y = countdown.numberOfRounds > 0 ? 6 : 7;
+
+    // chess clock: blue bar at the side of the player on turn; the time keeps its place, only a time
+    // touching the bar (hh:mm:ss is 31 px) moves one pixel away from it
+    bool bar = countdown.count > 1 && countdown.active >= 0;
+    int barX = countdown.active == 0 ? 0 : matrix.width() - 1;
+    if (bar) {
+        int16_t x1, y1;
+        uint16_t w, h;
+        matrix.getTextBounds(view.text, x, y, &x1, &y1, &w, &h);
+        if (barX == 0 && x1 <= 0) x += 1 - x1;
+        if (barX > 0 && x1 + (int) w > barX) x -= x1 + (int) w - barX;
+    }
+    matrix.setCursor(x, y);
     matrix.print(view.text);
+    if (bar) {
+        matrix.drawFastVLine(barX, 0, matrix.height(), COLOR_DEEPSKYBLUE);
+    }
     if (countdown.numberOfRounds > 0) {
         displayRoundWithCountdown(countdown.currentRound, countdown.numberOfRounds);
     }

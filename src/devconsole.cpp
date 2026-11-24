@@ -18,6 +18,9 @@
 #if BCP_MODE_OFFLINE
 #include "offlinemode.h"
 #endif
+#if BCP_MODE_CHESS
+#include "chessmode.h"
+#endif
 
 static long timeShift_ = 0;  // total seconds the system clock was shifted by "timeshift"
 bool devWifiFailing = false;
@@ -66,8 +69,16 @@ static void handleStatus(Hw *hw) {
     Serial.printf("config: event=%s yellow=%ld red=%ld beep=%s\n",
                   Config.eventId().c_str(), Config.yellowThreshold(), Config.redThreshold(),
                   Config.isAcousticSignalsEnabled() ? "on" : "off");
-#if BCP_MODE_OFFLINE
+#if BCP_MODE_OFFLINE || BCP_MODE_CHESS
     static const char *timerStates[] = { "ready", "running", "paused" };
+#endif
+#if BCP_MODE_CHESS
+    const ChessClock& chess = chessMode.clock();
+    Serial.printf("chess: active=%d, left %s %ld s, right %s %ld s, round=%ld s\n", chess.active,
+                  timerStates[chess.players[0].state % 3], chess.players[0].remainingAt(now),
+                  timerStates[chess.players[1].state % 3], chess.players[1].remainingAt(now), Config.chessLength());
+#endif
+#if BCP_MODE_OFFLINE
     Serial.printf("offline: %s, remaining=%ld s, length=%ld s\n", timerStates[offlineMode.timer().state % 3],
                   offlineMode.timer().remainingAt(now), Config.offlineLength());
 #endif

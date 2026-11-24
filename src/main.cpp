@@ -17,6 +17,9 @@
 #if BCP_MODE_OFFLINE
 #include "offlinemode.h"
 #endif
+#if BCP_MODE_CHESS
+#include "chessmode.h"
+#endif
 #ifdef BCP_DEV
 #include "devconsole.h"
 #endif
@@ -34,6 +37,9 @@ static Mode *const modes[] = {
 #endif
 #if BCP_MODE_OFFLINE
     &offlineMode,
+#endif
+#if BCP_MODE_CHESS
+    &chessMode,
 #endif
 };
 static constexpr int MODE_COUNT = sizeof(modes) / sizeof(modes[0]);

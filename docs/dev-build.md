@@ -7,7 +7,7 @@
 - Debug output (`DEV_LOG("Module", msg)` from `lib/devlog/devlog.h`, printed to `Serial`) exists only in the dev
   build; in production the macro emits no code or strings.
 - Serial command console (`src/devconsole.cpp`, called from `loop()`), 9600 baud, one command per line,
-  each response ends with `[Console] done`. `help` lists commands: `status` (incl. the mode and the offline countdown), `screen` (ASCII dump of the
+  each response ends with `[Console] done`. `help` lists commands: `status` (incl. the mode, the offline countdown and the chess clock), `screen` (ASCII dump of the
   matrix: `.` off, `:` dim, letters = colour), `left`, `right`, `mid` (short press), `midlong` (long press, config page),
   `refresh` (BCP data now), `timeshift <sec>`, `beep yellow|red` (play a threshold signal),
   `fake <mode> [sec] [length] [round/rounds]` (fake event data: `name`, `round`, `start`, `run`, `pause`,

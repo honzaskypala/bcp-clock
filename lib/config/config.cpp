@@ -31,6 +31,9 @@ static const uint8_t DEF_MODE = 0;   // MODE_BCP, the first mode of the build if
 #if BCP_MODE_OFFLINE
 static const long DEF_OFFLINE = 3600; // seconds
 #endif
+#if BCP_MODE_CHESS
+static const long DEF_CHESS = 3600;   // seconds, both players
+#endif
 static constexpr const char* STATE_NS = "state";
 static constexpr const char* CONFIG_NS = "config";
 // ---- Read configuration values from an opened Preferences namespace ----
@@ -56,6 +59,9 @@ ConfigValues readConfig(Preferences& prefs) {
 #if BCP_MODE_OFFLINE
     v.offline = prefs.getLong("offline", DEF_OFFLINE);
 #endif
+#if BCP_MODE_CHESS
+    v.chess = prefs.getLong("chess", DEF_CHESS);
+#endif
     return v;
 }
 
@@ -71,6 +77,9 @@ CConfig::CConfig() {
     mode_ = DEF_MODE;
 #if BCP_MODE_OFFLINE
     offline_ = DEF_OFFLINE;
+#endif
+#if BCP_MODE_CHESS
+    chess_ = DEF_CHESS;
 #endif
 
     // Load configuration from persistent storage if available
@@ -92,6 +101,9 @@ CConfig::CConfig() {
     mode_     = v.mode;
 #if BCP_MODE_OFFLINE
     offline_  = v.offline;
+#endif
+#if BCP_MODE_CHESS
+    chess_    = v.chess;
 #endif
     prefs.end();
     CONFIG_DEBUG("Preferences loaded");
@@ -117,6 +129,9 @@ void CConfig::savePreferences() {
     prefs.putString("hostname", hostname_);
 #if BCP_MODE_OFFLINE
     prefs.putLong("offline", offline_);
+#endif
+#if BCP_MODE_CHESS
+    prefs.putLong("chess", chess_);
 #endif
     prefs.end();
     CONFIG_DEBUG("Preferences saved");
@@ -180,6 +195,9 @@ void CConfig::erase() {
     mode_ = DEF_MODE;
 #if BCP_MODE_OFFLINE
     offline_ = DEF_OFFLINE;
+#endif
+#if BCP_MODE_CHESS
+    chess_ = DEF_CHESS;
 #endif
 }
 
@@ -346,6 +364,13 @@ void CConfig::appendConfigFormHtml(String& html) {
                 "<input type='text' id='offline' name='offline' value='" + secondsToTime(offline_) + "'>"
             "</div>";
 #endif
+#if BCP_MODE_CHESS
+    html += WebUI::buildSectionHeader("Chess clock");
+    html += "<div class='row'>"
+                "<label for='chess'>Round:</label>"
+                "<input type='text' id='chess' name='chess' value='" + secondsToTime(chess_) + "'>"
+            "</div>";
+#endif
 #if BCP_FEATURE_WIFIMGR
     html += WebUI::buildSectionHeader("Network");
     html += "<div class='row'>"
@@ -375,6 +400,12 @@ void CConfig::handleConfigPost() {
     if (configServer->hasArg("offline")) {
         long offline = timeToSeconds(configServer->arg("offline"));
         if (offline > 0) offline_ = offline;  // keep the previous length on an invalid value
+    }
+#endif
+#if BCP_MODE_CHESS
+    if (configServer->hasArg("chess")) {
+        long chess = timeToSeconds(configServer->arg("chess"));
+        if (chess > 1) chess_ = chess;  // keep the previous length on an invalid value
     }
 #endif
     if (configServer->hasArg("hostname")) {

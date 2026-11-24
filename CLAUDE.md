@@ -57,6 +57,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 | `src/main.cpp` | `setup()`/`loop()`: modes of the build, button events, mode switching, long Mid = config page |
 | `src/mode.h`, `src/bcpmode.*` | `Mode` interface; BCP mode: data refresh every 60 s, display decisions (`updateDisplay()`), reboot after 5 failed fetches |
 | `src/offlinemode.*` | Offline mode: `ManualTimer` (`lib/core/manualtimer`) controlled by the buttons, state in NVS |
+| `src/chessmode.*` | Chess clock: `ChessClock` (`lib/core/chessclock`), two players, state in NVS |
 | `src/devconsole.*` | Serial command console, dev build only |
 | `tools/` | Host-side dev helpers (`devmon.py`, `devcmd.sh`, `bcp_contract.py`, `build_release.sh`, `build_configs.sh`, `git-hooks/pre-commit`) |
 | `configs/` | Build configurations (`tc001.ini` = release, `tc001-minimal.ini`, `tc001-offline.ini`): envs and feature switches |

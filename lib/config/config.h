@@ -19,6 +19,9 @@ struct ConfigValues {
 #if BCP_MODE_OFFLINE
     long offline;       // seconds, length of the offline countdown
 #endif
+#if BCP_MODE_CHESS
+    long chess;         // seconds, chess clock round (both players)
+#endif
 };
 
 // Reads the configuration from an opened Preferences namespace, defaults for missing keys
@@ -35,6 +38,9 @@ public:
     uint8_t mode() const { return mode_; }  // ModeId of the last mode, also when not in the build
 #if BCP_MODE_OFFLINE
     long offlineLength() const { return offline_; }
+#endif
+#if BCP_MODE_CHESS
+    long chessLength() const { return chess_; }  // whole round, each player has half
 #endif
 
     // ---- State saved outside the config page ----
@@ -68,6 +74,9 @@ private:
     uint8_t mode_;
 #if BCP_MODE_OFFLINE
     long offline_;
+#endif
+#if BCP_MODE_CHESS
+    long chess_;
 #endif
     void savePreferences();
     

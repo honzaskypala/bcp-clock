@@ -55,8 +55,9 @@ The clock works in one of several modes; a short press of the middle button swit
 
 | Mode | Name on the display | What it does |
 |---|---|---|
-| BCP mode | `BCP` | Countdown of the round timer of a tournament on Best Coast Pairings (see below) |
+| BCP mode | `BCP mode` | Countdown of the round timer of a tournament on Best Coast Pairings (see below) |
 | Offline mode | `Offline` | Countdown of a round length set on the configuration page, started and paused with the buttons; no internet needed |
+| Chess clock | `Chess clock` | Two players, each with half of the round length set on the configuration page; no internet needed |
 
 ### Offline mode
 
@@ -75,10 +76,28 @@ another mode, and continues as if nothing happened when you come back. A white t
 not been started yet. After zero it keeps counting into overtime in red. A new length from the configuration
 page applies at once to a countdown that has not been started, otherwise after the next reset.
 
+### Chess clock
+
+Each player gets half of the round length set on the configuration page (default `1:00:00` for the whole
+round, so `30:00` per player). As on a chess clock, a player presses the button on their side to end their
+turn and start the opponent's time. The display shows the time of the player on turn, with a blue bar at
+that player's side. The yellow and red thresholds are halved too (yellow at `10:00` turns a player's time
+yellow and beeps at `5:00`).
+
+| Button | Action |
+|---|---|
+| Right | Starts the time of the left player (blue bar on the left); nothing if it already runs |
+| Left | Starts the time of the right player (blue bar on the right); nothing if it already runs |
+| Middle (short) | Running: pauses (blinks magenta), Right or Left continues (and may switch the player). Paused: resets both players to the configured time. Reset: switches to the next mode |
+
+Like the offline countdown, the chess clock keeps running while the clock is switched off or in another mode,
+including which player is on turn and the other player's time. A beep that started continues when the
+players switch. There is no round indicator and no connection indicator.
+
 Without WiFi: when the clock starts in a mode that does not need the internet and no stored network is
 available, it continues without WiFi (the time comes from the built-in clock chip); the configuration page is
 then not available, and holding the middle button shows `No WiFi`. When the clock waits in the WiFi setup portal
-for BCP mode, a short press of the middle button leaves it and continues in offline mode.
+for BCP mode, a short press of the middle button leaves it and continues in the next mode that does not need the internet.
 
 ## What the display shows
 
@@ -138,9 +157,9 @@ Detailed hardware documentation is available at
 
 | Button | Held while powering on | Pressed while running |
 |---|---|---|
-| Left | – | Offline mode: resets the countdown |
+| Left | – | Offline mode: resets the countdown. Chess clock: starts the right player's time |
 | Middle | Opens the WiFi setup portal | Short press: switches to the next mode (if the firmware has more modes). Hold for 1 second: opens the configuration page (for 5 minutes) |
-| Right | – | BCP mode: refreshes the data from BCP immediately. Offline mode: starts / resumes the countdown |
+| Right | – | BCP mode: refreshes the data from BCP immediately. Offline mode: starts / resumes the countdown. Chess clock: starts the left player's time |
 
 After a mode switch, the display shows the name of the new mode for 5 seconds (a name too long for the
 display scrolls once). Any button press ends it right away, and the button does its usual action too. The
@@ -263,6 +282,7 @@ The configuration page is available at `http://<IP of the clock>`, or at `http:/
 | Yellow | Remaining time below which the countdown turns yellow, as `m:ss` or `h:mm:ss` | `10:00` |
 | Red | Remaining time below which the countdown turns red, as `m:ss` or `h:mm:ss` | `0:00` |
 | Offline mode: Round | Length of the offline mode countdown, as `h:mm:ss` or `m:ss` | `1:00:00` |
+| Chess clock: Round | Length of the whole round, both players together (each gets half), as `h:mm:ss` or `m:ss` | `1:00:00` |
 | Acoustic signals | Beep when the countdown reaches a threshold: one long beep at yellow, three long beeps at red | on |
 | Hostname | Device name in the network: shown in the router's client list and used for the `.local` address of the configuration page. Letters, digits and hyphens, up to 32 characters. A change of the router name applies at the next WiFi connection. | `BCP-clock` |
 
@@ -288,6 +308,7 @@ All settings are stored in the ESP32's non-volatile memory and survive reboots a
 | `src/main.cpp` | Main loop: modes, buttons, mode switching |
 | `src/bcpmode.*` | BCP mode: data refresh, display state decisions |
 | `src/offlinemode.*` | Offline mode: countdown controlled by the buttons |
+| `src/chessmode.*` | Chess clock mode |
 | `lib/bcp/` | Best Coast Pairings API client |
 | `lib/hw/` | Hardware abstraction and the TC001 implementation (matrix, buttons, display task) |
 | `lib/config/` | Settings storage and the configuration web server |
@@ -339,7 +360,6 @@ connected, the commit is stopped; `SKIP_DEVICE_TESTS=1 git commit` skips them. T
 
 Planned features and known tasks are tracked in [TODO.md](TODO.md). Highlights:
 
-- chess clock mode
 - configurable display brightness
 
 ## History

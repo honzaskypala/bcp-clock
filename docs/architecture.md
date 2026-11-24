@@ -28,6 +28,13 @@
   epoch / paused with the remaining seconds), button logic in `handleOfflineButton()`; saved with
   `Config.saveState()` at every change and loaded at the first `enter()`, so it runs on while the clock is off or
   in another mode. A countdown without a round indicator is drawn one row lower (vertically centred).
+- Chess clock (`src/chessmode.*`): `ChessClock` (`lib/core/chessclock`) = two `ManualTimer`s and the player on
+  turn; player 0 (left) is started by Right, player 1 (right) by Left. `chessCountdown()` passes both timers
+  (the waiting one as `TIMER_WAITING`: fixed, coloured by the thresholds, no blinking) with halved thresholds.
+  `Tc001::drawCountdown()` shows the active timer (the first one when reset) and a DeepSkyBlue bar in column 0 or
+  31; a time touching the bar moves away from it by one pixel (only hh:mm:ss, 31 px). A display with more
+  rows (TC002) can draw both timers. Threshold signals are detected per timer (`lastRemaining[]`), a beep that
+  started continues after a switch. State in NVS `state/chess`.
 - Network: `Mode::needsNetwork()` (BCP mode). At boot a mode that needs it calls `ensureConnection(required)`
   (portal with timeout); other modes try the stored networks only (`WifiMgr.connect(..., allowPortal=false)`,
   portal only with Mid held) and run without WiFi, the time then comes from the RTC (`Tc001::setTimeFromRtc()`,
@@ -113,9 +120,9 @@ connects or NTP fails) → `BCPEvent.setID(Config.eventId())`. An invalid/empty 
 server with no timeout and scrolls "Config page http://<IP>".
 
 ## Persistent storage (NVS / Preferences)
-- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`, `mode` (uchar `ModeId` of the last mode, saved at each switch), `offline` (long seconds, offline mode length).
+- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`, `mode` (uchar `ModeId` of the last mode, saved at each switch), `offline` (long seconds, offline mode length), `chess` (long seconds, chess clock round, both players).
 - Namespace `state`: plain data of the modes (`Config.loadState()` / `saveState()`, ignored when the size differs):
-  `offline` (`ManualTimer`).
+  `offline` (`ManualTimer`), `chess` (`ChessClock`).
 - Namespace `wificreds`: `__ssids` (newline-separated list), `pwd_<fnv1a32(ssid) hex>` per network.
 - Config web form (`/`, `POST /config`, `/wifi/delete`, `/wifi/deleteAll`) also lists/deletes stored WiFi networks.
 
