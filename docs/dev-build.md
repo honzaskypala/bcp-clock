@@ -1,6 +1,8 @@
 # Dev build, console, tests
 
-## Dev build (`-e dev`, `BCP_DEV` define)
+## Dev build (`-e tc001-dev`, `BCP_DEV` define)
+- Every build configuration in `configs/` has a dev env next to its release env (`tc001` / `tc001-dev`), with the
+  same features plus `-D BCP_DEV`.
 - All development code is inside `#ifdef BCP_DEV`; the production build must stay byte-identical without it.
 - Debug output (`DEV_LOG("Module", msg)` from `lib/devlog/devlog.h`, printed to `Serial`) exists only in the dev
   build; in production the macro emits no code or strings.
@@ -31,9 +33,12 @@
   `-f device/<suite>`. Unity on the ESP32 has no 64-bit asserts. Logic that needs tests belongs to
   `lib/core` (no ESP-only includes). Display, WiFi, portal, config server and buttons are verified on the
   device with the dev console.
+- `tools/build_configs.sh` builds every env of every `configs/*.ini` (logs in `.pio/configs/`), so a feature
+  combination that does not compile is found; device tests run with the release config (`pio test -e tc001`).
 - Git pre-commit hook `tools/git-hooks/pre-commit` (enable per clone: `git config core.hooksPath tools/git-hooks`):
-  native tests always; TC001 suites only for related staged files (`lib/gfx/` → `test_gfx`; `lib/config/`,
-  `lib/core/bcpparse.*`, `lib/core/textutil.*` → `test_platform`; `platformio.ini` → both), with upload
+  native tests always; `tools/build_configs.sh` when `src/`, `lib/`, `configs/` or `platformio.ini` is staged;
+  TC001 suites only for related staged files (`lib/gfx/` → `test_gfx`; `lib/config/`,
+  `lib/core/bcpparse.*`, `lib/core/textutil.*` → `test_platform`; `platformio.ini`, `configs/tc001.ini` → both), with upload
   retries, then production is flashed back. Blocks the commit if the TC001 is needed but missing or devmon
   holds the port; `SKIP_DEVICE_TESTS=1 git commit` skips the device part. A commit with device tests takes
   several minutes: run it in the background (Bash timeout is 10 min). Logs in `.pio/precommit/`.
@@ -51,7 +56,8 @@
 
 ## Release
 - Push a tag `vX.Y.Z` (e.g. `git tag v1.0.1 && git push origin v1.0.1`). `.github/workflows/release.yml` runs the host
-  tests, builds with `tools/build_release.sh X.Y.Z`, creates a GitHub Release with the merged image
+  tests, builds every build configuration (`tools/build_configs.sh`), builds the release configuration `tc001` with
+  `tools/build_release.sh X.Y.Z`, creates a GitHub Release with the merged image
   `bcp-clock-X.Y.Z.bin` and deploys the browser installer to GitHub Pages (https://honzaskypala.github.io/bcp-clock/).
   Pages must have Source: GitHub Actions.
 - The version comes from the tag as the `BCP_VERSION` define (`PLATFORMIO_BUILD_FLAGS`) and is shown in the footer of the

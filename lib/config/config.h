@@ -5,6 +5,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <buildfeatures.h>
 #include <Arduino.h>
 #include <WebServer.h>
 #include <Preferences.h>
@@ -58,9 +59,13 @@ private:
     String statusMessage();
     void appendConfigFormHtml(String& html);
     void handleConfigPost();
+#if BCP_FEATURE_WIFIMGR
     void handleWifiDelete();
     void handleWifiDeleteAll();
+#endif
+#if BCP_FEATURE_MDNS
     void startMdns();
+#endif
 
     // ---- HTTP server timeout tracking ----
     unsigned long _serverStartMs;   // millis() when server started/reset

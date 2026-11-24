@@ -1,4 +1,5 @@
-# Release: on a pushed tag vX.Y.Z, run the host tests, build the firmware, create a GitHub Release with the
+# Release: on a pushed tag vX.Y.Z, run the host tests, build every build configuration (configs/*.ini), build the
+# release firmware (configs/tc001.ini), create a GitHub Release with the
 # merged image and publish the web installer on GitHub Pages.
 # Requires Settings -> Pages -> Source: GitHub Actions.
 
@@ -37,6 +38,9 @@ jobs:
 
       - name: Host unit tests
         run: pio test -e native
+
+      - name: Build all build configurations
+        run: sh tools/build_configs.sh
 
       - name: Build release
         run: sh tools/build_release.sh "${GITHUB_REF_NAME#v}"

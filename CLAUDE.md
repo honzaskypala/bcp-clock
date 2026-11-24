@@ -26,12 +26,13 @@ If `pio` is not on PATH, use PlatformIO's own `~/.platformio/penv/bin/pio` (and 
 the pre-commit hook always uses that path.
 
 ```sh
-pio run                    # build production (env nodemcu-32s, default)
+pio run                    # build production (env tc001 = configs/tc001.ini, default)
 pio run -t upload          # flash production over USB
-pio run -e dev -t upload   # flash dev build (debug output + console)
+pio run -e tc001-dev -t upload   # flash dev build (debug output + console)
 pio device monitor -b 9600 # serial console
 pio test -e native         # unit tests on the host (lib/core, lib/webui)
-pio test -e nodemcu-32s    # unit tests on the TC001 (gfx, NVS, newlib time)
+pio test -e tc001          # unit tests on the TC001 (gfx, NVS, newlib time)
+sh tools/build_configs.sh  # build every build configuration (configs/*.ini)
 python tools/bcp_contract.py <eventId>  # contract test of the live BCP API (PlatformIO's python)
 ```
 
@@ -40,7 +41,9 @@ python tools/bcp_contract.py <eventId>  # contract test of the live BCP API (Pla
 - Opening or closing the serial port resets the ESP32.
 - Device tests replace the firmware: stop devmon before, flash production again right after every run
   (the test firmware leaves the display frozen and the TC001 whistles).
-- Dev build (`-e dev`, `BCP_DEV`): all development code is inside `#ifdef BCP_DEV`; the production build must
+- Build features: every build configuration `configs/*.ini` sets all `BCP_FEATURE_*` to 0/1; code uses `#if`
+  (never `#ifdef`) after `#include <buildfeatures.h>`, which checks the dependencies. See `docs/features.md`.
+- Dev build (`-e tc001-dev`, `BCP_DEV`): all development code is inside `#ifdef BCP_DEV`; the production build must
   stay byte-identical without it. `DEV_LOG("Module", msg)` prints only in the dev build.
 - Logic that needs tests belongs to `lib/core` (no ESP-only includes, tested on the host).
 - Dev console, devmon/devcmd helpers, test details, pre-commit hook, USB/freeze troubleshooting: `docs/dev-build.md`.
@@ -53,7 +56,8 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 |---|---|
 | `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display decisions (`updateDisplay()`), reboot after 5 failed fetches, mDNS |
 | `src/devconsole.*` | Serial command console, dev build only |
-| `tools/` | Host-side dev helpers (`devmon.py`, `devcmd.sh`, `bcp_contract.py`, `build_release.sh`, `git-hooks/pre-commit`) |
+| `tools/` | Host-side dev helpers (`devmon.py`, `devcmd.sh`, `bcp_contract.py`, `build_release.sh`, `build_configs.sh`, `git-hooks/pre-commit`) |
+| `configs/` | Build configurations (`tc001.ini` = release, `tc001-minimal.ini`): envs and feature switches |
 | `install/`, `.github/workflows/` | Browser installer page (ESP Web Tools) and the release workflow (see `docs/dev-build.md`) |
 | `test/native/`, `test/device/` | Unit tests on the host / on the TC001 |
 | `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: BCP REST API, event data, RTC snapshot |
@@ -62,6 +66,7 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 | `lib/config/` | `CConfig` singleton `Config`: settings in NVS + on-demand HTTP config server |
 | `lib/wifimgr/` | `CWifiMgr` global `WifiMgr`: multi-network WiFi, captive portal, NTP + RTC sync |
 | `lib/devlog/` | `DEV_LOG` debug macro, dev build only |
+| `lib/features/` | `buildfeatures.h`: feature switch checks and dependencies |
 | `lib/webui/` | Shared look of the web pages (template, CSS, `escapeHtml`) |
 | `lib/gfx/` | Adafruit_GFX helpers: `ScrollingText`, `ProgressIndicator`, `UTF8canvas16`, fonts |
 
@@ -92,6 +97,7 @@ Read only when the task touches the topic.
 
 | Document | Content |
 |---|---|
+| `docs/features.md` | Build features and configurations: list, dependencies, adding a feature or a configuration |
 | `docs/architecture.md` | Execution contexts, display state machine, buttons, buzzer, startup flow, NVS storage, time |
 | `docs/dev-build.md` | Dev build, serial console commands, devmon/devcmd, tests, pre-commit hook, troubleshooting, release |
 | `docs/bcp-api.md` | BCP endpoints, response quirks, parsing |

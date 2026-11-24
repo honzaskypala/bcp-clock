@@ -170,10 +170,18 @@ or the CLI.
 ```sh
 git clone https://github.com/honzaskypala/bcp-clock.git
 cd bcp-clock
-pio run                       # build
+pio run                       # build (env tc001, the release configuration)
 pio run -t upload             # flash over USB
 pio device monitor -b 9600    # optional: serial console
 ```
+
+#### Build configurations
+
+A build contains a chosen set of features (WiFi manager, mDNS, battery monitoring, connection monitoring, ...).
+Each file in `configs/` is one build configuration and defines its PlatformIO envs: `configs/tc001.ini` is the
+release (`tc001`, all features) with its dev build `tc001-dev`; `configs/tc001-minimal.ini` leaves out the
+optional features. Build another one with `pio run -e <env>`; add your own by copying a file. See
+[docs/features.md](docs/features.md).
 
 > [!TIP]
 > Plug the TC001 directly into your computer. Uploading through a USB hub often fails.
@@ -243,14 +251,17 @@ All settings are stored in the ESP32's non-volatile memory and survive reboots a
 | `lib/wifimgr/` | WiFi manager with captive portal, NTP and RTC time synchronisation |
 | `lib/gfx/` | Graphics helpers on top of Adafruit GFX: scrolling text, progress indicator, UTF-8 fonts |
 | `lib/core/` | Hardware independent logic: parsing of the BCP data, countdown text and colours, round indicator, display decisions |
+| `lib/features/` | Build features (`buildfeatures.h`): checks of the feature switches of a build |
+| `configs/` | Build configurations: which features a build contains |
 | `test/` | Unit tests: `native/` run on the computer, `device/` run on the TC001 |
 
 ## Testing
 
 ```sh
 pio test -e native                          # unit tests on the computer, no device needed
-pio test -e nodemcu-32s                     # unit tests on the TC001 connected over USB
+pio test -e tc001                           # unit tests on the TC001 connected over USB
 python tools/bcp_contract.py <eventId>      # checks the live Best Coast Pairings API
+sh tools/build_configs.sh                   # builds every build configuration in configs/
 ```
 
 The tests on the computer cover the hardware independent logic in `lib/core` and the web page helpers: parsing of
@@ -265,7 +276,7 @@ The contract test calls the unofficial BCP API with a real event and checks that
 fields and formats the clock expects. Run it by hand, e.g. when the clock stops showing data.
 
 A git pre-commit hook runs the tests before every commit and stops the commit on a failure. The tests on the
-computer run always; the tests on the TC001 only when the commit changes code they cover (graphics, settings,
+computer run always; every build configuration is built when the commit changes code; the tests on the TC001 only when the commit changes code they cover (graphics, settings,
 time parsing), and then the production firmware is flashed back. If they are needed and the clock is not
 connected, the commit is stopped; `SKIP_DEVICE_TESTS=1 git commit` skips them. Turn the hook on once per clone:
 `git config core.hooksPath tools/git-hooks`.
@@ -279,7 +290,7 @@ connected, the commit is stopped; `SKIP_DEVICE_TESTS=1 git commit` skips them. T
 | `Invalid event ID, please configure.` | The event was not found in BCP. Open the configuration page and check the event URL or ID. |
 | The clock reboots by itself | It lost WiFi or could not connect to BCP 5 times in a row (about 5 minutes) and restarts to recover. Check the WiFi network and internet access. |
 | Installation, upload or serial monitor fails | Connect the clock directly, without a USB hub, and use a data cable. On Windows, install the [CH340 USB driver](https://www.wch-ic.com/downloads/CH341SER_EXE.html). |
-| Need more details | Build from source and flash the dev build (`pio run -e dev -t upload`). It prints debug output and has a command console on the serial port at 9600 baud, see [docs/dev-build.md](docs/dev-build.md). |
+| Need more details | Build from source and flash the dev build (`pio run -e tc001-dev -t upload`). It prints debug output and has a command console on the serial port at 9600 baud, see [docs/dev-build.md](docs/dev-build.md). |
 
 ## Roadmap
 

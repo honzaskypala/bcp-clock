@@ -20,13 +20,14 @@ cd "$(dirname "$0")/.."
 PIO="${PIO:-pio}"
 command -v "$PIO" >/dev/null 2>&1 || PIO="$HOME/.platformio/penv/bin/pio"
 
-BUILD=.pio/build/nodemcu-32s
+ENV=tc001     # release build configuration of the TC001 (configs/tc001.ini)
+BUILD=.pio/build/$ENV
 OUT=.pio/release
 SITE="$OUT/site"
 BIN="bcp-clock-$VERSION.bin"
 BOOT_APP0="$HOME/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"
 
-PLATFORMIO_BUILD_FLAGS="-DBCP_VERSION=\\\"$VERSION\\\"" "$PIO" run -e nodemcu-32s
+PLATFORMIO_BUILD_FLAGS="-DBCP_VERSION=\\\"$VERSION\\\"" "$PIO" run -e "$ENV"
 
 rm -rf "$OUT"
 mkdir -p "$SITE"

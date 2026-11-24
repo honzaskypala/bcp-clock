@@ -4,9 +4,13 @@
 
 #include "config.h"
 #include <Preferences.h>
+#if BCP_FEATURE_MDNS
 #include <ESPmDNS.h>
+#endif
 #include <nvs_flash.h>
+#if BCP_FEATURE_WIFIMGR
 #include <wifimgr.h>
+#endif
 #include <webui.h>
 #include <textutil.h>
 #include <devlog.h>
@@ -135,9 +139,11 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
     
     configServer->on("/", HTTP_GET, [this]() { handleConfigRoot(); });
     configServer->on("/config", HTTP_POST, [this]() { handleConfigPost(); });
+#if BCP_FEATURE_WIFIMGR
     // same paths as the captive portal, the stored networks HTML is shared (WifiMgr.buildStoredWifisHtml())
     configServer->on("/delete", HTTP_DELETE, [this]() { handleWifiDelete(); });
     configServer->on("/deleteAll", HTTP_DELETE, [this]() { handleWifiDeleteAll(); });
+#endif
 
     // Handle accidental GET on /config by redirecting to root
     configServer->on("/config", HTTP_GET, [this]() {
@@ -157,7 +163,9 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
     });
     
     configServer->begin();
+#if BCP_FEATURE_MDNS
     startMdns();
+#endif
     _serverStartMs = millis();
     _serverTimeoutMs = timeoutMs; // 0 => no timeout
     CONFIG_DEBUG("HTTP server started on http://" + WiFi.localIP().toString() + (timeoutMs == 0 ? " (no timeout)" : " (with timeout)"));
@@ -165,13 +173,16 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
 
 void CConfig::stopConfigServer() {
     if (configServer == nullptr) return;
+#if BCP_FEATURE_MDNS
     MDNS.end();
+#endif
     configServer->stop();
     delete configServer;
     configServer = nullptr;
     CONFIG_DEBUG("HTTP server stopped");
 }
 
+#if BCP_FEATURE_MDNS
 // The config page is also reachable at http://<hostname>.local while the server runs
 void CConfig::startMdns() {
     if (MDNS.begin(hostname_.c_str())) {
@@ -180,6 +191,7 @@ void CConfig::startMdns() {
         CONFIG_DEBUG("mDNS start failed");
     }
 }
+#endif
 
 void CConfig::handleClient() {
     if (configServer == nullptr) return;
@@ -227,7 +239,9 @@ void CConfig::handleConfigRoot() {
     }
     appendConfigFormHtml(page);
     page += CONFIG_PAGE_SCRIPT;
+#if BCP_FEATURE_WIFIMGR
     page += WifiMgr.buildStoredWifisHtml();
+#endif
     page += "<p class='version'>BCP Clock " BCP_VERSION "</p>";
     page += WebUI::buildPageEnd();
 
@@ -236,8 +250,10 @@ void CConfig::handleConfigRoot() {
 
 // Status bar text after a redirect from a form action, empty if none
 String CConfig::statusMessage() {
+#if BCP_FEATURE_WIFIMGR
     if (configServer->hasArg("wifiAllDeleted")) return "All WiFi networks deleted";
     if (configServer->hasArg("wifiDeleted")) return "WiFi network deleted";
+#endif
     if (configServer->hasArg("saved")) return "Configuration saved";
     return "";
 }
@@ -264,12 +280,14 @@ void CConfig::appendConfigFormHtml(String& html) {
                 "<input type='checkbox' id='beep' name='beep' value='1'" + (beep_ ? " checked" : "") + ">"
                 "<label for='beep'>Acoustic signals</label>"
             "</div>";
+#if BCP_FEATURE_WIFIMGR
     html += WebUI::buildSectionHeader("Network");
     html += "<div class='row'>"
                 "<label for='hostname'>Hostname:</label>"
                 "<input type='text' id='hostname' name='hostname' maxlength='32' value='" + WebUI::escapeHtml(hostname_) + "'>"
-            "</div>"
-            "<div class='actions'><button class='btn btnMain' type='submit'>Save</button></div>"
+            "</div>";
+#endif
+    html += "<div class='actions'><button class='btn btnMain' type='submit'>Save</button></div>"
             "</form>";
 }
 
@@ -289,9 +307,11 @@ void CConfig::handleConfigPost() {
         String hostname = sanitizeHostname(configServer->arg("hostname"));
         if (hostname != hostname_) {
             hostname_ = hostname;
+#if BCP_FEATURE_MDNS
             CONFIG_DEBUG("Hostname changed, restarting mDNS.");
             MDNS.end();
             startMdns();
+#endif
         }
     }
     
@@ -303,6 +323,7 @@ void CConfig::handleConfigPost() {
     configUpdated = true;
 }
 
+#if BCP_FEATURE_WIFIMGR
 void CConfig::handleWifiDelete() {
     if (!configServer->hasArg("ssid")) {
         configServer->send(400, "text/plain", "Missing ssid parameter");
@@ -326,6 +347,7 @@ void CConfig::handleWifiDeleteAll() {
         configServer->send(500, "text/plain", "Delete all failed");
     }
 }
+#endif
 
 // ---- Helpers ----
 

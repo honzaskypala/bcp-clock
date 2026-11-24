@@ -19,7 +19,9 @@
 #define PIN_MID_BUTTON      27
 #define PIN_RIGHT_BUTTON    14
 #define PIN_LED_MATRIX      32
+#if BCP_FEATURE_BATTERY
 #define PIN_BATTERY         34  // battery voltage, ADC1
+#endif
 
 #define COLOR_WHITE matrix.Color24to16(CRGB::White)
 #define COLOR_BLACK matrix.Color24to16(CRGB::Black)
@@ -34,7 +36,9 @@
 #define SCROLLING_TEXT_SPEED 100 // miliseconds per step
 #define PROGRESS_INDICATOR_SPEED 100 // milliseconds per step
 #define INDICATOR_BLINK_MS 1000      // status indicators: on for this long, then off for this long
+#if BCP_FEATURE_BATTERY
 #define BATTERY_READ_INTERVAL_MS 1000
+#endif
 
 constexpr uint32_t BEEP_FREQ = 2000;   // Hz, the buzzer is passive and needs a square wave
 constexpr uint8_t BEEP_CHANNEL = 0;    // LEDC channel (FastLED uses RMT, not LEDC)
@@ -59,9 +63,11 @@ bool Tc001::beepToneOn = false;
 volatile bool Tc001::indicatorActive[INDICATOR_COUNT] = {};
 volatile bool Tc001::iconActive[ICON_COUNT] = {};
 uint8_t Tc001::shownOverlay = 0;
+#if BCP_FEATURE_BATTERY
 BatteryMonitor Tc001::battery;
 volatile BatteryLevel Tc001::batteryLevel = BATTERY_UNKNOWN;
 unsigned long Tc001::batteryReadAt = 0;
+#endif
 
 // ---- Display lock ----
 // The matrix and the animations are used by both loop() and handleEvents (same core and priority,
@@ -301,6 +307,7 @@ void Tc001::stopProgress() {
 // ---- Status overlay ----
 // Called with the display lock held.
 
+#if BCP_FEATURE_BATTERY
 static const uint8_t batteryIcon[] = {  // 15x7, empty battery with "LoW"
     0x7F, 0xFE,  // .##############
     0x40, 0x02,  // .#............#
@@ -310,6 +317,8 @@ static const uint8_t batteryIcon[] = {  // 15x7, empty battery with "LoW"
     0x40, 0x02,  // .#............#
     0x7F, 0xFE   // .##############
 };
+#endif
+#if BCP_FEATURE_CONNECTION_MONITOR
 static const uint8_t wifiIcon[] = {  // 8x7
     0x3C,  // ..####..
     0x42,  // .#....#.
@@ -336,6 +345,7 @@ static const uint8_t bcpIcon[] = {  // 24x5, unplugged plug and socket
     0x0F, 0xE1, 0xC0,  // ....#######....###......
     0x0F, 0x03, 0xC0   // ....####......####......
 };
+#endif
 static CRGB overlayBackup[256];  // content under the overlay while it is shown
 
 uint8_t Tc001::overlayState() {
@@ -360,12 +370,16 @@ bool Tc001::drawOverlay(uint8_t state) {
     if (state & OVERLAY_ICON) {
         matrix.fillScreen(COLOR_BLACK);
         switch (state & ~OVERLAY_ICON) {
+#if BCP_FEATURE_BATTERY
             case ICON_BATTERY: matrix.drawBitmap(8, 1, batteryIcon, 15, 7, COLOR_RED); break;  // body in columns 9..22
+#endif
+#if BCP_FEATURE_CONNECTION_MONITOR
             case ICON_WIFI:  // 25x8 in columns 3..27
                 matrix.drawBitmap(3, 1, wifiIcon, 8, 7, COLOR_AMBER);
                 matrix.drawBitmap(3, 0, wifiOffText, 25, 8, COLOR_RED);
                 break;
             case ICON_BCP: matrix.drawBitmap(4, 2, bcpIcon, 24, 5, COLOR_MAGENTA); break;
+#endif
         }
         return true;
     }
@@ -388,6 +402,7 @@ void Tc001::showMatrix() {
     if (drawn) restoreOverlay();
 }
 
+#if BCP_FEATURE_BATTERY
 // ---- Battery ----
 // Called from handleEvents only.
 
@@ -407,7 +422,9 @@ void Tc001::stepBattery() {
     indicatorActive[INDICATOR_LOW_BATTERY] = level == BATTERY_LOW || level == BATTERY_CRITICAL;
     iconActive[ICON_BATTERY] = level == BATTERY_CRITICAL;
 }
+#endif
 
+#if BCP_FEATURE_CONNECTION_MONITOR
 // ---- Connection alert ----
 
 void Tc001::setConnectionAlert(ConnectionProblem problem, bool showIcon) {
@@ -416,6 +433,7 @@ void Tc001::setConnectionAlert(ConnectionProblem problem, bool showIcon) {
     iconActive[ICON_WIFI] = showIcon && problem == CONNECTION_WIFI;
     iconActive[ICON_BCP] = showIcon && problem == CONNECTION_BCP;
 }
+#endif
 
 void Tc001::reboot() {
     ESP.restart();
@@ -424,9 +442,13 @@ void Tc001::reboot() {
 #ifdef BCP_DEV
 uint32_t Tc001::countdownDraws = 0;
 volatile BeepSignal Tc001::beepRequest = BEEP_NONE;
+#if BCP_FEATURE_BATTERY
 volatile int Tc001::simulatedBatteryRaw = -1;
 uint16_t Tc001::batteryRaw = 0;
+#endif
+#endif
 
+#if defined(BCP_DEV) && BCP_FEATURE_BATTERY
 // ---- Battery calibration log ----
 // Runs in handleEvents. The whole log is one NVS blob rewritten at every sample (2 kB, fine for a one-off
 // discharge measurement); the recording state is restored after a restart.
@@ -492,6 +514,9 @@ void Tc001::printBatteryLog(Print& out) {
         out.printf("%lu,%u\n", (unsigned long)(i + 1) * batteryLogInterval, batteryLog[i]);
     }
 }
+#endif
+
+#ifdef BCP_DEV
 
 static constexpr uint32_t FORCE_PORTAL_MAGIC = 0xB0C1F0CE;
 RTC_NOINIT_ATTR static uint32_t forcePortalFlag;  // survives ESP.restart()
@@ -534,6 +559,7 @@ void Tc001::dumpScreen(Print& out) {
     if (overlayDrawn) restoreOverlay();
 }
 
+#if BCP_FEATURE_BATTERY
 static const char *batteryLevelName(BatteryLevel level) {
     switch (level) {
         case BATTERY_UNKNOWN: return "UNKNOWN";
@@ -552,6 +578,7 @@ void Tc001::printBattery(Print& out) {
     }
     out.println();
 }
+#endif  // BCP_FEATURE_BATTERY
 #endif
 
 bool Tc001::ensureConnection() {
@@ -637,7 +664,9 @@ void Tc001::handleEvents(void * parameter) {
         }
 
         stepBeep();
+#if BCP_FEATURE_BATTERY
         stepBattery();
+#endif
 
         vTaskDelay(pdMS_TO_TICKS(10));
     }

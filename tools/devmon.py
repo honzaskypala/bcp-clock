@@ -1,4 +1,4 @@
-# Persistent serial monitor for the dev build (pio run -e dev)
+# Persistent serial monitor for the dev build (pio run -e tc001-dev)
 # (c) 2025 Honza Skýpala
 # WTFPL license applies
 #

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <buildfeatures.h>
 #include "hw.h"
 #include <Arduino.h>
 #include <Print.h>
@@ -12,7 +13,9 @@
 #include <FastLED.h>
 #include <FastLED_NeoMatrix.h>
 
+#if BCP_FEATURE_BATTERY
 #include <battery.h>
+#endif
 #include <countdown.h>
 #include <progress_indicator.h>
 #include <scrolling_text.h>
@@ -44,7 +47,9 @@ public:
 
     virtual void showConfigServerMsg(const char *msg) override;
 
+#if BCP_FEATURE_CONNECTION_MONITOR
     virtual void setConnectionAlert(ConnectionProblem problem, bool showIcon) override;
+#endif
 
     virtual void reboot() override;
 
@@ -57,6 +62,7 @@ public:
     static void playBeep(BeepSignal signal) { beepRequest = signal; }  // played by handleEvents
     static volatile BeepSignal beepRequest;
     void rebootToPortal();           // reboot and start the captive portal as if Mid was held
+#if BCP_FEATURE_BATTERY
     static void printBattery(Print& out);
     static void simulateBattery(int raw) { simulatedBatteryRaw = raw; }  // -1 = real reading
     static volatile int simulatedBatteryRaw;
@@ -69,6 +75,7 @@ private:
     static volatile int batteryLogRequest;  // 0 none, > 0 start with this interval (s), -1 stop
     static void stepBatteryLog();           // called from stepBattery()
 public:
+#endif  // BCP_FEATURE_BATTERY
 #endif
 
 private:
@@ -120,10 +127,12 @@ private:
     static void restoreOverlay();
     static void showMatrix();                // matrix.show() with the overlay, display lock held
 
+#if BCP_FEATURE_BATTERY
     static BatteryMonitor battery;
     static volatile BatteryLevel batteryLevel;
     static unsigned long batteryReadAt;      // millis() of the last ADC reading, 0 = read now
     static void stepBattery();
+#endif
 
     // loop = true: invalid event ID, message + looping address (DISPLAY_CONFIG_REQUIRED);
     // loop = false: config server started by the user, address scrolled once (DISPLAY_CONFIG_MESSAGE)

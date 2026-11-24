@@ -1,5 +1,6 @@
 #!/bin/sh
-# Git pre-commit hook: unit tests on the Mac always, on the TC001 only when the staged files need them
+# Git pre-commit hook: unit tests on the Mac always, all build configurations when code changed, tests on the
+# TC001 only when the staged files need them
 # (c) 2025 Honza Skýpala
 # WTFPL license applies
 #
@@ -36,11 +37,23 @@ if ! "$PIO" test -e native > "$LOGDIR/native.log" 2>&1; then
 fi
 say "native tests passed: $(grep -E 'test cases' "$LOGDIR/native.log" | tr -d '=' | sed 's/^ *//')"
 
+# ---- Build configurations: every feature combination must compile ----
+
+if staged '^(src/|lib/|configs/|platformio\.ini$)'; then
+    say "building all build configurations (tools/build_configs.sh)"
+    if ! sh tools/build_configs.sh > "$LOGDIR/configs.log" 2>&1; then
+        grep -E "FAILED|error" "$LOGDIR/configs.log" | sed 's/^/    /'
+        say "a build configuration does not build, commit aborted (log: $LOGDIR/configs.log)"
+        exit 1
+    fi
+    say "all build configurations built"
+fi
+
 # ---- Tests on the TC001: only suites related to the staged files ----
 
 SUITES=""
-staged '^(lib/gfx/|test/device/test_gfx/|platformio\.ini$)' && SUITES="$SUITES device/test_gfx"
-staged '^(lib/config/|lib/core/(bcpparse|textutil)\.|test/device/test_platform/|platformio\.ini$)' && SUITES="$SUITES device/test_platform"
+staged '^(lib/gfx/|test/device/test_gfx/|platformio\.ini$|configs/tc001\.ini$)' && SUITES="$SUITES device/test_gfx"
+staged '^(lib/config/|lib/core/(bcpparse|textutil)\.|test/device/test_platform/|platformio\.ini$|configs/tc001\.ini$)' && SUITES="$SUITES device/test_platform"
 
 # code no automated test covers: remind to check it on the device
 UNCOVERED=$(echo "$STAGED" | grep -E '^(src/|lib/hw/|lib/wifimgr/|lib/bcp/|lib/config/)')
@@ -86,7 +99,7 @@ FAILED=0
 for suite in $SUITES; do
     log="$LOGDIR/$(basename "$suite").log"
     say "device tests $suite on the TC001"
-    run_with_upload_retries "$log" '\[(PASSED|FAILED)\]' test -e nodemcu-32s -f "$suite"
+    run_with_upload_retries "$log" '\[(PASSED|FAILED)\]' test -e tc001 -f "$suite"
     case $? in
         0)   say "  passed: $(grep -E 'test cases' "$log" | tr -d '=' | sed 's/^ *//')" ;;
         255) say "  could not upload the tests (log: $log)"; FAILED=1 ;;
@@ -98,7 +111,7 @@ done
 # ---- Production firmware back on the TC001 ----
 
 say "flashing production firmware"
-if run_with_upload_retries "$LOGDIR/upload.log" '\[SUCCESS\]' run -e nodemcu-32s -t upload; then
+if run_with_upload_retries "$LOGDIR/upload.log" '\[SUCCESS\]' run -e tc001 -t upload; then
     say "  production firmware flashed"
 else
     say "  warning: production firmware NOT flashed, the TC001 runs test firmware (log: $LOGDIR/upload.log)"

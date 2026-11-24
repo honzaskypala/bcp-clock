@@ -3,6 +3,7 @@
 // (c) 2025 Honza Skýpala
 // WTFPL license applies
 
+#include <buildfeatures.h>
 #include <Arduino.h>
 #include <WiFi.h>
 #include <config.h>
@@ -10,14 +11,18 @@
 #include <hw.h>
 #include <tc001.h>
 #include <policy.h>
+#if BCP_FEATURE_CONNECTION_MONITOR
 #include <statusalert.h>
+#endif
 #include <devlog.h>
 #ifdef BCP_DEV
 #include "devconsole.h"
 #endif
 
 #define DATA_REFRESH_INTERVAL_MS 60000 // 60 seconds
+#if BCP_FEATURE_CONNECTION_MONITOR
 #define MAX_CONNECTION_FAILURES 5      // reboot after this many consecutive WiFi outages or connection errors
+#endif
 
 #define MAIN_DEBUG(msg) DEV_LOG("Main", msg)
 
@@ -92,8 +97,10 @@ void updateDisplay() {
 
 // ---- Data refresh ----
 
+#if BCP_FEATURE_CONNECTION_MONITOR
 static int failCount = 0;                   // consecutive WiFi outages and connection failures
 static ConnectionAlert connectionAlert;     // status indicator and icon of a connection problem
+#endif
 static unsigned long lastDataRefresh = 0;   // millis() of the last refresh, 0 = refresh now
 
 // Applies a configuration saved on the config page
@@ -107,9 +114,11 @@ void handleConfigUpdate() {
         hw->showSplashScreen();
         BCPEvent.setID(Config.eventId());
         lastDataRefresh = 0; // force data refresh
+#if BCP_FEATURE_CONNECTION_MONITOR
         failCount = 0;
         connectionAlert = ConnectionAlert();
         hw->setConnectionAlert(connectionAlert.problem, connectionAlert.isIconDue());
+#endif
     }
 }
 
@@ -117,8 +126,8 @@ bool isRefreshDue() {
     return lastDataRefresh == 0 || millis() - lastDataRefresh >= DATA_REFRESH_INTERVAL_MS || hw->enforceUpdate;
 }
 
-// Fetches the event data and reacts to failures (connection alert, WiFi reconnect, reboot after repeated
-// WiFi outages or connection errors)
+// Fetches the event data and reacts to failures (WiFi reconnect; with the connection monitor also the
+// connection alert and a reboot after repeated WiFi outages or connection errors)
 void refreshEventData() {
     MAIN_DEBUG("Refreshing BCP event data...");
     hw->enforceUpdate = false;
@@ -128,25 +137,37 @@ void refreshEventData() {
 #ifdef BCP_DEV
     if (devWifiFailing) wifiConnected = false;
 #endif
+#if BCP_FEATURE_CONNECTION_MONITOR
     RefreshDecision r = decideRefresh(ok, wifiConnected, BCPEvent.lastStatus(), failCount, MAX_CONNECTION_FAILURES);
     failCount = r.failCount;
     connectionAlert = nextConnectionAlert(connectionAlert, r.outcome);
     hw->setConnectionAlert(connectionAlert.problem, connectionAlert.isIconDue());
+#else
+    RefreshDecision r = decideRefresh(ok, wifiConnected, BCPEvent.lastStatus(), 0, INT_MAX);  // never reboots
+#endif
     switch (r.outcome) {
         case REFRESH_SUCCESS:
             MAIN_DEBUG("BCP event data refreshed successfully");
             break;
         case REFRESH_WIFI_DOWN:
+#if BCP_FEATURE_CONNECTION_MONITOR
             MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting (failure count " +
                        String(failCount) + ")");
+#else
+            MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting");
+#endif
 #ifdef BCP_DEV
             if (devWifiFailing) break;
 #endif
             WiFi.reconnect();
             break;
         case REFRESH_CONNECTION_ERROR:
+#if BCP_FEATURE_CONNECTION_MONITOR
             MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()) +
                        " (failure count " + String(failCount) + ")");
+#else
+            MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()));
+#endif
             break;
         case REFRESH_REBOOT:
             MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
@@ -160,7 +181,7 @@ void refreshEventData() {
     }
 }
 
-#ifdef BCP_DEV
+#if defined(BCP_DEV) && BCP_FEATURE_CONNECTION_MONITOR
 void printConnectionStatus(Print& out) {
     static const char *problemNames[] = { "OK", "WIFI", "BCP" };
     out.printf("connection: %s, failures %d (icon %s), reboot count %d/%d, wififail=%d\n",
