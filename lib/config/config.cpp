@@ -27,6 +27,7 @@ static const long DEF_YELLOW = 600; // seconds
 static const long DEF_RED    = 0;   // seconds
 static const bool DEF_BEEP   = true;
 static const String DEF_HOSTNAME = "BCP-clock";
+static const uint8_t DEF_MODE = 0;   // MODE_BCP, the first mode of the build if not in it
 static constexpr const char* CONFIG_NS = "config";
 // ---- Read configuration values from an opened Preferences namespace ----
 
@@ -47,6 +48,7 @@ ConfigValues readConfig(Preferences& prefs) {
     }
     v.beep = prefs.getBool("beep", DEF_BEEP);
     v.hostname = sanitizeHostname(prefs.getString("hostname", DEF_HOSTNAME));
+    v.mode = prefs.getUChar("mode", DEF_MODE);
     return v;
 }
 
@@ -59,6 +61,7 @@ CConfig::CConfig() {
     red_ = DEF_RED;
     beep_ = DEF_BEEP;
     hostname_ = DEF_HOSTNAME;
+    mode_ = DEF_MODE;
 
     // Load configuration from persistent storage if available
     if (!ensureNvsReady()) {
@@ -76,6 +79,7 @@ CConfig::CConfig() {
     red_      = v.red;
     beep_     = v.beep;
     hostname_ = v.hostname;
+    mode_     = v.mode;
     prefs.end();
     CONFIG_DEBUG("Preferences loaded");
 }
@@ -102,6 +106,19 @@ void CConfig::savePreferences() {
     CONFIG_DEBUG("Preferences saved");
 }
 
+void CConfig::setMode(uint8_t mode) {
+    if (mode == mode_) return;
+    mode_ = mode;
+    if (!ensureNvsReady()) return;
+    Preferences prefs;
+    if (!prefs.begin(CONFIG_NS, false)) {
+        CONFIG_DEBUG("Failed to open preferences for writing");
+        return;
+    }
+    prefs.putUChar("mode", mode_);
+    prefs.end();
+}
+
 // ---- Erase configuration from persistent storage ----
 
 void CConfig::erase() {
@@ -124,6 +141,7 @@ void CConfig::erase() {
     red_ = DEF_RED;
     beep_ = DEF_BEEP;
     hostname_ = DEF_HOSTNAME;
+    mode_ = DEF_MODE;
 }
 
 // ---- Configuration HTTP server ----
@@ -259,14 +277,16 @@ String CConfig::statusMessage() {
 }
 
 void CConfig::appendConfigFormHtml(String& html) {
-    html += "<form method='POST' action='/config'>"
-                "<div class='row'>"
+    html += "<form method='POST' action='/config'>";
+#if BCP_MODE_BCP
+    html += "<div class='row'>"
                     "<label for='event'>Event:</label>"
                     "<div class='input-wrapper'>"
                         "<input type='text' id='event' name='event' placeholder='Enter event ID or event URL' value='" + WebUI::escapeHtml(event_) + "'>"
                         "<a class='clear-text' onclick='clearInput(this);return false;'>⨂</a>"
                     "</div>"
                 "</div>";
+#endif
     html += WebUI::buildSectionHeader("Colour thresholds");
     html += "<div class='row threshold'>"
                 "<label for='yellow'>Yellow:</label>"
@@ -292,9 +312,11 @@ void CConfig::appendConfigFormHtml(String& html) {
 }
 
 void CConfig::handleConfigPost() {
+#if BCP_MODE_BCP
     if (configServer->hasArg("event")) {
         event_ = configServer->arg("event");
     }
+#endif
     if (configServer->hasArg("yellow")) {
         yellow_ = timeToSeconds(configServer->arg("yellow"));
         // an unchecked checkbox is not sent, the yellow field tells the form was posted

@@ -7,216 +7,109 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <config.h>
-#include <bcpevent.h>
 #include <hw.h>
 #include <tc001.h>
-#include <policy.h>
-#if BCP_FEATURE_CONNECTION_MONITOR
-#include <statusalert.h>
-#endif
 #include <devlog.h>
+#include "mode.h"
+#if BCP_MODE_BCP
+#include "bcpmode.h"
+#endif
 #ifdef BCP_DEV
 #include "devconsole.h"
-#endif
-
-#define DATA_REFRESH_INTERVAL_MS 60000 // 60 seconds
-#if BCP_FEATURE_CONNECTION_MONITOR
-#define MAX_CONNECTION_FAILURES 5      // reboot after this many consecutive WiFi outages or connection errors
 #endif
 
 #define MAIN_DEBUG(msg) DEV_LOG("Main", msg)
 
 Hw *hw;
 
-// ---- update display after data refresh ----
+// ---- Modes ----
 
-static inline DisplayInputs collectDisplayInputs() {
-    DisplayInputs in;
-    in.state = hw->displayState;
-    in.redrawRequested = hw->redrawRequested;
-    in.valid = BCPEvent.isValid();
-    in.invalid = BCPEvent.isInvalid();
-    in.started = BCPEvent.isStarted();
-    in.ended = BCPEvent.isEnded();
-    in.timerLength = BCPEvent.timerLength();
-    in.name = BCPEvent.name();
-    in.currentRound = BCPEvent.currentRound();
-    return in;
-}
-
-static void applyDisplayAction(DisplayAction action) {
-    switch (action) {
-        case SHOW_EVENT_NAME:
-            MAIN_DEBUG("Displaying event name.");
-            hw->displayEventName(BCPEvent);
-            break;
-        case SHOW_EVENT_ROUND:
-            MAIN_DEBUG("Displaying event round.");
-            hw->displayEventRound(BCPEvent);
-            break;
-        case SHOW_COUNTDOWN:
-            // the countdown is redrawn by the Hw implementation
-            MAIN_DEBUG("Displaying countdown.");
-            hw->displayCountdown(BCPEvent);
-            break;
-        case SHOW_SPLASH:
-            MAIN_DEBUG("Event ID not verified yet, displaying splash screen.");
-            hw->showSplashScreen();
-            break;
-        case SHOW_CONFIG_REQUIRED:
-            // run the config server with no timeout and ask for configuration
-            MAIN_DEBUG("Invalid event ID, starting config server.");
-            if (Config.isConfigServerRunning()) {
-                Config.stopConfigServer();
-            }
-            Config.startConfigServer(0);
-            hw->showConfigServerMsg("Invalid event ID");
-            break;
-        case SHOW_NOTHING_NEW:
-            break;
-    }
-}
-
-// The display state is set by the Hw implementation; here it is only read to avoid redrawing
-// what is already shown.
-void updateDisplay() {
-    static DisplayMemory memory;
-    DisplayInputs in = collectDisplayInputs();
-    hw->redrawRequested = false;
-    MAIN_DEBUG("Updating display, current state: " + String(displayStateName(in.state)));
-
-    DisplayDecision d = decideDisplay(in, memory);
-
-    if (d.restartConfigServer && Config.isConfigServerRunning()) {
-        // event ID became valid: restart config server with timeout
-        Config.stopConfigServer();
-        Config.startConfigServer();
-    }
-    applyDisplayAction(d.action);
-}
-
-// ---- Data refresh ----
-
-#if BCP_FEATURE_CONNECTION_MONITOR
-static int failCount = 0;                   // consecutive WiFi outages and connection failures
-static ConnectionAlert connectionAlert;     // status indicator and icon of a connection problem
+// The modes of the build in the order of switching (short Mid press)
+static Mode *const modes[] = {
+#if BCP_MODE_BCP
+    &bcpMode,
 #endif
-static unsigned long lastDataRefresh = 0;   // millis() of the last refresh, 0 = refresh now
+};
+static constexpr int MODE_COUNT = sizeof(modes) / sizeof(modes[0]);
+static int currentMode = 0;
+
+const char *currentModeName() {
+    return modes[currentMode]->name();
+}
+
+// Restores the mode used before the restart / power-off
+static void enterStoredMode() {
+    ModeId ids[MODE_COUNT];
+    for (int i = 0; i < MODE_COUNT; i++) {
+        ids[i] = modes[i]->id();
+    }
+    currentMode = findModeIndex(ids, MODE_COUNT, Config.mode());
+    MAIN_DEBUG("Entering mode " + String(modes[currentMode]->name()));
+    hw->redrawRequested = true;
+    modes[currentMode]->enter(*hw);
+}
+
+static void switchToNextMode() {
+    int next = nextModeIndex(currentMode, MODE_COUNT);
+    if (next == currentMode) return;  // a single mode in the build
+    modes[currentMode]->leave(*hw);
+    currentMode = next;
+    MAIN_DEBUG("Switching to mode " + String(modes[currentMode]->name()));
+    Config.setMode(modes[currentMode]->id());
+    hw->redrawRequested = false;  // the mode draws when its name finishes
+    hw->showModeName(modes[currentMode]->name());
+    modes[currentMode]->enter(*hw);
+}
+
+// Long Mid press: config page for 5 minutes, its address scrolls once
+static void startConfigPage() {
+    MAIN_DEBUG("Starting config server.");
+    Config.startConfigServer();
+    hw->showConfigServerAddress();
+}
+
+static void handleButtons() {
+    for (ButtonEvent event = hw->nextButtonEvent(); event != BUTTON_NONE; event = hw->nextButtonEvent()) {
+        if (event == BUTTON_MID_LONG) {
+            startConfigPage();
+        } else if (modes[currentMode]->onButton(*hw, event) == MODE_NEXT) {
+            switchToNextMode();
+        }
+    }
+}
 
 // Applies a configuration saved on the config page
-void handleConfigUpdate() {
+static void handleConfigUpdate() {
     if (!Config.configUpdated) return;
     MAIN_DEBUG("Configuration updated.");
     Config.configUpdated = false;
+#if BCP_FEATURE_WIFIMGR
     WiFi.setHostname(Config.hostname().c_str());   // DHCP hostname applies at the next WiFi connection
-    if (Config.eventId() != BCPEvent.fullId()) {
-        MAIN_DEBUG("Event ID changed, updating BCP event.");
-        hw->showSplashScreen();
-        BCPEvent.setID(Config.eventId());
-        lastDataRefresh = 0; // force data refresh
-#if BCP_FEATURE_CONNECTION_MONITOR
-        failCount = 0;
-        connectionAlert = ConnectionAlert();
-        hw->setConnectionAlert(connectionAlert.problem, connectionAlert.isIconDue());
 #endif
-    }
+    modes[currentMode]->onConfigUpdated(*hw);
 }
-
-bool isRefreshDue() {
-    return lastDataRefresh == 0 || millis() - lastDataRefresh >= DATA_REFRESH_INTERVAL_MS || hw->enforceUpdate;
-}
-
-// Fetches the event data and reacts to failures (WiFi reconnect; with the connection monitor also the
-// connection alert and a reboot after repeated WiFi outages or connection errors)
-void refreshEventData() {
-    MAIN_DEBUG("Refreshing BCP event data...");
-    hw->enforceUpdate = false;
-    lastDataRefresh = millis();
-    bool ok = BCPEvent.refreshData();
-    bool wifiConnected = WiFi.status() == WL_CONNECTED;
-#ifdef BCP_DEV
-    if (devWifiFailing) wifiConnected = false;
-#endif
-#if BCP_FEATURE_CONNECTION_MONITOR
-    RefreshDecision r = decideRefresh(ok, wifiConnected, BCPEvent.lastStatus(), failCount, MAX_CONNECTION_FAILURES);
-    failCount = r.failCount;
-    connectionAlert = nextConnectionAlert(connectionAlert, r.outcome);
-    hw->setConnectionAlert(connectionAlert.problem, connectionAlert.isIconDue());
-#else
-    RefreshDecision r = decideRefresh(ok, wifiConnected, BCPEvent.lastStatus(), 0, INT_MAX);  // never reboots
-#endif
-    switch (r.outcome) {
-        case REFRESH_SUCCESS:
-            MAIN_DEBUG("BCP event data refreshed successfully");
-            break;
-        case REFRESH_WIFI_DOWN:
-#if BCP_FEATURE_CONNECTION_MONITOR
-            MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting (failure count " +
-                       String(failCount) + ")");
-#else
-            MAIN_DEBUG("Failed to refresh BCP event data, WiFi disconnected, reconnecting");
-#endif
-#ifdef BCP_DEV
-            if (devWifiFailing) break;
-#endif
-            WiFi.reconnect();
-            break;
-        case REFRESH_CONNECTION_ERROR:
-#if BCP_FEATURE_CONNECTION_MONITOR
-            MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()) +
-                       " (failure count " + String(failCount) + ")");
-#else
-            MAIN_DEBUG("Failed to refresh BCP event data, connection error " + String(BCPEvent.lastStatus()));
-#endif
-            break;
-        case REFRESH_REBOOT:
-            MAIN_DEBUG("Too many consecutive connection failures, rebooting device");
-            hw->reboot();
-            break;
-        case REFRESH_HTTP_ERROR:
-            MAIN_DEBUG("Failed to refresh BCP event data, HTTP status " + String(BCPEvent.lastStatus()));
-            break;
-        case REFRESH_NO_REQUEST:
-            break;
-    }
-}
-
-#if defined(BCP_DEV) && BCP_FEATURE_CONNECTION_MONITOR
-void printConnectionStatus(Print& out) {
-    static const char *problemNames[] = { "OK", "WIFI", "BCP" };
-    out.printf("connection: %s, failures %d (icon %s), reboot count %d/%d, wififail=%d\n",
-               problemNames[connectionAlert.problem], connectionAlert.failures,
-               connectionAlert.isIconDue() ? "on" : "off", failCount, MAX_CONNECTION_FAILURES, devWifiFailing);
-}
-#endif
 
 // ---- core Arduino functions ----
 
 void setup() {
     hw = &Tc001::getInstance();
     hw->showSplashScreen();
+#if BCP_FEATURE_WIFIMGR
     WiFi.setHostname(Config.hostname().c_str());   // must be set before WiFi starts
+#endif
     if (!hw->ensureConnection()) {
         MAIN_DEBUG("Connection not established, rebooting in 5 seconds...");
         delay(5000);
         hw->reboot();
     }
     // Config.erase(); // for testing only - remove in production
-    BCPEvent.setID(Config.eventId());
-    if (BCPEvent.isValid()) {
-        MAIN_DEBUG("Event data restored from snapshot.");
-    }
+    enterStoredMode();
 }
 
 void loop() {
     handleConfigUpdate();
-
-    if (isRefreshDue()) {
-        refreshEventData();
-        updateDisplay();
-    } else if (hw->redrawRequested) {
-        updateDisplay();
-    }
+    handleButtons();
+    modes[currentMode]->tick(*hw);
 
 #ifdef BCP_DEV
     tickDevConsole(hw);

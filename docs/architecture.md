@@ -1,9 +1,10 @@
 # Runtime architecture
 
 ## Two execution contexts
-- **Arduino `loop()`** (main task, core 1 = `CONFIG_ARDUINO_RUNNING_CORE`): config change handling, data refresh, `updateDisplay()`, `delay(10)`.
+- **Arduino `loop()`** (main task, core 1 = `CONFIG_ARDUINO_RUNNING_CORE`): config change handling, button events,
+  `tick()` of the current mode (BCP: data refresh, `updateDisplay()`), `delay(10)`.
 - **`Tc001::handleEvents`** FreeRTOS task (`xTaskCreatePinnedToCore`, core 1, priority 1, 8 KB stack),
-  runs every 10 ms: mid-button handling, `Config.handleClient()`, scrolling text / progress indicator
+  runs every 10 ms: button polling, `Config.handleClient()`, scrolling text / progress indicator
   steps, and redrawing the countdown when `displayState == DISPLAY_EVENT_COUNTDOWN` (once per second,
   when `time(nullptr)` changes; the dev console `status` shows the redraw count).
 - Both contexts draw to the same `FastLED_NeoMatrix` and share `scrollingText`/`progressIndicator`.
@@ -12,6 +13,21 @@
 - Both tasks run on core 1 with the same priority, so FreeRTOS time-slices them; a blocking HTTPS
   request in `loop()` does not stop the countdown redraw (measured 1 redraw/s during fetches). Core 0
   is left to the WiFi stack on purpose: the display task next to it risks FastLED flicker.
+
+## Modes (`src/mode.h`, `src/main.cpp`)
+- A `Mode` owns the display content and the buttons while it is current: `enter()` / `leave()`, `tick()` from
+  `loop()`, `onButton()` for Left, Right and a short Mid press (returns `MODE_NEXT` to switch), `onConfigUpdated()`.
+  It draws when `Hw::redrawRequested` is set (at boot, after the mode name or the config page address).
+- `main.cpp` lists the modes of the build (`#if BCP_MODE_*`) in the switching order, handles the long Mid press
+  (config page) and the switching: `leave()`, save the `ModeId` (`lib/core/modeid.h`) to NVS, `showModeName()`,
+  `enter()`. At boot it enters the stored mode (the first one if the build does not contain it). A build with a
+  single mode ignores the short Mid press (only ends a message).
+- BCP mode (`src/bcpmode.*`): the former main loop. Leaving it switches the connection alert off and gives a
+  config server running with no timeout (invalid event ID) the normal timeout; entering it refreshes at once.
+- A countdown is passed to the `Hw` as a `CountdownDisplay` copy (`lib/core/countdown.h`: one `CountdownTimer` per
+  player, thresholds, round indicator), never as a pointer to mode data, so `handleEvents` never reads data that
+  `loop()` is changing. `displayCountdown()` starts a countdown (the first redraw never beeps),
+  `updateCountdown()` passes new data of the shown one (BCP refresh, pause) and keeps the threshold memory.
 
 ## Display state machine (`DisplayState` in `lib/core/displaystate.h`)
 `displayState` says what is shown. Only the `Hw` implementation sets it (each `display*()` /
@@ -26,9 +42,13 @@ redrawing what is already shown.
   the yellow / red threshold between two redraws, `drawCountdown` starts a beep (see Buzzer below).
 - `CONFIG_REQUIRED` — invalid event ID: red message once, then the config page address loops; config
   server runs with no timeout.
-- `CONFIG_MESSAGE` — config server started by the Mid button: the address scrolls once, data refreshes
-  do not redraw meanwhile; when it finishes, `handleEvents` sets `Hw::redrawRequested` and `loop()`
-  calls `updateDisplay()` without fetching data.
+- `CONFIG_MESSAGE` — config server started by a long Mid press: the address scrolls once, data refreshes
+  do not redraw meanwhile; when it finishes, `handleEvents` sets `Hw::redrawRequested` and the mode
+  redraws (BCP: `updateDisplay()` without fetching data).
+- `MODE_NAME` — after a mode switch: the name in f3x5, centred for 5 s if it fits, else scrolled once; then
+  `Hw::redrawRequested` like `CONFIG_MESSAGE` (`isMessageShown()` covers both).
+- Any button press ends `CONFIG_MESSAGE` / `MODE_NAME` at once (`Tc001::nextButtonEvent()` → `finishMessage()`),
+  then the button does its action.
 
 ## Status overlay, battery and connection (`Tc001`, `lib/core/battery`, `lib/core/statusalert`)
 - `Tc001::showMatrix()` replaces every `matrix.show()`: it saves the content, draws the overlay over it, shows
@@ -37,8 +57,8 @@ redrawing what is already shown.
 - Status indicators (`enum StatusIndicator`: low battery red, WiFi amber, BCP magenta) blink 1 s on / 1 s off in
   column 0, stacked from the top in enum order without gaps. A new indicator = enum entry + colour + where it is set.
 - Alert icons (`enum AlertIcon`: battery, WiFi, BCP) alternate with the content, 5 s each, content first, then
-  each active icon in enum order (`alertCyclePhase`); not while the config page address scrolls once after the
-  Mid button (`DISPLAY_CONFIG_MESSAGE`). Amber is `Color(255, 140, 0)`, (255, 77, 0) on the LEDs after the
+  each active icon in enum order (`alertCyclePhase`); not while the config page address scrolls once after a
+  long Mid press or the mode name is shown (`isMessageShown()`). Amber is `Color(255, 140, 0)`, (255, 77, 0) on the LEDs after the
   gamma correction of Framebuffer_GFX (a lower green looks red).
 - Battery voltage on GPIO 34 (ADC1, works with WiFi), read by `stepBattery()` in `handleEvents` once a second.
   `BatteryMonitor` keeps the median of the last 15 readings (no level for the first 15 s) and compares it with
@@ -58,9 +78,15 @@ redrawing what is already shown.
   reboot. The captive portal at boot is not affected (no refresh runs there).
 
 ## Buttons (TC001 pins)
-- Mid (GPIO 27): held at boot → force WiFi captive portal; pressed at runtime → start config server (5 min timeout).
-- Right (GPIO 14): immediate data refresh (`Hw::enforceUpdate`).
-- Left button is not used. LED matrix data on GPIO 32.
+- Left (GPIO 26), Mid (GPIO 27), Right (GPIO 14), active low with pull-ups. Polled by `Tc001::stepButtons()` in
+  `handleEvents` every 10 ms once the WiFi connection is up (`PressDetector` in `lib/core/buttons`: 30 ms debounce);
+  events go through a FreeRTOS queue to `loop()` (`Hw::nextButtonEvent()`). A button held at that moment counts
+  only after its release (Mid held at power-on for the portal).
+- Left / Right: an event at the press. Mid: short = released within 1 s, long = held for 1 s (reported at once,
+  without waiting for the release).
+- Mid held at boot → force WiFi captive portal; long Mid → config server (5 min timeout); short Mid → the mode
+  (usually the next mode). BCP mode: Right → immediate data refresh. Dev console: `left`, `right`, `mid`, `midlong`.
+- LED matrix data on GPIO 32.
 
 ## Buzzer (GPIO 15, passive)
 - Idles as `INPUT_PULLDOWN`; a floating pin whistles. A beep attaches LEDC channel 0 (`ledcWriteTone`, 2 kHz) and
@@ -76,7 +102,7 @@ connects or NTP fails) → `BCPEvent.setID(Config.eventId())`. An invalid/empty 
 server with no timeout and scrolls "Config page http://<IP>".
 
 ## Persistent storage (NVS / Preferences)
-- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`.
+- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`, `mode` (uchar `ModeId` of the last mode, saved at each switch).
 - Namespace `wificreds`: `__ssids` (newline-separated list), `pwd_<fnv1a32(ssid) hex>` per network.
 - Config web form (`/`, `POST /config`, `/wifi/delete`, `/wifi/deleteAll`) also lists/deletes stored WiFi networks.
 

@@ -19,6 +19,7 @@ judges' desk and nobody has to check their phone.
 ## Contents
 
 - [Features](#features)
+- [Modes](#modes)
 - [What the display shows](#what-the-display-shows)
 - [Hardware](#hardware)
 - [Installation](#installation)
@@ -46,8 +47,19 @@ judges' desk and nobody has to check their phone.
 - **Accurate time** from NTP, with the built-in RTC as a fallback.
 - **Web configuration page** served by the clock itself, usable from a phone.
 - **Self-recovery**: the clock reboots itself after repeated connection failures.
+- **Modes**: switched with the middle button, the clock returns to the last one after a restart.
+
+## Modes
+
+The clock works in one of several modes; a short press of the middle button switches to the next one.
+
+| Mode | Name on the display | What it does |
+|---|---|---|
+| BCP mode | `BCP` | Countdown of the round timer of a tournament on Best Coast Pairings (see below) |
 
 ## What the display shows
+
+In BCP mode:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/bcp-clock-dark.gif">
@@ -103,9 +115,14 @@ Detailed hardware documentation is available at
 
 | Button | Held while powering on | Pressed while running |
 |---|---|---|
-| Left | – | not used |
-| Middle | Opens the WiFi setup portal | Opens the configuration page (for 5 minutes) |
-| Right | – | Refreshes the data from BCP immediately |
+| Left | – | not used in BCP mode |
+| Middle | Opens the WiFi setup portal | Short press: switches to the next mode (if the firmware has more modes). Hold for 1 second: opens the configuration page (for 5 minutes) |
+| Right | – | BCP mode: refreshes the data from BCP immediately |
+
+After a mode switch, the display shows the name of the new mode for 5 seconds (a name too long for the
+display scrolls once). Any button press ends it right away, and the button does its usual action too. The
+clock remembers the mode and returns to it after a restart or power-off. The modes are described in
+[Modes](#modes).
 
 <img src="docs/img/buttons.jpg" alt="Top of the TC001 with the left, middle and right buttons labelled" width="800">
 
@@ -215,7 +232,7 @@ The configuration page is available at `http://<IP of the clock>`, or at `http:/
 (the hostname setting followed by `.local`):
 
 - automatically, with no time limit, while the configured event is missing or invalid;
-- after pressing the **middle button**, for 5 minutes.
+- after holding the **middle button** for 1 second, for 5 minutes.
 
 | Setting | Description | Default |
 |---|---|---|
@@ -244,7 +261,8 @@ All settings are stored in the ESP32's non-volatile memory and survive reboots a
 
 | Path | Contents |
 |---|---|
-| `src/main.cpp` | Main loop: data refresh, display state decisions |
+| `src/main.cpp` | Main loop: modes, buttons, mode switching |
+| `src/bcpmode.*` | BCP mode: data refresh, display state decisions |
 | `lib/bcp/` | Best Coast Pairings API client |
 | `lib/hw/` | Hardware abstraction and the TC001 implementation (matrix, buttons, display task) |
 | `lib/config/` | Settings storage and the configuration web server |

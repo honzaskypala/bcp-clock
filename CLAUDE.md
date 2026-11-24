@@ -54,14 +54,15 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 
 | Path | Purpose |
 |---|---|
-| `src/main.cpp` | `setup()`/`loop()`: data refresh every 60 s, display decisions (`updateDisplay()`), reboot after 5 failed fetches, mDNS |
+| `src/main.cpp` | `setup()`/`loop()`: modes of the build, button events, mode switching, long Mid = config page |
+| `src/mode.h`, `src/bcpmode.*` | `Mode` interface; BCP mode: data refresh every 60 s, display decisions (`updateDisplay()`), reboot after 5 failed fetches |
 | `src/devconsole.*` | Serial command console, dev build only |
 | `tools/` | Host-side dev helpers (`devmon.py`, `devcmd.sh`, `bcp_contract.py`, `build_release.sh`, `build_configs.sh`, `git-hooks/pre-commit`) |
 | `configs/` | Build configurations (`tc001.ini` = release, `tc001-minimal.ini`): envs and feature switches |
 | `install/`, `.github/workflows/` | Browser installer page (ESP Web Tools) and the release workflow (see `docs/dev-build.md`) |
 | `test/native/`, `test/device/` | Unit tests on the host / on the TC001 |
 | `lib/bcp/` | `CBCPEvent` singleton `BCPEvent`: BCP REST API, event data, RTC snapshot |
-| `lib/core/` | Hardware independent logic, host-tested: parsing, countdown text/colour, display/refresh policy, battery level, alert icon cycle and connection alert, `DisplayState`, string helpers |
+| `lib/core/` | Hardware independent logic, host-tested: parsing, countdown text/colour (`CountdownDisplay`), display/refresh policy, buttons (short/long press), mode IDs, battery level, alert icon cycle and connection alert, `DisplayState`, string helpers |
 | `lib/hw/` | Abstract `Hw` interface (`hw.h`); `Tc001` singleton (matrix, buttons, display task, fonts, status overlay, battery ADC) |
 | `lib/config/` | `CConfig` singleton `Config`: settings in NVS + on-demand HTTP config server |
 | `lib/wifimgr/` | `CWifiMgr` global `WifiMgr`: multi-network WiFi, captive portal, NTP + RTC sync |
@@ -75,7 +76,9 @@ PlatformIO's LDF picks up each folder in `lib/` as a library; headers are includ
 - Two tasks on core 1 draw to the same matrix: Arduino `loop()` and the `Tc001::handleEvents` task (10 ms).
   All display access in `tc001.cpp` goes through the recursive mutex `DisplayLock`; keep new drawing code
   inside it and slow work (HTTP, config server) outside.
-- `displayState` (`lib/core/displaystate.h`) is set only by the `Hw` implementation; `main.cpp` only reads it.
+- `displayState` (`lib/core/displaystate.h`) is set only by the `Hw` implementation; modes only read it.
+- Modes pass countdowns to the `Hw` as `CountdownDisplay` copies, never pointers (the display task reads them).
+- Buttons are polled in `handleEvents` and queued to `loop()`; modes handle them in `onButton()`.
 - `Tc001` is a `Print` sink for `WifiMgr.connect()` and dispatches on the message prefix (`"Error:"`,
   `"Connecting "`, `"Connected "`); changing message texts in `wifimgr.cpp` changes what the display does.
 - Countdown = `roundEndEpoch - time(nullptr)`, so the system clock must be valid UTC (NTP, RTC fallback).

@@ -29,8 +29,8 @@ static DisplayAction decideValidEvent(const DisplayInputs& in, DisplayMemory& me
 DisplayDecision decideDisplay(const DisplayInputs& in, DisplayMemory& memory) {
     DisplayDecision d = { SHOW_NOTHING_NEW, false };
 
-    if (in.state == DISPLAY_CONFIG_MESSAGE && !in.redrawRequested) {
-        return d;  // config page address is scrolling, handleEvents requests a redraw when it finishes
+    if (isMessageShown(in.state) && !in.redrawRequested) {
+        return d;  // config page address or mode name shown, handleEvents requests a redraw when it finishes
     }
 
     if (in.valid) {

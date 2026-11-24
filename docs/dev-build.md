@@ -7,8 +7,9 @@
 - Debug output (`DEV_LOG("Module", msg)` from `lib/devlog/devlog.h`, printed to `Serial`) exists only in the dev
   build; in production the macro emits no code or strings.
 - Serial command console (`src/devconsole.cpp`, called from `loop()`), 9600 baud, one command per line,
-  each response ends with `[Console] done`. `help` lists commands: `status`, `screen` (ASCII dump of the
-  matrix: `.` off, `:` dim, letters = colour), `refresh`, `mid`, `timeshift <sec>`, `beep yellow|red` (play a threshold signal),
+  each response ends with `[Console] done`. `help` lists commands: `status` (incl. the mode), `screen` (ASCII dump of the
+  matrix: `.` off, `:` dim, letters = colour), `left`, `right`, `mid` (short press), `midlong` (long press, config page),
+  `refresh` (BCP data now), `timeshift <sec>`, `beep yellow|red` (play a threshold signal),
   `fake <mode> [sec] [length] [round/rounds]` (fake event data: `name`, `round`, `start`, `run`, `pause`,
   `over`, `off`; BCP is not contacted while active), `bcpfail on|off` (simulated BCP connection errors), `wififail on|off` (simulated WiFi outage: the refresh
   fails and main sees WiFi as disconnected, no reconnect),
@@ -20,7 +21,7 @@
 - Helpers in `tools/`: run `python tools/devmon.py` (PlatformIO's python, it needs pyserial) in the background (keeps the port
   open so the device is not reset, logs to `.pio/dev.log`, reads commands from `.pio/dev.fifo`), then
   `tools/devcmd.sh <command>` sends a command and prints the response. Stop devmon before flashing.
-- The config web server (started by `mid`) is reachable from the host over WiFi at the device IP
+- The config web server (started by `midlong`) is reachable from the host over WiFi at the device IP
   (see `status`), so config changes can be made via HTTP.
 
 ## Tests

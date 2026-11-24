@@ -5,6 +5,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <time.h>
 
 // ---- Countdown ----
 
@@ -24,9 +25,47 @@ struct CountdownView {
     int x;                 // cursor x position
 };
 
-// remaining = round end epoch - now; blinkOn = phase of the paused blinking
-CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused, uint32_t pausedRemaining,
-                              long yellowThreshold, long redThreshold, bool blinkOn);
+// remaining = round end epoch - now; blinkOn = phase of the paused blinking;
+// startPhase: remaining above timerLength is the time to the round start (green, BCP);
+// ready: countdown not started yet, white without thresholds
+CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused, long pausedRemaining,
+                              long yellowThreshold, long redThreshold, bool blinkOn,
+                              bool startPhase = true, bool ready = false);
+
+// ---- Countdown as the display draws it (BCP round, offline countdown, chess clock players) ----
+
+enum TimerPhase : uint8_t {
+    TIMER_RUNNING,  // remaining = endEpoch - now
+    TIMER_PAUSED,   // remaining fixed, blinks magenta
+    TIMER_READY     // not started (reset), remaining fixed, white
+};
+
+struct CountdownTimer {
+    TimerPhase phase = TIMER_READY;
+    time_t endEpoch = 0;     // TIMER_RUNNING
+    long remaining = 0;      // TIMER_PAUSED / TIMER_READY: seconds shown
+    uint32_t length = 0;     // round length; up to one hour mm:ss, longer h:mm:ss
+    bool startPhase = false; // remaining above length = time to the round start (BCP)
+
+    long remainingAt(time_t now) const { return phase == TIMER_RUNNING ? (long) (endEpoch - now) : remaining; }
+};
+
+constexpr int MAX_COUNTDOWN_TIMERS = 2;
+
+// What a mode shows: one countdown, or one per player (chess clock). A display that has room for only
+// one shows the active timer (the first one if none is active).
+struct CountdownDisplay {
+    CountdownTimer timers[MAX_COUNTDOWN_TIMERS];
+    int count = 1;
+    int active = -1;          // index of the running player (chess clock), -1 = none
+    long yellowThreshold = 0; // seconds
+    long redThreshold = 0;
+    int currentRound = 0;     // round indicator, numberOfRounds 0 = none
+    int numberOfRounds = 0;
+};
+
+CountdownView formatCountdown(const CountdownTimer& timer, time_t now, long yellowThreshold, long redThreshold,
+                              bool blinkOn);
 
 // ---- Acoustic signals at thresholds ----
 

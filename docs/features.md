@@ -23,7 +23,7 @@ A build of BCP-clock contains a chosen set of features. The choice is a **build 
 | File | Envs | Contents |
 |---|---|---|
 | `configs/tc001.ini` | `tc001`, `tc001-dev` | TC001 release: all features |
-| `configs/tc001-minimal.ini` | `tc001-minimal`, `tc001-minimal-dev` | TC001 with the required features only (build check) |
+| `configs/tc001-minimal.ini` | `tc001-minimal`, `tc001-minimal-dev` | TC001, BCP mode without the optional features (build check) |
 
 ## Features
 
@@ -32,9 +32,12 @@ A build of BCP-clock contains a chosen set of features. The choice is a **build 
 | `BCP_FEATURE_WIFIMGR` | WiFi manager: stored networks, captive portal (Mid held at power-on), NTP + RTC time sync, stored networks on the config page, hostname setting (DHCP) | – |
 | `BCP_FEATURE_MDNS` | Config page at `http://<hostname>.local` | `WIFIMGR` |
 | `BCP_FEATURE_BATTERY` | Battery voltage monitoring: low battery status pixel and icon, dev console `battery`, `battlog` | – |
-| `BCP_FEATURE_CONNECTION_MONITOR` | WiFi / BCP status pixels and icons, reboot after 5 consecutive failed refreshes, dev console connection status | – |
+| `BCP_FEATURE_CONNECTION_MONITOR` | WiFi / BCP status pixels and icons, reboot after 5 consecutive failed refreshes, dev console connection status | `BCP_MODE_BCP` |
+| `BCP_MODE_BCP` | BCP mode (`src/bcpmode.*`, `lib/bcp`): event field on the config page, event name / round / countdown with the round indicator, dev console `refresh`, `fake`, `bcpfail`, `wififail` and the event status | `WIFIMGR` |
 
-The BCP countdown needs a network, so `BCP_FEATURE_WIFIMGR` is required on the TC001.
+A build needs at least one mode (`BCP_MODE_*`), the build fails otherwise. Modes are switched by a short press of
+the middle button in the order of `modes[]` in `src/main.cpp`; a new mode also needs its `ModeId`
+(`lib/core/modeid.h`).
 
 ## Adding a feature
 1. Add the define to every `configs/*.ini` and to the check in `buildfeatures.h` (with its dependencies).

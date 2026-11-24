@@ -15,6 +15,7 @@ struct ConfigValues {
     long yellow, red;   // seconds
     bool beep;          // acoustic signals at thresholds
     String hostname;
+    uint8_t mode;       // ModeId of the last mode
 };
 
 // Reads the configuration from an opened Preferences namespace, defaults for missing keys
@@ -28,6 +29,10 @@ public:
     long redThreshold() const { return red_; }
     bool isAcousticSignalsEnabled() const { return beep_; }
     const String& hostname() const { return hostname_; }
+    uint8_t mode() const { return mode_; }  // ModeId of the last mode, also when not in the build
+
+    // ---- State saved outside the config page ----
+    void setMode(uint8_t mode);             // saved right away
 
     // ---- Erase configuration from persistent storage ----
     void erase();
@@ -51,6 +56,7 @@ private:
     long yellow_, red_;
     bool beep_;
     String hostname_;
+    uint8_t mode_;
     void savePreferences();
     
     // ---- Configuration HTTP server ----

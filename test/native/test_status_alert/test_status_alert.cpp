@@ -35,6 +35,7 @@ static void test_cycle_twoIcons_eachInTurn() {
 
 static void test_cycle_notDuringConfigMessage() {
     TEST_ASSERT_EQUAL(0, alertCyclePhase(1, 5000, DISPLAY_CONFIG_MESSAGE));
+    TEST_ASSERT_EQUAL(0, alertCyclePhase(1, 5000, DISPLAY_MODE_NAME));
     TEST_ASSERT_EQUAL(1, alertCyclePhase(1, 5000, DISPLAY_CONFIG_REQUIRED));
 }
 

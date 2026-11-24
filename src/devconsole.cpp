@@ -10,8 +10,11 @@
 #include <WiFi.h>
 #include <sys/time.h>
 #include <config.h>
-#include <bcpevent.h>
 #include <tc001.h>
+#if BCP_MODE_BCP
+#include <bcpevent.h>
+#include "bcpmode.h"
+#endif
 
 static long timeShift_ = 0;  // total seconds the system clock was shifted by "timeshift"
 bool devWifiFailing = false;
@@ -21,11 +24,13 @@ bool devWifiFailing = false;
 static void handleHelp() {
     Serial.println("Commands:");
     Serial.println("  help              this list");
-    Serial.println("  status            device, network, event and timer state");
+    Serial.println("  status            device, network, mode, event and timer state");
     Serial.println("  screen            ASCII dump of the LED matrix");
-    Serial.println("  refresh           refresh data now (= right button)");
-    Serial.println("  mid               start config server (= mid button)");
+    Serial.println("  left | right      press the left / right button");
+    Serial.println("  mid | midlong     short (next mode) / long (config page) press of the middle button");
     Serial.println("  timeshift <sec>   shift system clock by <sec> seconds (negative to go back)");
+#if BCP_MODE_BCP
+    Serial.println("  refresh           refresh BCP data now");
     Serial.println("  fake <mode> [sec] [length] [round/rounds]");
     Serial.println("                    fake event data, BCP is not contacted until 'fake off'");
     Serial.println("                    modes: name (not started), round (no timer), start (sec to round start),");
@@ -33,6 +38,7 @@ static void handleHelp() {
     Serial.println("                    defaults: sec=300, length=9000, round 3/5");
     Serial.println("  bcpfail on|off    simulate BCP connection errors (counts toward reboot, reset by reboot)");
     Serial.println("  wififail on|off   simulate a WiFi outage (counts toward reboot, reset by reboot)");
+#endif
     Serial.println("  beep yellow|red   play the threshold signal (also when acoustic signals are off)");
 #if BCP_FEATURE_BATTERY
     Serial.println("  battery [raw|off] battery reading; raw simulates the ADC median (e.g. 2300), off = real");
@@ -51,16 +57,18 @@ static void handleStatus(Hw *hw) {
     Serial.printf("wifi: %s, ssid: %s, ip: %s, rssi: %d dBm\n",
                   WiFi.isConnected() ? "connected" : "disconnected",
                   WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
-    Serial.printf("display state: %s, countdown draws: %u\n", displayStateName(hw->displayState), Tc001::countdownDraws);
+    Serial.printf("mode: %s, display state: %s, countdown draws: %u\n", currentModeName(),
+                  displayStateName(hw->displayState), Tc001::countdownDraws);
     Serial.printf("config server: %s\n", Config.isConfigServerRunning() ? "running" : "stopped");
     Serial.printf("config: event=%s yellow=%ld red=%ld beep=%s\n",
                   Config.eventId().c_str(), Config.yellowThreshold(), Config.redThreshold(),
                   Config.isAcousticSignalsEnabled() ? "on" : "off");
+#if BCP_MODE_BCP
     Serial.printf("event: id=%s valid=%d invalid=%d fake=%d bcpfail=%d lastStatus=%d name=\"%s\"\n",
                   BCPEvent.id().c_str(), BCPEvent.isValid(), BCPEvent.isInvalid(), BCPEvent.isFake(),
                   BCPEvent.isNetworkFailing(), BCPEvent.lastStatus(), BCPEvent.name().c_str());
 #if BCP_FEATURE_CONNECTION_MONITOR
-    printConnectionStatus(Serial);
+    bcpMode.printConnectionStatus(Serial);
 #endif
     Serial.printf("event: started=%d ended=%d round=%d/%d\n",
                   BCPEvent.isStarted(), BCPEvent.isEnded(), BCPEvent.currentRound(), BCPEvent.numberOfRounds());
@@ -70,6 +78,7 @@ static void handleStatus(Hw *hw) {
     if (BCPEvent.timerLength() > 0) {
         Serial.printf("timer: remaining=%ld s\n", (long) (BCPEvent.roundEndEpoch() - now));
     }
+#endif
 }
 
 static void handleTimeshift(const String& arg) {
@@ -82,6 +91,7 @@ static void handleTimeshift(const String& arg) {
     Serial.printf("Clock shifted by %ld s (total %ld s)\n", shift, timeShift_);
 }
 
+#if BCP_MODE_BCP
 // Returns the n-th space separated word of str, or empty string
 static String extractWord(const String& str, int n) {
     int start = 0;
@@ -127,6 +137,7 @@ static void handleFake(const String& arg) {
     Hw::enforceUpdate = true;
     Serial.printf("Fake data set: %s sec=%ld length=%ld round=%d/%d\n", mode.c_str(), sec, length, round, rounds);
 }
+#endif
 
 static void executeCommand(const String& line, Hw *hw) {
     int space = line.indexOf(' ');
@@ -137,9 +148,13 @@ static void executeCommand(const String& line, Hw *hw) {
     if (cmd == "help") handleHelp();
     else if (cmd == "status") handleStatus(hw);
     else if (cmd == "screen") Tc001::dumpScreen(Serial);
-    else if (cmd == "refresh") { Hw::enforceUpdate = true; Serial.println("Refresh requested"); }
-    else if (cmd == "mid") { Tc001::simulateMidButton(); Serial.println("Mid button pressed"); }
+    else if (cmd == "left") { Tc001::simulateButton(BUTTON_LEFT); Serial.println("Left button pressed"); }
+    else if (cmd == "right") { Tc001::simulateButton(BUTTON_RIGHT); Serial.println("Right button pressed"); }
+    else if (cmd == "mid") { Tc001::simulateButton(BUTTON_MID_SHORT); Serial.println("Mid button pressed (short)"); }
+    else if (cmd == "midlong") { Tc001::simulateButton(BUTTON_MID_LONG); Serial.println("Mid button pressed (long)"); }
     else if (cmd == "timeshift") handleTimeshift(arg);
+#if BCP_MODE_BCP
+    else if (cmd == "refresh") { Hw::enforceUpdate = true; Serial.println("Refresh requested"); }
     else if (cmd == "fake") handleFake(arg);
     else if (cmd == "bcpfail") {
         BCPEvent.setNetworkFailing(arg == "on");
@@ -150,6 +165,7 @@ static void executeCommand(const String& line, Hw *hw) {
         BCPEvent.setNetworkFailing(devWifiFailing);
         Serial.printf("WiFi outage %s\n", devWifiFailing ? "on" : "off");
     }
+#endif
     else if (cmd == "beep" && (arg == "yellow" || arg == "red")) {
         Tc001::playBeep(arg == "red" ? BEEP_RED : BEEP_YELLOW);
         Serial.printf("Playing %s signal\n", arg.c_str());

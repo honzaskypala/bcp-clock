@@ -18,7 +18,8 @@ static inline void formatTime(CountdownView& view, long remaining, bool dontDisp
     int seconds = absoluteTime % 60;
 
     if (dontDisplayHours) {
-        // mm:ss
+        // mm:ss, total minutes (a one hour countdown starts at 60:00)
+        minutes = absoluteTime / 60;
         view.hmmss = false;
         view.x = remaining < 0 ? 1 : 5;
         if (remaining < -3599) {
@@ -42,8 +43,8 @@ static inline void formatTime(CountdownView& view, long remaining, bool dontDisp
     }
 }
 
-CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused, uint32_t pausedRemaining,
-                              long yellowThreshold, long redThreshold, bool blinkOn) {
+CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused, long pausedRemaining,
+                              long yellowThreshold, long redThreshold, bool blinkOn, bool startPhase, bool ready) {
     CountdownView view;
     bool dontDisplayHours = timerLength <= 3600;
 
@@ -51,13 +52,15 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
         // timer is paused
         remaining = pausedRemaining;
         view.color = blinkOn ? COUNTDOWN_MAGENTA : COUNTDOWN_BLACK;
+    } else if (ready) {
+        view.color = COUNTDOWN_WHITE;
     } else if (remaining <= redThreshold) {
         // we are below red threshold of the timer
         view.color = COUNTDOWN_RED;
     } else if (remaining <= yellowThreshold) {
         // we are below yellow threshold of the timer
         view.color = COUNTDOWN_YELLOW;
-    } else if (remaining > timerLength || (remaining == timerLength && timerLength <= 3600)) {
+    } else if (startPhase && (remaining > (long) timerLength || (remaining == (long) timerLength && timerLength <= 3600))) {
         // event round not yet started, show time to start
         view.color = COUNTDOWN_GREEN;
         remaining -= timerLength;
@@ -70,6 +73,13 @@ CountdownView formatCountdown(long remaining, uint32_t timerLength, bool paused,
     bool twoDigitHours = timerLength >= 36000 || remaining >= 36000;
     formatTime(view, remaining, dontDisplayHours, twoDigitHours);
     return view;
+}
+
+CountdownView formatCountdown(const CountdownTimer& timer, time_t now, long yellowThreshold, long redThreshold,
+                              bool blinkOn) {
+    long remaining = timer.remainingAt(now);
+    return formatCountdown(remaining, timer.length, timer.phase == TIMER_PAUSED, remaining, yellowThreshold,
+                           redThreshold, blinkOn, timer.startPhase, timer.phase == TIMER_READY);
 }
 
 // ---- Acoustic signals at thresholds ----

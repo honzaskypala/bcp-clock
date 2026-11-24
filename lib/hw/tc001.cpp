@@ -8,7 +8,9 @@
 #include <f4x6.h>
 #include <wifimgr.h>
 #include <config.h>
+#if BCP_MODE_BCP
 #include <bcpevent.h>
+#endif
 #include <countdown.h>
 #include <policy.h>
 #ifdef BCP_DEV
@@ -16,6 +18,7 @@
 #endif
 
 #define PIN_BUZZER          15
+#define PIN_LEFT_BUTTON     26
 #define PIN_MID_BUTTON      27
 #define PIN_RIGHT_BUTTON    14
 #define PIN_LED_MATRIX      32
@@ -36,6 +39,7 @@
 #define SCROLLING_TEXT_SPEED 100 // miliseconds per step
 #define PROGRESS_INDICATOR_SPEED 100 // milliseconds per step
 #define INDICATOR_BLINK_MS 1000      // status indicators: on for this long, then off for this long
+#define MODE_NAME_MS 5000            // a mode name that fits the display is shown this long
 #if BCP_FEATURE_BATTERY
 #define BATTERY_READ_INTERVAL_MS 1000
 #endif
@@ -43,7 +47,6 @@
 constexpr uint32_t BEEP_FREQ = 2000;   // Hz, the buzzer is passive and needs a square wave
 constexpr uint8_t BEEP_CHANNEL = 0;    // LEDC channel (FastLED uses RMT, not LEDC)
 
-constexpr int DEBOUNCE_DELAY_MS = 500;
 constexpr uint32_t PORTAL_TIMEOUT_MS = 5UL * 60UL * 1000UL; // captive portal inactivity timeout, then reboot and retry
 
 CRGB Tc001::matrixleds[256];
@@ -56,7 +59,12 @@ const GFXfont* Tc001::mmssFont = &F4x6;
 unsigned long Tc001::stMillis = 0;
 unsigned long Tc001::piMillis = 0;
 time_t Tc001::countdownDrawnAt = 0;
-long Tc001::lastRemaining = LONG_MIN;
+long Tc001::lastRemaining[MAX_COUNTDOWN_TIMERS] = { LONG_MIN, LONG_MIN };
+CountdownDisplay Tc001::countdown;
+unsigned long Tc001::messageUntil = 0;
+volatile bool Tc001::buttonsEnabled = false;
+static QueueHandle_t buttonQueue = nullptr;  // ButtonEvent from handleEvents to loop(), created in the ctor
+static PressDetector leftButton, midButton, rightButton;  // set in ensureConnection()
 BeepSignal Tc001::beepSignal = BEEP_NONE;
 unsigned long Tc001::beepStartMs = 0;
 bool Tc001::beepToneOn = false;
@@ -82,13 +90,12 @@ public:
     DisplayLock& operator=(const DisplayLock&) = delete;
 };
 
-const CBCPEvent* Tc001::countdownEvent = nullptr;
 ProgressIndicator* Tc001::progressIndicator = nullptr;
 ScrollingText* Tc001::scrollingText = nullptr;
-bool Tc001::midButtonPressed = false;
 
 Tc001::Tc001() {
     pinMode(PIN_BUZZER, INPUT_PULLDOWN);      // stop whistle noise
+    pinMode(PIN_LEFT_BUTTON, INPUT_PULLUP);   // left button
     pinMode(PIN_MID_BUTTON, INPUT_PULLUP);    // mid button
     pinMode(PIN_RIGHT_BUTTON, INPUT_PULLUP);  // right button
     Serial.begin(9600);
@@ -102,6 +109,7 @@ Tc001::Tc001() {
     matrix.setFont((GFXfont *) defaultFont);
 
     displayMutex = xSemaphoreCreateRecursiveMutex();
+    buttonQueue = xQueueCreate(8, sizeof(ButtonEvent));
     xTaskCreatePinnedToCore(
             handleEvents,     // Function to run
             "EventHandler",   // Task name
@@ -123,6 +131,7 @@ void Tc001::stopAnimations() {
     stMillis = 0;
     piMillis = 0;
     countdownDrawnAt = 0;
+    messageUntil = 0;
 }
 
 void Tc001::showSplashScreen(bool showProgress) {
@@ -165,6 +174,41 @@ void Tc001::showConfigServerMsg(const char *msg) {
     showConfigServerMsg(msg, true);
 }
 
+void Tc001::showConfigServerAddress() {
+    showConfigServerMsg("", false);
+}
+
+void Tc001::showModeName(const char *name) {
+    DisplayLock lock;
+    displayState = DISPLAY_MODE_NAME;
+    stopAnimations();
+    matrix.clear();
+    matrix.setTextColor(COLOR_WHITE);
+    int16_t x1, y1;
+    uint16_t w, h;
+    matrix.getTextBounds(name, 0, 7, &x1, &y1, &w, &h);
+    if (w <= matrix.width()) {
+        matrix.setCursor((matrix.width() - w) / 2, 7);
+        matrix.print(name);
+        messageUntil = millis() + MODE_NAME_MS;
+        if (messageUntil == 0) messageUntil = 1;
+    } else {
+        // scrolled once, like the config page address
+        scrollingText = new ScrollingText(&matrix, name, 0, 7, (const GFXfont *) defaultFont, false, COLOR_WHITE, 24, 8, false);
+    }
+    showMatrix();
+}
+
+// Called with the display lock held
+void Tc001::finishMessage() {
+    if (scrollingText) {
+        delete scrollingText;
+        scrollingText = nullptr;
+    }
+    messageUntil = 0;
+    redrawRequested = true;
+}
+
 void Tc001::displayRoundWithCountdown(int currentRound, int totalRounds) {
     const int line = 7;
     const int displayWidth = 32;
@@ -177,6 +221,7 @@ void Tc001::displayRoundWithCountdown(int currentRound, int totalRounds) {
     }
 }
 
+#if BCP_MODE_BCP
 void Tc001::displayEventName(const CBCPEvent& event) {
     DisplayLock lock;
     displayState = DISPLAY_EVENT_NAME;
@@ -202,32 +247,51 @@ void Tc001::displayEventRound(const CBCPEvent& event) {
     showMatrix();
 }
 
-void Tc001::displayCountdown(const CBCPEvent& event) {
+#endif
+
+void Tc001::displayCountdown(const CountdownDisplay& newCountdown) {
     DisplayLock lock;
     stopAnimations();  // also resets countdownDrawnAt, so handleEvents draws the countdown right away
-    countdownEvent = &event;
-    lastRemaining = LONG_MIN;  // the first redraw does not beep (boot or return in the middle of a round)
+    countdown = newCountdown;
+    for (int i = 0; i < MAX_COUNTDOWN_TIMERS; i++) {
+        lastRemaining[i] = LONG_MIN;  // the first redraw does not beep (boot or return in the middle of a round)
+    }
     displayState = DISPLAY_EVENT_COUNTDOWN;
 }
 
-void Tc001::drawCountdown(const CBCPEvent& event) {
+void Tc001::updateCountdown(const CountdownDisplay& newCountdown) {
+    DisplayLock lock;
+    countdown = newCountdown;
+    countdownDrawnAt = 0;  // redraw right away
+}
+
+// Called with the display lock held
+void Tc001::drawCountdown() {
 #ifdef BCP_DEV
     countdownDraws++;
 #endif
     time_t now = time(nullptr);
-    long remaining = event.roundEndEpoch() - now;
-    CountdownView view = formatCountdown(remaining, event.timerLength(), event.isTimerPaused(),
-                                         event.pausedTimeRemaining(), Config.yellowThreshold(),
-                                         Config.redThreshold(), now % 2);
 
-    // the same value formatCountdown compares with the thresholds
-    if (event.isTimerPaused()) remaining = event.pausedTimeRemaining();
-    BeepSignal signal = detectThresholdCrossing(lastRemaining, remaining, Config.yellowThreshold(),
-                                                Config.redThreshold());
-    lastRemaining = remaining;
-    if (signal != BEEP_NONE && Config.isAcousticSignalsEnabled()) {
-        startBeep(signal);
+    // threshold signals of every timer (a chess player may cross a threshold right after the switch)
+    for (int i = 0; i < countdown.count; i++) {
+        const CountdownTimer& timer = countdown.timers[i];
+        if (timer.phase == TIMER_READY) {
+            lastRemaining[i] = LONG_MIN;  // starting does not beep
+            continue;
+        }
+        long remaining = timer.remainingAt(now);
+        BeepSignal signal = detectThresholdCrossing(lastRemaining[i], remaining, countdown.yellowThreshold,
+                                                    countdown.redThreshold);
+        lastRemaining[i] = remaining;
+        if (signal != BEEP_NONE && Config.isAcousticSignalsEnabled()) {
+            startBeep(signal);
+        }
     }
+
+    // one line: the active timer, the first one if none runs
+    int shown = countdown.active >= 0 ? countdown.active : 0;
+    CountdownView view = formatCountdown(countdown.timers[shown], now, countdown.yellowThreshold,
+                                         countdown.redThreshold, now % 2);
     uint16_t color;
     switch (view.color) {
         case COUNTDOWN_YELLOW:  color = COLOR_YELLOW; break;
@@ -243,7 +307,9 @@ void Tc001::drawCountdown(const CBCPEvent& event) {
     matrix.clear();
     matrix.setCursor(view.x, 6);
     matrix.print(view.text);
-    displayRoundWithCountdown(event.currentRound(), event.numberOfRounds());
+    if (countdown.numberOfRounds > 0) {
+        displayRoundWithCountdown(countdown.currentRound, countdown.numberOfRounds);
+    }
     showMatrix();
     matrix.setFont((GFXfont *) defaultFont);
 }
@@ -581,6 +647,41 @@ void Tc001::printBattery(Print& out) {
 #endif  // BCP_FEATURE_BATTERY
 #endif
 
+// ---- Buttons ----
+
+void Tc001::queueButton(ButtonEvent event) {
+    xQueueSend(buttonQueue, &event, 0);  // dropped when full
+}
+
+#ifdef BCP_DEV
+void Tc001::simulateButton(ButtonEvent event) {
+    queueButton(event);
+}
+#endif
+
+// Called from handleEvents every 10 ms
+void Tc001::stepButtons() {
+    if (!buttonsEnabled) return;
+    unsigned long now = millis();
+    if (leftButton.update(digitalRead(PIN_LEFT_BUTTON) == LOW, now) == PRESS_DOWN) queueButton(BUTTON_LEFT);
+    if (rightButton.update(digitalRead(PIN_RIGHT_BUTTON) == LOW, now) == PRESS_DOWN) queueButton(BUTTON_RIGHT);
+    switch (midButton.update(digitalRead(PIN_MID_BUTTON) == LOW, now)) {
+        case PRESS_SHORT: queueButton(BUTTON_MID_SHORT); break;
+        case PRESS_LONG:  queueButton(BUTTON_MID_LONG); break;
+        default: break;
+    }
+}
+
+ButtonEvent Tc001::nextButtonEvent() {
+    ButtonEvent event;
+    if (xQueueReceive(buttonQueue, &event, 0) != pdTRUE) return BUTTON_NONE;
+    DisplayLock lock;
+    if (isMessageShown(displayState) && (scrollingText || messageUntil != 0)) {
+        finishMessage();  // any button ends the mode name or the config page address
+    }
+    return event;
+}
+
 bool Tc001::ensureConnection() {
     bool enforcePortal = digitalRead(PIN_MID_BUTTON) == LOW;   // if mid button pressed, enforce portal with no timeout
 #ifdef BCP_DEV
@@ -589,24 +690,13 @@ bool Tc001::ensureConnection() {
 #endif
     bool retValue = WifiMgr.connect(enforcePortal, enforcePortal ? 0 : PORTAL_TIMEOUT_MS, this);
     if (retValue) {
-        attachInterrupt(PIN_MID_BUTTON, []() { midButtonPressed = true; }, FALLING);
-        attachInterrupt(PIN_RIGHT_BUTTON, []() { enforceUpdate = true; }, FALLING);
+        // a button still held (Mid for the portal) counts only after its release
+        leftButton = PressDetector(digitalRead(PIN_LEFT_BUTTON) == LOW);
+        midButton = PressDetector(digitalRead(PIN_MID_BUTTON) == LOW);
+        rightButton = PressDetector(digitalRead(PIN_RIGHT_BUTTON) == LOW);
+        buttonsEnabled = true;
     }
     return retValue;
-}
-
-// Mid button pressed (debounced): start the config server and show its address
-void Tc001::handleMidButton() {
-    if (!midButtonPressed) return;
-    static unsigned long lastPress = millis();
-    unsigned long now = millis();
-    if (now - lastPress < DEBOUNCE_DELAY_MS) return;
-    lastPress = now;
-    midButtonPressed = false;
-    DisplayLock lock;
-    stopAnimations();
-    Config.startConfigServer();
-    showConfigServerMsg("", false);
 }
 
 // Advances the animations and the countdown that are due, returns true if the matrix needs to be shown.
@@ -614,11 +704,12 @@ void Tc001::handleMidButton() {
 bool Tc001::stepAnimations() {
     bool showMatrix = false;
 
-    if (displayState == DISPLAY_CONFIG_MESSAGE && scrollingText && !scrollingText->isActive) {
-        // config page address scrolled once, let main redraw the event data
-        delete scrollingText;
-        scrollingText = nullptr;
-        redrawRequested = true;
+    if (isMessageShown(displayState) && scrollingText && !scrollingText->isActive) {
+        // config page address or mode name scrolled once, let the mode redraw its content
+        finishMessage();
+    }
+    if (displayState == DISPLAY_MODE_NAME && messageUntil != 0 && (long) (millis() - messageUntil) >= 0) {
+        finishMessage();
     }
 
     if (scrollingText && scrollingText->isActive && (stMillis == 0 || millis() - stMillis > SCROLLING_TEXT_SPEED)) {
@@ -634,9 +725,9 @@ bool Tc001::stepAnimations() {
     }
 
     // redraw the countdown once per second, right after the second changes
-    if (displayState == DISPLAY_EVENT_COUNTDOWN && countdownEvent && time(nullptr) != countdownDrawnAt) {
+    if (displayState == DISPLAY_EVENT_COUNTDOWN && time(nullptr) != countdownDrawnAt) {
         countdownDrawnAt = time(nullptr);
-        drawCountdown(*countdownEvent);
+        drawCountdown();
         showMatrix = true;
     }
 
@@ -650,7 +741,7 @@ bool Tc001::stepAnimations() {
 
 void Tc001::handleEvents(void * parameter) {
     while (true) {
-        handleMidButton();
+        stepButtons();
 
         if (Config.isConfigServerRunning()) {
             Config.handleClient();

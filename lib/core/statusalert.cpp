@@ -7,7 +7,7 @@
 // ---- Alert icon cycle ----
 
 int alertCyclePhase(int iconCount, unsigned long ms, DisplayState state) {
-    if (iconCount <= 0 || state == DISPLAY_CONFIG_MESSAGE) return 0;
+    if (iconCount <= 0 || isMessageShown(state)) return 0;
     return (ms / ALERT_PHASE_MS) % (iconCount + 1);
 }
 

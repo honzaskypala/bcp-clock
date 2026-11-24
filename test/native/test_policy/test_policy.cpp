@@ -98,6 +98,14 @@ static void test_configMessage_waitsForRedrawRequest() {
     TEST_ASSERT_EQUAL(SHOW_COUNTDOWN, decideDisplay(in, m).action);
 }
 
+static void test_modeName_waitsForRedrawRequest() {
+    DisplayMemory m;
+    DisplayInputs in = validEvent(DISPLAY_MODE_NAME, true, false, 9000);
+    TEST_ASSERT_EQUAL(SHOW_NOTHING_NEW, decideDisplay(in, m).action);
+    in.redrawRequested = true;
+    TEST_ASSERT_EQUAL(SHOW_COUNTDOWN, decideDisplay(in, m).action);
+}
+
 // ---- decideRefresh ----
 
 static const int MAX_FAILURES = 5;
@@ -187,6 +195,7 @@ int main() {
     RUN_TEST(test_unverifiedId_splashUnlessBoot);
     RUN_TEST(test_invalidId_configRequiredOnce_thenValidRestartsServer);
     RUN_TEST(test_configMessage_waitsForRedrawRequest);
+    RUN_TEST(test_modeName_waitsForRedrawRequest);
     RUN_TEST(test_refresh_success_resetsCount);
     RUN_TEST(test_refresh_wifiDown_countsTowardReboot);
     RUN_TEST(test_refresh_wifiDownAndConnectionErrors_shareCount);

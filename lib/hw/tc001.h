@@ -39,13 +39,20 @@ public:
     virtual void showSplashScreen(bool showProgress = true) override;
     virtual bool ensureConnection() override;
 
+    virtual ButtonEvent nextButtonEvent() override;
+
+#if BCP_MODE_BCP
     virtual void displayEventName(const CBCPEvent& event) override;
     virtual void displayEventRound(const CBCPEvent& event) override;
-    virtual void displayCountdown(const CBCPEvent& event) override;
+#endif
+    virtual void displayCountdown(const CountdownDisplay& countdown) override;
+    virtual void updateCountdown(const CountdownDisplay& countdown) override;
 
     static void handleEvents(void * parameter);
 
+    virtual void showModeName(const char *name) override;
     virtual void showConfigServerMsg(const char *msg) override;
+    virtual void showConfigServerAddress() override;
 
 #if BCP_FEATURE_CONNECTION_MONITOR
     virtual void setConnectionAlert(ConnectionProblem problem, bool showIcon) override;
@@ -56,7 +63,7 @@ public:
 #ifdef BCP_DEV
 // ---- Development helpers (dev build only) ----
 public:
-    static void simulateMidButton() { midButtonPressed = true; }
+    static void simulateButton(ButtonEvent event);  // as if the button was pressed
     static void dumpScreen(Print& out);
     static uint32_t countdownDraws;  // number of countdown redraws since boot
     static void playBeep(BeepSignal signal) { beepRequest = signal; }  // played by handleEvents
@@ -92,15 +99,21 @@ private:
     static time_t countdownDrawnAt;  // time(nullptr) of the last countdown redraw, 0 = redraw now
     static void stopAnimations();
 
-    static bool midButtonPressed;
-    static void handleMidButton();
-    static bool stepAnimations();
+    // ---- Buttons ----
+    // Polled by handleEvents (debounced, short / long Mid press), passed to loop() through a queue
+    static volatile bool buttonsEnabled;     // after the WiFi connection (Mid held at power-on = portal)
+    static void stepButtons();
+    static void queueButton(ButtonEvent event);
+    static void finishMessage();             // ends the mode name / config page address, requests a redraw
 
-    static const CBCPEvent *countdownEvent;  // event drawn by handleEvents in DISPLAY_EVENT_COUNTDOWN
-    static void drawCountdown(const CBCPEvent& event);
+    static bool stepAnimations();
+    static unsigned long messageUntil;       // millis() when the static mode name ends, 0 = none
+
+    static CountdownDisplay countdown;       // drawn by handleEvents in DISPLAY_EVENT_COUNTDOWN
+    static void drawCountdown();
     static void displayRoundWithCountdown(int currentRound, int totalRounds);
 
-    static long lastRemaining;              // remaining seconds at the last countdown redraw, LONG_MIN = none
+    static long lastRemaining[MAX_COUNTDOWN_TIMERS];  // remaining seconds at the last redraw, LONG_MIN = none
     static BeepSignal beepSignal;           // signal being played, BEEP_NONE = buzzer idle
     static unsigned long beepStartMs;
     static bool beepToneOn;

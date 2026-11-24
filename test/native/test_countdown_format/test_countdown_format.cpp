@@ -156,10 +156,11 @@ static void test_invariants_fontCharsAndHours() {
 
 // Documents a known limitation: a paused timer of a round <= 1 h with more than 1 h remaining
 // loses the hours (mm:ss font). BCP never reports more paused time than the timer length.
-static void test_knownLimitation_pausedOverOneHourInShortRound() {
+// mm:ss shows total minutes, up to 99:59
+static void test_pausedOverOneHourInShortRound_totalMinutes() {
     CountdownView v = formatCountdown(0, 600, true, 4000, YELLOW, RED, true);
     TEST_ASSERT_FALSE(v.hmmss);
-    TEST_ASSERT_EQUAL_STRING("06:40", v.text);
+    TEST_ASSERT_EQUAL_STRING("66:40", v.text);
 }
 
 // ---- Acoustic signals ----
@@ -226,6 +227,55 @@ static void test_beepPattern_none() {
     TEST_ASSERT_FALSE(isBeepOn(BEEP_NONE, 0));
 }
 
+// ---- CountdownTimer (offline countdown, chess clock, BCP) ----
+
+static CountdownTimer timer(TimerPhase phase, long remaining, uint32_t length) {
+    CountdownTimer t;
+    t.phase = phase;
+    t.length = length;
+    t.endEpoch = 1000 + remaining;   // now = 1000
+    t.remaining = remaining;
+    return t;
+}
+
+static void test_timer_ready_whiteWithoutThresholds() {
+    assertView("60:00", COUNTDOWN_WHITE, false, 5, formatCountdown(timer(TIMER_READY, 3600, 3600), 1000, YELLOW, RED, false));
+    // a ready countdown below the yellow threshold is still white
+    assertView("05:00", COUNTDOWN_WHITE, false, 5, formatCountdown(timer(TIMER_READY, 300, 300), 1000, YELLOW, RED, false));
+}
+
+static void test_timer_runningAtFullLength_noTimeToStart() {
+    // without startPhase the full length is the running countdown, not "00:00" in green
+    assertView("60:00", COUNTDOWN_WHITE, false, 5, formatCountdown(timer(TIMER_RUNNING, 3600, 3600), 1000, YELLOW, RED, false));
+    assertView("1:30:00", COUNTDOWN_WHITE, true, 3, formatCountdown(timer(TIMER_RUNNING, 5400, 5400), 1000, YELLOW, RED, false));
+}
+
+static void test_timer_running_thresholdsAndOverTime() {
+    assertView("10:00", COUNTDOWN_YELLOW, false, 5, formatCountdown(timer(TIMER_RUNNING, 600, 3600), 1000, YELLOW, RED, false));
+    assertView("-00:30", COUNTDOWN_RED, false, 1, formatCountdown(timer(TIMER_RUNNING, -30, 3600), 1000, YELLOW, RED, false));
+}
+
+static void test_timer_paused_blinks_alsoOverTime() {
+    assertView("20:00", COUNTDOWN_MAGENTA, false, 5, formatCountdown(timer(TIMER_PAUSED, 1200, 3600), 1000, YELLOW, RED, true));
+    assertView("20:00", COUNTDOWN_BLACK, false, 5, formatCountdown(timer(TIMER_PAUSED, 1200, 3600), 1000, YELLOW, RED, false));
+    // paused in over time keeps the sign (the BCP pause value was unsigned)
+    assertView("-00:30", COUNTDOWN_MAGENTA, false, 1, formatCountdown(timer(TIMER_PAUSED, -30, 3600), 1000, YELLOW, RED, true));
+}
+
+static void test_timer_startPhase_bcpTimeToStart() {
+    CountdownTimer t = timer(TIMER_RUNNING, 3600 + 120, 3600);
+    t.startPhase = true;
+    assertView("02:00", COUNTDOWN_GREEN, false, 5, formatCountdown(t, 1000, YELLOW, RED, false));
+}
+
+static void test_timer_remainingAt() {
+    CountdownTimer t = timer(TIMER_RUNNING, 100, 3600);
+    TEST_ASSERT_EQUAL(100, t.remainingAt(1000));
+    TEST_ASSERT_EQUAL(40, t.remainingAt(1060));
+    t.phase = TIMER_PAUSED;
+    TEST_ASSERT_EQUAL(100, t.remainingAt(5000));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_running_shortRound_mmss);
@@ -244,7 +294,7 @@ int main() {
     RUN_TEST(test_paused_precedesThresholds);
     RUN_TEST(test_paused_longRound_hmmss);
     RUN_TEST(test_invariants_fontCharsAndHours);
-    RUN_TEST(test_knownLimitation_pausedOverOneHourInShortRound);
+    RUN_TEST(test_pausedOverOneHourInShortRound_totalMinutes);
     RUN_TEST(test_crossing_yellowAtThreshold);
     RUN_TEST(test_crossing_redAtThreshold);
     RUN_TEST(test_crossing_skippedSecond);
@@ -256,5 +306,11 @@ int main() {
     RUN_TEST(test_beepPattern_yellow);
     RUN_TEST(test_beepPattern_red);
     RUN_TEST(test_beepPattern_none);
+    RUN_TEST(test_timer_ready_whiteWithoutThresholds);
+    RUN_TEST(test_timer_runningAtFullLength_noTimeToStart);
+    RUN_TEST(test_timer_running_thresholdsAndOverTime);
+    RUN_TEST(test_timer_paused_blinks_alsoOverTime);
+    RUN_TEST(test_timer_startPhase_bcpTimeToStart);
+    RUN_TEST(test_timer_remainingAt);
     return UNITY_END();
 }
