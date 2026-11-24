@@ -107,6 +107,9 @@ private:
     unsigned long _serverStartMs;   // millis() when server started/reset
     unsigned long _serverTimeoutMs; // 0 = no timeout
 
+    // Start/stop run in loop(), handleClient() in the Tc001 event task (same core, they preempt each other)
+    SemaphoreHandle_t serverMutex_;
+
     // ---- Helpers ----
     bool ensureNvsReady();
 };

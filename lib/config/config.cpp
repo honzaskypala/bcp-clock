@@ -77,6 +77,8 @@ ConfigValues readConfig(Preferences& prefs) {
 // ---- Constructor: load configuration from persistent storage ----
 
 CConfig::CConfig() {
+    serverMutex_ = xSemaphoreCreateRecursiveMutex();
+
     // Default configuration values
     event_ = DEF_EVENT;
     yellow_ = DEF_YELLOW;
@@ -224,7 +226,19 @@ void CConfig::erase() {
 
 // ---- Configuration HTTP server ----
 
+// Holds the server mutex for the scope: the event task must not see a half started or stopped server
+class ServerLock {
+public:
+    explicit ServerLock(SemaphoreHandle_t mutex) : mutex_(mutex) { xSemaphoreTakeRecursive(mutex_, portMAX_DELAY); }
+    ~ServerLock() { xSemaphoreGiveRecursive(mutex_); }
+    ServerLock(const ServerLock&) = delete;
+    ServerLock& operator=(const ServerLock&) = delete;
+private:
+    SemaphoreHandle_t mutex_;
+};
+
 void CConfig::startConfigServer(unsigned long timeoutMs) {
+    ServerLock lock(serverMutex_);
     // If already running, just update timeout and reset the start time
     if (configServer != nullptr) {
         _serverTimeoutMs = timeoutMs;      // 0 => no timeout
@@ -268,6 +282,7 @@ void CConfig::startConfigServer(unsigned long timeoutMs) {
 }
 
 void CConfig::stopConfigServer() {
+    ServerLock lock(serverMutex_);
     if (configServer == nullptr) return;
 #if BCP_FEATURE_MDNS
     MDNS.end();
@@ -290,6 +305,7 @@ void CConfig::startMdns() {
 #endif
 
 void CConfig::handleClient() {
+    ServerLock lock(serverMutex_);
     if (configServer == nullptr) return;
     configServer->handleClient();
     // Stop server after timeout, if configured
