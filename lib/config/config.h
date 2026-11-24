@@ -22,6 +22,9 @@ struct ConfigValues {
 #if BCP_MODE_CHESS
     long chess;         // seconds, chess clock round (both players)
 #endif
+#if BCP_FEATURE_BRIGHTNESS
+    uint8_t brightness; // percent, 10..100 step 10
+#endif
 };
 
 // Reads the configuration from an opened Preferences namespace, defaults for missing keys
@@ -41,6 +44,9 @@ public:
 #endif
 #if BCP_MODE_CHESS
     long chessLength() const { return chess_; }  // whole round, each player has half
+#endif
+#if BCP_FEATURE_BRIGHTNESS
+    uint8_t brightness() const { return brightness_; }  // display brightness in percent
 #endif
 
     // ---- State saved outside the config page ----
@@ -77,6 +83,9 @@ private:
 #endif
 #if BCP_MODE_CHESS
     long chess_;
+#endif
+#if BCP_FEATURE_BRIGHTNESS
+    uint8_t brightness_;
 #endif
     void savePreferences();
     

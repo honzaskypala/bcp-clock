@@ -132,7 +132,7 @@ current round highlighted in blue.
 Low battery: about 30 minutes before the battery runs out, the top-left LED blinks red. About 10 minutes
 before, the display alternates every 5 seconds between the normal content and a red empty battery icon;
 plug in the USB cable. The time is estimated from the battery voltage, so it is approximate. A full
-battery lasts about 2 hours with a countdown on the display.
+battery lasts about 2 to 4 hours with a countdown on the display, depending on the display brightness.
 
 Connection problems: the top-left LED (below the battery one, if that is blinking too) blinks amber when the
 clock lost WiFi, or magenta when WiFi works but Best Coast Pairings does not respond correctly. Meanwhile the
@@ -150,7 +150,7 @@ Detailed hardware documentation is available at
 [rroels/ulanzi_tc001_hardware](https://github.com/rroels/ulanzi_tc001_hardware).
 
 > [!NOTE]
-> The built-in battery lasts about 2 hours with a countdown on the display (measured). For all-day tournaments, connect the clock to a
+> The built-in battery lasts about 2 to 4 hours with a countdown on the display, depending on the display brightness. For all-day tournaments, connect the clock to a
 > power bank or a USB power adapter.
 
 ### Buttons
@@ -284,6 +284,7 @@ The configuration page is available at `http://<IP of the clock>`, or at `http:/
 | Offline mode: Round | Length of the offline mode countdown, as `h:mm:ss` or `m:ss` | `1:00:00` |
 | Chess clock: Round | Length of the whole round, both players together (each gets half), as `h:mm:ss` or `m:ss` | `1:00:00` |
 | Acoustic signals | Beep when the countdown reaches a threshold: one long beep at yellow, three long beeps at red | on |
+| Brightness | Brightness of the display, 10 to 100 %. A lower brightness makes the battery last longer. | 100 % |
 | Hostname | Device name in the network: shown in the router's client list and used for the `.local` address of the configuration page. Letters, digits and hyphens, up to 32 characters. A change of the router name applies at the next WiFi connection. | `BCP-clock` |
 
 The same page lists the **stored WiFi networks**, where you can delete individual networks or all of
@@ -360,7 +361,7 @@ connected, the commit is stopped; `SKIP_DEVICE_TESTS=1 git commit` skips them. T
 
 Planned features and known tasks are tracked in [TODO.md](TODO.md). Highlights:
 
-- configurable display brightness
+- support for the Ulanzi TC002 (larger display, both chess clock players at once)
 
 ## History
 

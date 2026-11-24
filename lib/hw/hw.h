@@ -52,5 +52,10 @@ public:
     // Connection problem after the last data refresh: blinking status indicator, icon if showIcon
     virtual void setConnectionAlert(ConnectionProblem problem, bool showIcon) {};
 
+#if BCP_FEATURE_BRIGHTNESS
+    // Display brightness in percent (10..100), applies at once
+    virtual void setBrightness(uint8_t percent) {}
+#endif
+
     virtual void reboot() = 0;
 };

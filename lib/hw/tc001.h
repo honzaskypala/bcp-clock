@@ -58,6 +58,9 @@ public:
 #if BCP_FEATURE_CONNECTION_MONITOR
     virtual void setConnectionAlert(ConnectionProblem problem, bool showIcon) override;
 #endif
+#if BCP_FEATURE_BRIGHTNESS
+    virtual void setBrightness(uint8_t percent) override;
+#endif
 
     virtual void reboot() override;
 

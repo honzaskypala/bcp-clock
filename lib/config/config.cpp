@@ -13,6 +13,9 @@
 #endif
 #include <webui.h>
 #include <textutil.h>
+#if BCP_FEATURE_BRIGHTNESS
+#include <brightness.h>
+#endif
 #include <devlog.h>
 
 #define CONFIG_DEBUG(msg) DEV_LOG("Config", msg)
@@ -35,6 +38,9 @@ static const long DEF_OFFLINE = 3600; // seconds
 static const long DEF_CHESS = 3600;   // seconds, both players
 #endif
 static constexpr const char* STATE_NS = "state";
+#if BCP_FEATURE_BRIGHTNESS
+static const uint8_t DEF_BRIGHT = BRIGHTNESS_MAX;   // percent
+#endif
 static constexpr const char* CONFIG_NS = "config";
 // ---- Read configuration values from an opened Preferences namespace ----
 
@@ -62,6 +68,9 @@ ConfigValues readConfig(Preferences& prefs) {
 #if BCP_MODE_CHESS
     v.chess = prefs.getLong("chess", DEF_CHESS);
 #endif
+#if BCP_FEATURE_BRIGHTNESS
+    v.brightness = normalizeBrightness(prefs.getUChar("bright", DEF_BRIGHT));
+#endif
     return v;
 }
 
@@ -80,6 +89,9 @@ CConfig::CConfig() {
 #endif
 #if BCP_MODE_CHESS
     chess_ = DEF_CHESS;
+#endif
+#if BCP_FEATURE_BRIGHTNESS
+    brightness_ = DEF_BRIGHT;
 #endif
 
     // Load configuration from persistent storage if available
@@ -104,6 +116,9 @@ CConfig::CConfig() {
 #endif
 #if BCP_MODE_CHESS
     chess_    = v.chess;
+#endif
+#if BCP_FEATURE_BRIGHTNESS
+    brightness_ = v.brightness;
 #endif
     prefs.end();
     CONFIG_DEBUG("Preferences loaded");
@@ -132,6 +147,9 @@ void CConfig::savePreferences() {
 #endif
 #if BCP_MODE_CHESS
     prefs.putLong("chess", chess_);
+#endif
+#if BCP_FEATURE_BRIGHTNESS
+    prefs.putUChar("bright", brightness_);
 #endif
     prefs.end();
     CONFIG_DEBUG("Preferences saved");
@@ -198,6 +216,9 @@ void CConfig::erase() {
 #endif
 #if BCP_MODE_CHESS
     chess_ = DEF_CHESS;
+#endif
+#if BCP_FEATURE_BRIGHTNESS
+    brightness_ = DEF_BRIGHT;
 #endif
 }
 
@@ -287,6 +308,9 @@ static const char CONFIG_PAGE_CSS[] =
     ".row.check{gap:8px}"
     ".row.check label{flex:0 1 auto}"
     ".input-wrapper{position:relative;flex:1 1 auto}"
+#if BCP_FEATURE_BRIGHTNESS
+    "input[type=range]{flex:1 1 auto}"
+#endif
     ".clear-text{display:none}"
     "@media (pointer:coarse){"
         ".input-wrapper input{padding-right:2.5rem}"
@@ -371,6 +395,16 @@ void CConfig::appendConfigFormHtml(String& html) {
                 "<input type='text' id='chess' name='chess' value='" + secondsToTime(chess_) + "'>"
             "</div>";
 #endif
+#if BCP_FEATURE_BRIGHTNESS
+    String bright(brightness_);
+    html += WebUI::buildSectionHeader("Display");
+    html += "<div class='row'>"
+                "<label for='brightness'>Brightness:</label>"
+                "<input type='range' id='brightness' name='brightness' min='10' max='100' step='10' value='" + bright +
+                    "' oninput='bv.value=value+\" %\"'>"
+                "<output id='bv'>" + bright + " %</output>"
+            "</div>";
+#endif
 #if BCP_FEATURE_WIFIMGR
     html += WebUI::buildSectionHeader("Network");
     html += "<div class='row'>"
@@ -406,6 +440,11 @@ void CConfig::handleConfigPost() {
     if (configServer->hasArg("chess")) {
         long chess = timeToSeconds(configServer->arg("chess"));
         if (chess > 1) chess_ = chess;  // keep the previous length on an invalid value
+    }
+#endif
+#if BCP_FEATURE_BRIGHTNESS
+    if (configServer->hasArg("brightness")) {
+        brightness_ = normalizeBrightness(configServer->arg("brightness").toInt());
     }
 #endif
     if (configServer->hasArg("hostname")) {

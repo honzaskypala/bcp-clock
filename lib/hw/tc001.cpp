@@ -18,6 +18,9 @@
 #endif
 #include <countdown.h>
 #include <policy.h>
+#if BCP_FEATURE_BRIGHTNESS
+#include <brightness.h>
+#endif
 #ifdef BCP_DEV
 #include <Preferences.h>
 #endif
@@ -522,6 +525,16 @@ void Tc001::setConnectionAlert(ConnectionProblem problem, bool showIcon) {
     indicatorActive[INDICATOR_BCP] = problem == CONNECTION_BCP;
     iconActive[ICON_WIFI] = showIcon && problem == CONNECTION_WIFI;
     iconActive[ICON_BCP] = showIcon && problem == CONNECTION_BCP;
+}
+#endif
+
+#if BCP_FEATURE_BRIGHTNESS
+// ---- Brightness ----
+
+void Tc001::setBrightness(uint8_t percent) {
+    DisplayLock lock;
+    matrix.setBrightness(brightnessLevel(percent));   // FastLED scales the LEDs at every show
+    showMatrix();
 }
 #endif
 

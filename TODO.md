@@ -6,7 +6,6 @@
 - [ ] bliking every 0.5 sec instead of 1 sec
 - [ ] blink red (over time) always
 - [ ] blink green (time to start) last 2 minutes
-- [ ] display brightness configurable
 - [ ] show finished tables + config top / bottom / none
 
 ## TC002 support (see docs/tc002.md)
@@ -39,6 +38,7 @@ Requirements: stock firmware and its apps stay, BCP Clock is an extra app; every
 ## General
 
 ## Done
+- [x] [Config] [Feature] Display brightness 10–100 % (step 10, default 100 %) on the config page (section Display, range slider), NVS `config/bright`, applied at startup and after a save (`Hw::setBrightness`, FastLED brightness); build feature `BCP_FEATURE_BRIGHTNESS` (+1 KB flash in `tc001`); `lib/core/brightness` with native tests
 - [x] [Main] [Feature] Chess clock (feature `BCP_MODE_CHESS`): round length on the config page (default 1:00:00), half per player; Right = left player on turn (blue bar at the left), Left = right player (bar at the right), short Mid = pause / reset / next mode; thresholds halved, beeps per player; TC001 shows the player on turn, `CountdownDisplay` carries both (TC002 can show both); a time touching the bar (hh:mm:ss) moves one pixel; state in NVS (`state/chess`), runs on while the clock is off; logic in `lib/core/chessclock` (two `ManualTimer`s)
 - [x] [Main] [Feature] Offline mode (feature `BCP_MODE_OFFLINE`): countdown of a length set on the config page (default 1:00:00), Right = start / resume, short Mid = pause / next mode, Left = reset when stopped; same colours, thresholds and beeps as BCP, no round indicator, no connection monitoring; computed from the end time and saved in NVS (`state/offline`), so it runs on while the clock is off; logic in `lib/core/manualtimer`; boot without WiFi in a mode that does not need it (stored networks only, then time from the RTC), short Mid leaves the portal of BCP mode to offline mode, long Mid without WiFi shows `No WiFi`; durations accept h:mm:ss (`1:00:00`, also the thresholds; signed values fixed); countdown without round indicator one row lower; a finished scrolling text no longer ends the next message; new build config `tc001-offline` (no WiFi, ~370 KB)
 - [x] [Main] [Feature] Modes: `Mode` interface (`src/mode.h`), the former main loop is BCP mode (`src/bcpmode.*`, feature `BCP_MODE_BCP`); short Mid = next mode, long Mid (1 s, without waiting for the release) = config page; mode name in f3x5 for 5 s or scrolled once, any button ends it (also the config page address); last mode stored in NVS (`config/mode`); buttons polled in handleEvents (`lib/core/buttons`, 30 ms debounce, queue to loop), Left button read; countdown passed to the Hw as a `CountdownDisplay` copy; mm:ss shows total minutes (a one hour countdown starts at 60:00); dev console `left`, `right`, `mid`, `midlong`

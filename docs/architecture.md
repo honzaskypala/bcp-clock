@@ -83,7 +83,9 @@ redrawing what is already shown.
   raw thresholds measured by one discharge (2026-11-24, full brightness, white countdown: 2514 after
   unplugging, off at 2256 after 112 min, ~2700 when charging): LOW < 2321 (~30 min left), CRITICAL < 2288
   (~10 min left), a level is left 10 above its threshold (hysteresis). Fewer lit LEDs = less voltage sag, so
-  the time left is approximate (+-5 min). Recalibrate with the dev console `battlog`.
+  the time left is approximate (+-5 min). Recalibrate with the dev console `battlog`. The thresholds were
+  calibrated at full brightness: at a lower brightness (`BCP_FEATURE_BRIGHTNESS`) the voltage sags less, so the low
+  battery warning comes earlier than the stated time left.
 - CRITICAL: the 15x7 battery icon joins the icon cycle.
 - Connection: after each data refresh `main.cpp` updates `ConnectionAlert` (`nextConnectionAlert`) and passes it
   to `Hw::setConnectionAlert()`. A failed refresh with WiFi disconnected = WiFi problem (amber pixel; 25x8 icon: amber WiFi symbol crossed out
@@ -120,7 +122,8 @@ connects or NTP fails) → `BCPEvent.setID(Config.eventId())`. An invalid/empty 
 server with no timeout and scrolls "Config page http://<IP>".
 
 ## Persistent storage (NVS / Preferences)
-- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`, `mode` (uchar `ModeId` of the last mode, saved at each switch), `offline` (long seconds, offline mode length), `chess` (long seconds, chess clock round, both players).
+- Namespace `config`: `event` (string, ID or URL as entered), `yellow`, `red` (long seconds; legacy string `m:ss` is still read), `beep` (bool, acoustic signals, default on), `hostname`, `mode` (uchar `ModeId` of the last mode, saved at each switch), `offline` (long seconds, offline mode length), `chess` (long seconds, chess clock round, both players),
+  `bright` (uchar display brightness in percent, 10..100 step 10, default 100; `BCP_FEATURE_BRIGHTNESS`).
 - Namespace `state`: plain data of the modes (`Config.loadState()` / `saveState()`, ignored when the size differs):
   `offline` (`ManualTimer`), `chess` (`ChessClock`).
 - Namespace `wificreds`: `__ssids` (newline-separated list), `pwd_<fnv1a32(ssid) hex>` per network.

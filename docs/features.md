@@ -36,6 +36,7 @@ A build of BCP-clock contains a chosen set of features. The choice is a **build 
 | `BCP_FEATURE_CONNECTION_MONITOR` | WiFi / BCP status pixels and icons, reboot after 5 consecutive failed refreshes, dev console connection status | `BCP_MODE_BCP` |
 | `BCP_MODE_OFFLINE` | Offline mode (`src/offlinemode.*`): round length on the config page, state in NVS `state/offline`, dev console `offline` status line | – |
 | `BCP_MODE_CHESS` | Chess clock (`src/chessmode.*`): round length on the config page, state in NVS `state/chess`, dev console `chess` status line | – |
+| `BCP_FEATURE_BRIGHTNESS` | Display brightness 10–100 % (step 10) on the config page (section Display), stored in NVS (`config/bright`), applied at startup and after a save | – |
 | `BCP_MODE_BCP` | BCP mode (`src/bcpmode.*`, `lib/bcp`): event field on the config page, event name / round / countdown with the round indicator, dev console `refresh`, `fake`, `bcpfail`, `wififail` and the event status | `WIFIMGR` |
 
 A build needs at least one mode (`BCP_MODE_*`), the build fails otherwise. Modes are switched by a short press of

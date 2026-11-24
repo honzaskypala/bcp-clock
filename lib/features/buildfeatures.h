@@ -9,8 +9,8 @@
 #pragma once
 
 #if !defined(BCP_FEATURE_WIFIMGR) || !defined(BCP_FEATURE_MDNS) || !defined(BCP_FEATURE_BATTERY) || \
-    !defined(BCP_FEATURE_CONNECTION_MONITOR) || !defined(BCP_MODE_BCP) || !defined(BCP_MODE_OFFLINE) || \
-    !defined(BCP_MODE_CHESS)
+    !defined(BCP_FEATURE_CONNECTION_MONITOR) || !defined(BCP_FEATURE_BRIGHTNESS) || !defined(BCP_MODE_BCP) || \
+    !defined(BCP_MODE_OFFLINE) || !defined(BCP_MODE_CHESS)
 #error "Build feature not defined, build with an env from configs/*.ini (see docs/features.md)"
 #endif
 

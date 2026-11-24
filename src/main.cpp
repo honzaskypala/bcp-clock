@@ -137,6 +137,9 @@ static void handleConfigUpdate() {
 #if BCP_FEATURE_WIFIMGR
     WiFi.setHostname(Config.hostname().c_str());   // DHCP hostname applies at the next WiFi connection
 #endif
+#if BCP_FEATURE_BRIGHTNESS
+    hw->setBrightness(Config.brightness());
+#endif
     modes[currentMode]->onConfigUpdated(*hw);
 }
 
@@ -144,6 +147,9 @@ static void handleConfigUpdate() {
 
 void setup() {
     hw = &Tc001::getInstance();
+#if BCP_FEATURE_BRIGHTNESS
+    hw->setBrightness(Config.brightness());
+#endif
     hw->showSplashScreen();
 #if BCP_FEATURE_WIFIMGR
     WiFi.setHostname(Config.hostname().c_str());   // must be set before WiFi starts
